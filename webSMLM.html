@@ -21,7 +21,7 @@
   edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2403   PARAMS registry, single source of truth for params;
+    params          2476   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,12 +30,18 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3120   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3226   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3419   synthetic stack generator ("Simulate movie")
-    detect          4297   per-frame band-pass + local-maxima detection
-    fit             4574   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    simulation      3525   synthetic stack generator ("Simulate movie");
+                           Zernike-aberrated PSF kernel (Phase 1: build +
+                           raw-panel z-scrollable preview only, not yet wired
+                           into generateSynthetic()'s emitter render loop —
+                           see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md);
+                           buildPsfKernelStack()/getOrBuildPsfKernelStack()
+                           (cached), PSF_ZERNIKE_PRESETS, Preview PSF button
+    detect          4616   per-frame band-pass + local-maxima detection
+    fit             4893   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -45,7 +51,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          5083   accumulate to offscreen buffer; view/colour/blur;
+    render          5402   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -67,20 +73,20 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         6365   frame-parallel detect/fit worker pool; dedicated
+    workers         6687   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
                            fit pool — never shares it, see that code's own
                            comment for why)
-    export          6671   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  6963   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          6993   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  7285   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           7380   AIM drift correction (2D+z); drift-vs-frame or
+    drift           7702   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -90,16 +96,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    7886   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    8208   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           8595   spectrally resolved SMLM pair-finding; merged
+    sSMLM           8917   spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             9065   single particle tracking, trackpy-inspired;
+    spt             9387   single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -130,7 +136,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        10566  top-level orchestration, *Core()/wrapper split;
+    pipeline        10889  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -139,7 +145,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   11187  Micro-Manager/pycromanager camera bridge
+    liveStreaming   11510  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -183,9 +189,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           13031  localizations table, filtering, histograms;
+    table           13379  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    13606  window.webSMLM.analyze()/analyzeBatch();
+    headless API    13954  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1877,7 +1883,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02e</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1963,6 +1969,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Stream heap (MB) <input type="number" id="chunkmb" value="500" min="50" max="2000" step="50" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-memory"><span class="pill">module: in/out</span>
+
           <ul>
           <li><b>Budget</b> — if the decoded stack fits, keep it all in RAM; re-runs then skip decoding entirely. Beyond it, frames are decoded as the analysis reaches them and discarded (“streaming”), so memory stays bounded but re-runs re-decode.</li>
           <li><b>Heap</b> — chunk size for streaming, used only when every frame must go through the TIFF decoder. Contiguous ImageJ stacks decode one frame at a time and ignore this.</li>
@@ -1980,6 +1987,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <div id="liveStreamStatus" style="margin-top:6px;color:var(--muted);font-size:12px">Not streaming.</div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-liveStreaming"><span class="pill">module: liveStreaming</span>
+
           <p>Lets an external process push frame chunks into webSMLM as they're acquired, localized and rendered here live, without a full stack ever being loaded upfront. Two ways in:</p>
           <ul>
           <li><b>WebSocket</b> (for hooking into a tab you already have open, in any browser) — a local process you run (e.g. <code>tools/test_livestream_demo.py</code>) opens a WebSocket <i>server</i>; this page only ever <i>connects out</i> to it as a client, opt-in, when you click <b>Connect</b> — webSMLM never listens for incoming connections itself. <b>Connect</b> arms the session using whatever pxnm/gain/method/etc. the sidebar is currently set to at that moment; <b>Disconnect</b> (or the connection dropping unexpectedly) ends it, without closing this tab. Each binary WebSocket message is treated as one chunk's raw TIFF bytes; a text message <code>{"cmd":"stop"}</code> also finalizes the session without disconnecting.</li>
@@ -2004,8 +2012,36 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
         <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
+        <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike">Zernike-aberrated</option></select></label>
+        <label class="row" id="psfNARow" style="display:none">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
+        <label class="row" id="psfWavelengthRow" style="display:none">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
+        <label class="row" id="psfNsRow" style="display:none">Sample refractive index (ns) <input type="number" id="simulation_psfNs" min="1.0" max="1.7" step="0.001" value="1.33" class="num"></label>
+        <label class="row" id="psfNiRow" style="display:none">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
+        <label class="row" id="psfTi0Row" style="display:none">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
+        <label class="row" id="psfDepthRow" style="display:none">Emitter depth into sample (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
+        <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="500" class="num"></label>
+        <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="20" class="num"></label>
+        <label class="row" id="psfOversampleRow" style="display:none">PSF lateral oversampling (×) <input type="number" id="simulation_psfOversample" min="4" max="8" step="1" value="4" class="num"></label>
+        <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="2000" class="num"></label>
+        <label class="row" id="psfZernikePresetRow" style="display:none">Zernike aberration preset
+          <select id="simulation_psfZernikePreset" class="sel">
+            <option value="none">None (unaberrated)</option>
+            <option value="astigWeak">Astigmatism (weak)</option>
+            <option value="astigModerate" selected>Astigmatism (moderate)</option>
+            <option value="astigStrong">Astigmatism (strong)</option>
+            <option value="comaWeak">Coma (weak)</option>
+            <option value="comaStrong">Coma (strong)</option>
+            <option value="sphericalWeak">Spherical (weak)</option>
+            <option value="sphericalStrong">Spherical (strong)</option>
+            <option value="trefoilModerate">Trefoil (moderate)</option>
+            <option value="mixedRealistic">Mixed (realistic objective)</option>
+          </select>
+        </label>
+        <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 comma-separated values, one per OSA Zernike index 0-14, in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
+        <label class="row" id="psfPreviewBtnRow" style="display:none"><button type="button" id="psfPreviewBtn">Preview PSF</button></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation"><span class="pill">module: simulation</span>
+
           <p><b>Emitter density</b> is a physical areal density — the average number of ON emitters per µm² in any
           given frame — independent of how densely the ground-truth structure is sampled. Emitters arrive as a
           Poisson process at randomly chosen structure sites; each turns on exactly once: a fractional start time
@@ -2024,6 +2060,17 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           Fourier content, so leaving it out biases the fitted offset the same way.</p>
           <p><b>Drift (px, total)</b> — total sample drift over all frames, in a random direction (linear from
           frame 0). 0 = none. Used to test drift correction — the true drift is stored for scoring.</p>
+          <p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
+          Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
+          wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
+          lateral oversampling, kernel width) and a curated <b>Zernike aberration preset</b> dropdown
+          (astigmatism/coma/spherical/trefoil/mixed, at a few preset strengths) — magnitudes are
+          order-of-magnitude estimates, not paper-sourced calibrated values. A <b>Custom Zernike</b> text
+          field accepts 15 comma-separated milliwave coefficients (one per OSA Zernike index 0-14; 1000 =
+          one full wave) to override the preset entirely. <b>Preview PSF</b> builds this (cached, oversampled)
+          kernel and shows it as a z-scrollable slice in the raw panel — this is a preview/validation step
+          only; "Simulate movie" itself still always renders the plain Gaussian PSF for now (see
+          <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
         </div>
       </details>
       <details class="sim" id="pcfoBox">
@@ -2036,6 +2083,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-pcfo"><span class="pill">module: fit</span>
+
           <p>Estimates camera gain (photons/ADU) and offset (ADU) directly from the loaded stack via the
           Rieger–Heintzman photon-conversion-factor method (PCFO; Heintzmann, Relich, Nieuwenhuizen, Lidke &amp;
           Rieger, <a href="https://arxiv.org/abs/1611.05654" target="_blank" rel="noopener">arXiv:1611.05654</a>) —
@@ -2081,6 +2129,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-calibration"><span class="pill">module: 3D calibration</span>
+
           <p>Load a bead z-stack (stage scanned through focus). Uses the detection settings above. Crop the range to ~±500 nm around focus for a good fit.</p>
           <ul>
           <li>Detects every spot per frame.</li>
@@ -2131,6 +2180,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="10" step="1" value="4" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-detectfit"><span class="pill">module: detect/fit</span>
+
           <p><b>Fit method</b> — σ_noise below is the spread of the filtered image, not the PSF width.</p>
           <ul>
           <li><b>Phasor 2D/3D</b> — ~100–250× faster per candidate (265× on the GATTA-PAINT test stack). No per-localization uncertainty; 3D needs a phasor-magnitude calibration.</li>
@@ -2166,6 +2216,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-export"><span class="pill">module: export</span>
+
           <ul>
           <li><b>Pixel size (nm)</b> sets the physical scale used by the scale bar, z, and the exported CSV coordinates.</li>
           <li>With gain 1 the exported “intensity [photon]” is really <b>ADU</b> (analog-to-digital unit — the camera's raw pixel count, before any photon conversion), and the uncertainty column (∝ 1/√N) is not physically meaningful.</li>
@@ -2206,6 +2257,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-render"><span class="pill">module: render</span>
+
           <ul>
           <li><b>Render mode</b> — <b>Localization precision</b> (default) renders each localization as its own Gaussian sized by its real fitted precision, the scientifically correct choice for most datasets. <b>Fixed blur</b> is the older uniform-blur-over-everything behaviour, controlled by <b>Render blur σ_render</b> below (which only appears in this mode). <b>Precision (fast/dithered)</b> is a much faster stochastic approximation, best suited to very large/dense datasets where the exact per-localization rendering gets slow — it looks grainier on sparse data, so it isn't the default.</li>
           <li><b>Colour map</b> — Inferno/Viridis are perceptually uniform; Fire is the classic SMLM look.</li>
@@ -2231,6 +2283,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-drift"><span class="pill">module: drift</span>
+
           <p>Point-based drift correction — adaptive intersection maximization (AIM; Ma et al., <i>Sci. Adv.</i> 2024, after <code>picasso/aim.py</code>; see <a href="https://websmlm.readthedocs.io/en/latest/content/09-references-further-reading.html" target="_blank" rel="noopener">References &amp; further reading</a>). <b>Localize first, then Correct drift.</b></p>
           <ul>
           <li>The search radius must exceed the drift <b>increment per segment</b> — shrink the segment for faster drift.</li>
@@ -2251,6 +2304,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-locprecision"><span class="pill">module: locprecision</span>
+
           <ul>
           <li><b>NeNA</b> estimates the mean per-localization precision from the nearest-neighbour distance distribution — data-driven, and the honest single number for the phasor fit (which has no per-localization uncertainty). It assumes the labelled structure is <b>static</b>: consecutive-frame displacements must be localization error, not motion. A <b>diffusing probe</b> — e.g. Nile Red and similar solvatochromic dyes that partition into and move within membranes — adds diffusion to the distance and <b>inflates σ</b>. Fixed-target methods like <b>DNA-PAINT</b> (imager binding a static docking strand, as in the GATTAquant nanorulers) satisfy the assumption.</li>
           <li><b>FRC</b> reports image resolution at the <b>1/7</b> threshold by splitting the localisations into two independent halves (odd/even frames), rendering each and correlating over Fourier rings; <b>FSC</b> is the 3D shell version, once z exists.</li>
@@ -2279,6 +2333,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-sSMLM"><span class="pill">module: sSMLM</span>
+
           <p>Pairs 0th/1st-order localizations from a diffraction grating placed in the emission path — each emitter appears twice per frame, offset by a wavelength-dependent distance at a <b>fixed, known bearing</b> (not just orientation — <b>Primary angle</b> is a genuine direction, e.g. 0° always means the 1st order sits to the same side of every 0th order in the image). A point qualifies as a 0th order only if it has a candidate on that bearing AND no candidate on the opposite bearing (which would mean it's more likely someone else's 1st order) — this needs no brightness signal, since real data shows brightness alone doesn't reliably tell 0th from 1st order here. The paired position is the <b>0th order's own</b> — undispersed, so its centroid is the true emitter position — not the midpoint between the two (that would blur position by up to half the per-emitter spectral offset). The inter-order distance is stored in its own <b>dist</b> field (never <b>z</b> — kept independent so a future 3D-fit result could carry real depth and spectral distance at once), so the depth-coding render option (Rendering settings → Colour by depth/distance) shows it directly as a wavelength proxy with no other change needed. Localizations that don't find an unambiguous pair within the window are dropped from the result entirely.</p>
           <p>Localizing with <b>Gauss MLE 3D rotated elliptical</b> first (Fit method, above — <b>3D localisation?</b> unchecked fixes its angle to Primary angle below, exactly this section's own bearing) gives BOTH orders a genuine per-axis σx/σy after <b>Pair</b>, instead of the single symmetric-σ proxy (<code>sigma1st</code>) every other method reports for the spectrally-smeared 1st order.</p>
           <p><b>Preview pairs</b> only computes — <b>Show histograms</b> draws them: a distance histogram (every candidate pair in range, any angle) by default, or an angle histogram restricted to the current distance window via the toggle next to the raw panel's own title (labelled <b>Distances</b>/<b>Angles</b>, whichever it would switch to), so you can find your own setup's true peak instead of guessing. Both histograms are accumulated across ALL frames (only same-frame localizations are ever compared to each other — the accumulation just pools every frame's own candidates into one plot). Narrow <b>Distance min/max</b> and <b>Primary angle</b>/<b>tolerance</b> to that peak, then click <b>Pair</b> to commit — or click <b>Fit angle &amp; tol.</b> to fill Primary angle/Angle tolerance in automatically from the angle histogram's peak (its half-max width), a conservative starting point you can widen by hand.</p>
@@ -2334,6 +2389,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-spt"><span class="pill">module: spt</span>
+
           <p>Links each frame's localizations onto the previous frames' active tracks — a trackpy-<b>inspired</b> variant (same <code>search_range</code>/<code>memory</code> terminology and linking philosophy as the Python <code>trackpy</code> package), not a literal port of its source, since there's no way to call real Python trackpy from a static HTML page. Frame-to-frame candidates within <b>Search range</b> are grouped into small connected clusters and each solved via an optimal (minimum total squared displacement) assignment, which keeps crossing trajectories from swapping identity in the common case. <b>Memory</b> lets a track skip up to that many frames with no detection and still be relinked when it reappears.</p>
           <p>Every localization gets a <code>track_id</code> (even length-1 tracks); track-length filtering happens only at the diffusion-coefficient step. <b>Track</b> is safe to re-run any time — it only sets/overwrites <code>track_id</code>/<code>D_coeff</code>, never drops or replaces rows, so there's no separate "original vs. tracked" state to manage the way sSMLM's Pair/Unpair needs.</p>
           <p>One diffusion coefficient (D, µm²/s) is computed per track with at least <b>Min track length</b> localizations, from the gap-corrected mean of ALL of that track's own single-frame squared displacements (an average, not a linear MSD-vs-lag-time fit) — corrected for <b>Localization error</b>: D = MSD/(4·frame time) − error²/frame time. Changing <b>Frame time</b> or <b>Localization error</b> after <b>Track</b> has run instantly rescales every already-computed D (and the shown histogram) from cached per-track MSDs, no re-tracking needed — only <b>Search range</b>/<b>Memory</b>/<b>Min track length</b> require a fresh <b>Track</b> click, since those change which tracks/steps exist in the first place.</p>
@@ -2370,6 +2426,13 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
             </span>
           </div>
           <div id="liveStreamScrubNote" style="display:none;margin-top:4px;color:var(--muted);font-size:11px"></div>
+          <div id="psfScrubRow" style="display:none;margin-top:8px;align-items:center;gap:10px">
+            <span style="color:var(--muted);font-size:12px">PSF z-plane</span>
+            <input type="range" id="psfScrub" min="0" max="0" step="1" value="0" style="flex:1">
+            <span class="val" style="min-width:150px;text-align:right;font-size:12px;white-space:nowrap">
+              <input type="number" id="psfScrubNum" class="num" min="1" max="1" value="1" style="width:64px;padding:2px 4px" title="Type a z-plane number and press Enter to jump to it"><span id="psfScrubTotal" style="vertical-align:middle"> / 1</span>
+            </span>
+          </div>
           <div id="rawContrastRow" style="display:none;margin-top:6px;align-items:center;gap:10px" title="Fixed brightness/contrast range applied to every frame — set once, stays put while scrubbing">
             <span style="color:var(--muted);font-size:12px">Contrast</span>
             <div class="dualrange" style="flex:0 1 55%">
@@ -2739,6 +2802,39 @@ const PARAMS = {
   simulation_readnoise: { type:'number', id:'simulation_readnoise', label:'Simulation read noise σ (e⁻)', min:0, max:200, step:0.1, default:2.7, int:false },
   // driftpx = total simulated sample drift (px) over the whole synthetic stack, for testing drift correction
   driftpx: { type:'number', id:'driftpx', label:'Simulated total drift (px)', min:0, max:30, step:0.5, default:0, int:false },
+
+  // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — an optional, additive
+  // Zernike-aberrated PSF model for "Simulate movie", alongside the always-available fixed-
+  // sigma=1.3 isotropic Gaussian. Phase 1 only: these params build/preview an oversampled PSF
+  // kernel (see buildPsfKernelStack()) shown in the raw panel; generateSynthetic() itself is not
+  // wired to consume this yet — see the module's own comments for the deferred integration.
+  // simulation_psfModel = which PSF the (future) emitter-rendering path uses; default 'gaussian'
+  // keeps existing behaviour/saved-settings untouched until a user opts in.
+  simulation_psfModel: { type:'enum', id:'simulation_psfModel', label:'PSF model', options:['gaussian','zernike'], default:'gaussian' },
+  simulation_psfNA: { type:'number', id:'simulation_psfNA', label:'Numerical aperture (NA)', min:0.5, max:1.7, step:0.01, default:1.4, int:false },
+  simulation_psfWavelength: { type:'number', id:'simulation_psfWavelength', label:'Wavelength (nm)', min:300, max:900, step:1, default:660, int:false },
+  // simulation_psfNs/Ni = Gibson-Lanni sample/immersion refractive indices — kept as separate,
+  // genuine physical parameters (not folded into a bare defocus term) per the implementation doc's
+  // explicit choice, so imaging through a coverslip/medium mismatch is modelled physically.
+  simulation_psfNs: { type:'number', id:'simulation_psfNs', label:'Sample refractive index (ns)', min:1.0, max:1.7, step:0.001, default:1.33, int:false },
+  simulation_psfNi: { type:'number', id:'simulation_psfNi', label:'Immersion refractive index (ni)', min:1.0, max:1.7, step:0.001, default:1.518, int:false },
+  simulation_psfTi0: { type:'number', id:'simulation_psfTi0', label:'Working distance (µm)', min:100, max:250, step:1, default:150, int:false },
+  simulation_psfDepth: { type:'number', id:'simulation_psfDepth', label:'Emitter depth into sample (nm)', min:0, max:5000, step:10, default:0, int:false },
+  // simulation_psfZRange/ZStep define the z-plane grid the kernel is built over: nz =
+  // 2*round(zRange/zStep)+1 planes, centred on focus at index (nz-1)/2 — see buildPsfKernelStack().
+  simulation_psfZRange: { type:'number', id:'simulation_psfZRange', label:'PSF z range (± nm)', min:50, max:2000, step:10, default:500, int:false },
+  simulation_psfZStep: { type:'number', id:'simulation_psfZStep', label:'PSF z step (nm)', min:1, max:100, step:1, default:20, int:false },
+  // simulation_psfOversample = lateral oversampling factor relative to the camera pixel
+  // (simulation_pxnm) — 4-8x per docs/VECTORIAL_PSF_SIMULATION.md §5's literature-supported range.
+  simulation_psfOversample: { type:'number', id:'simulation_psfOversample', label:'PSF lateral oversampling (×)', min:4, max:8, step:1, default:4, int:true },
+  // simulation_psfKernelWidth = kernel FULL WIDTH in physical nm (not px) — independent of camera
+  // pixel size, more informative than a raw pixel count; rescaled to an oversampled-px half-width
+  // only where the kernel is actually built (readPsfConfigFromUI()), never stored as px itself.
+  simulation_psfKernelWidth: { type:'number', id:'simulation_psfKernelWidth', label:'PSF kernel width (nm)', min:500, max:6000, step:50, default:2000, int:false },
+  // simulation_psfZernikePreset = curated coefficient-set dropdown (PSF_ZERNIKE_PRESETS) — a
+  // deliberately narrow subset of the full 15-coefficient OSA basis; see that constant's own
+  // comment for the "order-of-magnitude, not paper-sourced" caveat these presets carry.
+  simulation_psfZernikePreset: { type:'enum', id:'simulation_psfZernikePreset', label:'Zernike aberration preset', options:['none','astigWeak','astigModerate','astigStrong','comaWeak','comaStrong','sphericalWeak','sphericalStrong','trefoilModerate','mixedRealistic'], default:'astigModerate' },
 
   // ---- pipeline behaviour (a Run/Calibrate config knob, not a scientific parameter) ----
   // liveUpdate = re-detect/re-fit the scrubbed frame live on every settings change, without a full Run
@@ -3541,6 +3637,219 @@ async function generateSynthetic(){
   if(driftPx>0) log(`Simulated ${driftPx} px total drift along (${ddx.toFixed(2)}, ${ddy.toFixed(2)}).`);
   log(`Simulated ${events.length} emitters (of ${gt.length} candidates) over ${n} frames.`);
   return makeStack(w,h,n,px, fi=>frames[fi]);
+}
+
+/* ---------------------------------------------------------------------------
+   Zernike-aberrated PSF simulation (Phase 1: kernel build + raw-panel preview
+   only — NOT yet wired into generateSynthetic()'s emitter render loop above,
+   see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md for the full plan/roadmap
+   and docs/VECTORIAL_PSF_SIMULATION.md for the oversampled-kernel-and-cache
+   design this builds on). Scalar Gibson-Lanni + Zernike-pupil model, ported
+   (not copied) from EPFL BIG's MIT-licensed `psf_generator`
+   (https://github.com/Biomedical-Imaging-Group/psf_generator) via an
+   intermediate Java port (GibsonLanniZernikePSF.java) in a sibling project —
+   see the implementation doc's §2/§3 for the full provenance/licensing
+   chain. Deliberately scalar (no polarization/apodization dyad): with every
+   Zernike coefficient at 0 this must reduce to a plain radially-symmetric
+   Gibson-Lanni PSF — a cheap regression check any time this code changes
+   (compare two perpendicular radii, or just look at "Preview PSF" with the
+   'none' preset).
+   --------------------------------------------------------------------------- */
+const PSF_N_RHO=20, PSF_N_PHI=40;   // fixed pupil-quadrature resolution, not user-configurable — see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5
+// OSA/ANSI single-index Zernike convention: j = n(n+1)/2 + l, l in [0,n], m = -n+2l.
+function psfIndexToNM(j){
+  for(let n=0; ; n++) for(let l=0; l<=n; l++) if(n*(n+1)/2+l===j) return [n, -n+2*l];
+}
+function psfBinomial(a,b){
+  if(b<0||b>a) return 0;
+  let r=1; for(let i=0;i<b;i++) r=r*(a-i)/(i+1);
+  return r;
+}
+function psfZernikeRadial(n,m,rho){
+  let r=0;
+  for(let k=0; k<=(n-m)/2; k++){
+    const coeff=(k%2===0?1:-1)*psfBinomial(n-k,k)*psfBinomial(n-2*k,(n-m)/2-k);
+    r+=coeff*Math.pow(rho,n-2*k);
+  }
+  return r;
+}
+// Unnormalized convention (no sqrt((2n+2)/(1+delta_m0)) orthonormality factor) — a
+// coefficient of 1.0 means "one full wave of R_n^m(1) peak amplitude", matching
+// PSF_ZERNIKE_PRESETS' own wave-unit values below.
+function psfZernikeValue(j,rho,phi){
+  const [n,l]=psfIndexToNM(j), m=Math.abs(l);
+  const radial = rho<=1 ? psfZernikeRadial(n,m,rho) : 0;
+  return radial * (l>=0 ? Math.cos(m*phi) : Math.sin(m*phi));
+}
+// Curated Zernike coefficient presets (indices 0-14, wave units, unnormalized convention
+// above) — magnitudes are ORDER-OF-MAGNITUDE ESTIMATES carried over from the reference
+// project's own planning docs, NOT paper-sourced calibrated values. j=5 is vertical
+// astigmatism, j=6/9 trefoil, j=7/8 coma, j=12 primary spherical (see the OSA table in
+// docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §4.1 — verify via psfIndexToNM(j) before
+// trusting any index by memory, that doc's own table was wrong twice before being checked).
+const PSF_ZERNIKE_PRESETS = {
+  none:             new Array(15).fill(0),
+  astigWeak:        Object.assign(new Array(15).fill(0), {5:0.07}),
+  astigModerate:    Object.assign(new Array(15).fill(0), {5:0.15}),
+  astigStrong:      Object.assign(new Array(15).fill(0), {5:0.3}),
+  comaWeak:         Object.assign(new Array(15).fill(0), {7:0.1}),
+  comaStrong:       Object.assign(new Array(15).fill(0), {7:0.25}),
+  sphericalWeak:    Object.assign(new Array(15).fill(0), {12:0.1}),
+  sphericalStrong:  Object.assign(new Array(15).fill(0), {12:0.25}),
+  trefoilModerate:  Object.assign(new Array(15).fill(0), {6:0.15}),
+  mixedRealistic:   Object.assign(new Array(15).fill(0), {4:0.05, 5:0.08, 7:0.06, 12:0.07}),
+};
+// Per-Z-plane pupil precompute: Gibson-Lanni sample/immersion-index OPD (kept in full, not
+// simplified to a bare defocus term — models a real coverslip/medium-mismatch aberration
+// source) plus the Zernike phase, on a polar (rho,phi) quadrature grid.
+function computePsfPupilForZPlane(z, nz, params){
+  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs} = params;
+  const ti = ti0 + zStep*(z-(nz-1)/2);
+  const k0 = 2*Math.PI/lambda;
+  const bMax = Math.min(1, ns/NA);
+  const dRho = bMax/PSF_N_RHO, dPhi = 2*Math.PI/PSF_N_PHI;
+  const cosPhiAt=new Float64Array(PSF_N_PHI), sinPhiAt=new Float64Array(PSF_N_PHI);
+  for(let ip=0; ip<PSF_N_PHI; ip++){ const phi=(ip+0.5)*dPhi; cosPhiAt[ip]=Math.cos(phi); sinPhiAt[ip]=Math.sin(phi); }
+  const krAt=new Float64Array(PSF_N_RHO);
+  const pupilRe=new Float64Array(PSF_N_RHO*PSF_N_PHI), pupilIm=new Float64Array(PSF_N_RHO*PSF_N_PHI);
+  for(let ir=0; ir<PSF_N_RHO; ir++){
+    const rho=(ir+0.5)*dRho;
+    krAt[ir]=k0*NA*rho;
+    const s1=NA*rho/ns, s3=NA*rho/ni;
+    const opd1=ns*particleAxialPosition*Math.sqrt(Math.max(0,1-s1*s1));
+    const opd3=ni*(ti-ti0)*Math.sqrt(Math.max(0,1-s3*s3));
+    const gibsonLanniPhase=k0*(opd1+opd3);
+    const rowBase=ir*PSF_N_PHI;
+    for(let ip=0; ip<PSF_N_PHI; ip++){
+      const phi=(ip+0.5)*dPhi;
+      let zernikePhase=0;
+      for(let j=0;j<zernikeCoeffs.length;j++){ const c=zernikeCoeffs[j]; if(c!==0) zernikePhase+=c*psfZernikeValue(j, rho/bMax, phi); }
+      zernikePhase*=2*Math.PI;
+      const phase=gibsonLanniPhase+zernikePhase;
+      pupilRe[rowBase+ip]=rho*Math.cos(phase);
+      pupilIm[rowBase+ip]=rho*Math.sin(phase);
+    }
+  }
+  return {pupilRe, pupilIm, krAt, cosPhiAt, sinPhiAt};
+}
+// Pupil -> image-plane intensity via direct 2D quadrature (no FFT — see
+// docs/VECTORIAL_PSF_SIMULATION.md for why an FFT-shift approach was NOT chosen).
+function computePsfIntensityPlane(nx, ny, resLateralM, pupil){
+  const {pupilRe, pupilIm, krAt, cosPhiAt, sinPhiAt} = pupil;
+  const x0=(nx-1)/2, y0=(ny-1)/2;
+  const slice=new Float64Array(nx*ny);
+  for(let y=0;y<ny;y++){
+    const dyM=(y-y0)*resLateralM, rowOut=nx*y;
+    for(let x=0;x<nx;x++){
+      const dxM=(x-x0)*resLateralM;
+      let sumRe=0, sumIm=0;
+      for(let ir=0; ir<PSF_N_RHO; ir++){
+        const kr=krAt[ir], rowBase=ir*PSF_N_PHI;
+        for(let ip=0; ip<PSF_N_PHI; ip++){
+          const sp=kr*(dxM*cosPhiAt[ip]+dyM*sinPhiAt[ip]);
+          const cosSp=Math.cos(sp), sinSp=Math.sin(sp);
+          const pr=pupilRe[rowBase+ip], pi=pupilIm[rowBase+ip];
+          sumRe+=pr*cosSp-pi*sinSp; sumIm+=pr*sinSp+pi*cosSp;
+        }
+      }
+      slice[rowOut+x]=sumRe*sumRe+sumIm*sumIm;
+    }
+  }
+  return slice;
+}
+// Reads the sidebar's simulation_psf* fields (+ the free-form custom-Zernike text field, which
+// is NOT a PARAMS entry — same "plain text input read directly" precedent as liveStreamWsUrl)
+// into a plain config object for buildPsfKernelStack()/getOrBuildPsfKernelStack(). Converts every
+// physical quantity to SI (m) up front so the physics functions above never see nm/µm directly.
+function readPsfConfigFromUI(){
+  const NA=paramValue('simulation_psfNA'), lambda=paramValue('simulation_psfWavelength')*1e-9;
+  const ns=paramValue('simulation_psfNs'), ni=paramValue('simulation_psfNi');
+  const ti0=paramValue('simulation_psfTi0')*1e-6, particleAxialPosition=paramValue('simulation_psfDepth')*1e-9;
+  const zRangeNm=paramValue('simulation_psfZRange'), zStepNm=paramValue('simulation_psfZStep');
+  const oversample=paramValue('simulation_psfOversample');
+  const cameraPxNm=paramValue('simulation_pxnm');
+  const kernelWidthNm=paramValue('simulation_psfKernelWidth');
+  const resLateralNm=cameraPxNm/oversample;
+  const halfWidthPx=Math.ceil((kernelWidthNm/2)/resLateralNm);
+  const nz=2*Math.round(zRangeNm/zStepNm)+1;
+  let zernikeCoeffs, zernikeSource;
+  const customStr=($('simulation_psfZernikeCustom')||{}).value||'';
+  if(customStr.trim()!==''){
+    const parts=customStr.split(',').map(s=>s.trim());
+    const nums=parts.map(Number);
+    if(parts.length===15 && nums.every(v=>isFinite(v))){
+      zernikeCoeffs=nums.map(v=>v/1000); zernikeSource='custom';
+    } else {
+      log(`PSF preview: custom Zernike field must be exactly 15 comma-separated numbers (milliwaves) — got "${customStr}", falling back to the preset.`);
+      zernikeCoeffs=PSF_ZERNIKE_PRESETS[paramValue('simulation_psfZernikePreset')].slice(); zernikeSource='preset-fallback';
+    }
+  } else {
+    zernikeCoeffs=PSF_ZERNIKE_PRESETS[paramValue('simulation_psfZernikePreset')].slice(); zernikeSource='preset';
+  }
+  return { NA, lambda, ns, ni, ti0, particleAxialPosition, zStep:zStepNm*1e-9, nz,
+           resLateralM:resLateralNm*1e-9, halfWidthPx, oversample, cameraPxNm, kernelWidthNm,
+           zernikeCoeffs, zernikeSource };
+}
+// Builds the full oversampled PSF kernel stack (one 2D intensity slice per z-plane), yielding
+// periodically on a time budget exactly like generateSynthetic()'s own frame loop above. Per
+// docs/VECTORIAL_PSF_SIMULATION.md §5's "oversample once, cache, reuse" design — see
+// getOrBuildPsfKernelStack() for the cache wrapper actually called from the UI.
+async function buildPsfKernelStack(cfg){
+  const nx=2*cfg.halfWidthPx*cfg.oversample+1, ny=nx;
+  const slices=new Array(cfg.nz);
+  let globalMax=0, lastYield=performance.now();
+  for(let z=0; z<cfg.nz; z++){
+    const pupil=computePsfPupilForZPlane(z, cfg.nz, cfg);
+    const slice=computePsfIntensityPlane(nx, ny, cfg.resLateralM, pupil);
+    for(let i=0;i<slice.length;i++) if(slice[i]>globalMax) globalMax=slice[i];
+    slices[z]=slice;
+    if(performance.now()-lastYield>50){ setProg(100*z/cfg.nz); await tick(); lastYield=performance.now(); }
+  }
+  setProg(null);
+  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm:cfg.zStep*1e9, focusIndex:Math.floor((cfg.nz-1)/2), globalMax };
+}
+let _psfKernelCacheKey=null, _psfKernelCache=null;
+async function getOrBuildPsfKernelStack(cfg){
+  const key=JSON.stringify(cfg);
+  if(key===_psfKernelCacheKey && _psfKernelCache) return _psfKernelCache;
+  const result=await buildPsfKernelStack(cfg);
+  _psfKernelCacheKey=key; _psfKernelCache=result;
+  return result;
+}
+
+// ---- PSF preview: raw-panel raster display + z scrubber (Phase 1 UI) ----
+let psfPreviewStack=null, psfPreviewIndex=0, rawPsfView=false;
+function drawPsfPreviewSlice(zi){
+  if(!psfPreviewStack) return;
+  const {slices, nx, ny, globalMax} = psfPreviewStack;
+  const slice=slices[zi];
+  { const rt=$('rawTitle'); if(rt) rt.textContent='PSF preview'; }
+  hideOtherRawToggleBtns(null);   // no rival toggle button of its own
+  if(!rawFull) rawFull=document.createElement('canvas');
+  rawFull.width=nx; rawFull.height=ny;
+  const ctx=rawFull.getContext('2d'), im=ctx.createImageData(nx,ny);
+  const scale = globalMax>0 ? 255/globalMax : 0;
+  for(let i=0;i<nx*ny;i++){
+    const g=Math.min(255, Math.round(slice[i]*scale));
+    im.data[i*4]=g; im.data[i*4+1]=g; im.data[i*4+2]=g; im.data[i*4+3]=255;
+  }
+  ctx.putImageData(im,0,0);
+  rawPixelData={arr:slice, w:nx, h:ny}; rawSpots=null; rawLocs=null;
+  rawSegView=false;   // reclaim from a shown segmentation image too, if one was up
+  rawPsfView=true; setRawPlot(false); $('rawCropBtn').disabled=true;
+  rawCropMode=false; $('rawCropBtn').classList.remove('on'); rawCropPt0=null;
+  setFrameAspect(nx, ny);
+  fitRawView(); clampRawView(); drawRawView();
+  syncSaveImg();
+}
+function showPsfSlice(zi){
+  if(!psfPreviewStack) return;
+  zi=Math.max(0, Math.min(psfPreviewStack.nz-1, zi));
+  psfPreviewIndex=zi;
+  $('psfScrub').value=zi; $('psfScrubNum').value=zi+1;
+  const zNm=Math.round((zi-psfPreviewStack.focusIndex)*psfPreviewStack.zStepNm);
+  $('psfScrubTotal').textContent=` / ${psfPreviewStack.nz}  (z = ${zNm>0?'+':''}${zNm} nm)`;
+  drawPsfPreviewSlice(zi);
 }
 
 // decode a single UTIF IFD -> Float32 grayscale (native depth; always LE bytes)
@@ -6191,7 +6500,7 @@ function syncRawContrastUI(){
 // re-fetching it from the stack (would lag while dragging a handle) —
 // rawPixelData already holds the exact ADU array drawRaw() last received.
 function redrawRawContrast(){
-  if(!rawPixelData || rawSegView) return;   // segmentation view repurposes rawPixelData for label lookups, not ADU — dragging Contrast while it's shown must no-op, not corrupt it through the grayscale mapping
+  if(!rawPixelData || rawSegView || rawPsfView) return;   // segmentation/PSF-preview views repurpose rawPixelData for label lookups / raw intensity, not ADU — dragging Contrast while either is shown must no-op, not corrupt it through the grayscale mapping
   drawRaw(rawPixelData.arr, rawPixelData.w, rawPixelData.h, rawSpots, rawLocs);
 }
 // Each window can also show a direct-drawn vector plot with no *Full source:
@@ -6235,6 +6544,8 @@ function fmtRawPixel(vx,vy){
   // Segmentation view repurposes rawPixelData to hold integer cell labels,
   // not ADU — read it back as "which cell is under the cursor" instead.
   if(rawSegView){ const id=Math.round(arr[py*w+px]); return `x=${px}, y=${py}: `+(id===0?'background':`cell ${id}`); }
+  // PSF preview repurposes rawPixelData to hold the raw (un-normalized) intensity slice.
+  if(rawPsfView){ return `x=${px}, y=${py}: intensity=${arr[py*w+px].toExponential(3)}`; }
   const raw=arr[py*w+px], gain=paramValue('gain'), camoffset=paramValue('camoffset');
   const calibrated = gain!==1 || camoffset!==0;
   return `x=${px}, y=${py}: ${raw.toFixed(1)} ADU`+(calibrated?` (${((raw-camoffset)*gain).toFixed(1)} photon)`:'');
@@ -6351,6 +6662,7 @@ function drawRaw(frame,w,h,spots,locs){
   { const rt=$('rawTitle'); if(rt) rt.textContent='Raw frame'; }   // reclaim the panel from the drift plot — title stays fixed; rawFtmBtn's own label says which view is showing
   hideOtherRawToggleBtns(null);   // no exception — none of the four toggles are relevant to a live frame
   rawSegView=false;   // reclaim the panel from a shown segmentation image too, same "any real frame redraw reclaims the panel" convention as the plot/FTM cases above
+  rawPsfView=false; { const r=$('psfScrubRow'); if(r) r.style.display='none'; }   // and from a shown PSF preview
   setRawPlot(false);
   if(!rawFull) rawFull=document.createElement('canvas');
   const sizeChanged = rawFull.width!==w || rawFull.height!==h;
@@ -10086,6 +10398,7 @@ function drawSegmentedImage(labelArr,w,h){
   }
   ctx.putImageData(im,0,0);
   rawPixelData={arr:labelArr,w,h}; rawSpots=null; rawLocs=null;
+  rawPsfView=false; { const r=$('psfScrubRow'); if(r) r.style.display='none'; }   // reclaim from a shown PSF preview too
   rawSegView=true; setRawPlot(false); $('rawCropBtn').disabled=true;
   rawCropMode=false; $('rawCropBtn').classList.remove('on'); rawCropPt0=null;
   // Both panels share ONE CSS aspect ratio (--frame-ar, see setFrameAspect()'s
@@ -12084,6 +12397,32 @@ $('method').addEventListener('change',updateMethodUI);
 $('localize3D').addEventListener('change',updateMethodUI);
 updateMethodUI();
 
+// Simulation PSF model rows (simBox) — same "one selector, a list of rows toggled together"
+// pattern as updateMethodUI() above, just for the Zernike-only fields.
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfPreviewBtnRow'];
+function updatePsfModelUI(){
+  const on = paramValue('simulation_psfModel')==='zernike';
+  for(const id of PSF_ZERNIKE_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
+}
+$('simulation_psfModel').addEventListener('change',updatePsfModelUI);
+updatePsfModelUI();
+
+$('psfPreviewBtn').addEventListener('click', async ()=>{
+  const btn=$('psfPreviewBtn'); btn.disabled=true;
+  try{
+    const cfg=readPsfConfigFromUI();
+    psfPreviewStack=await getOrBuildPsfKernelStack(cfg);
+    psfPreviewIndex=psfPreviewStack.focusIndex;
+    $('psfScrubRow').style.display='flex';
+    $('psfScrub').max=psfPreviewStack.nz-1; $('psfScrubNum').max=psfPreviewStack.nz;
+    showPsfSlice(psfPreviewIndex);
+    log(`PSF preview: ${psfPreviewStack.nx}×${psfPreviewStack.ny}px kernel (oversample ${cfg.oversample}×), ${psfPreviewStack.nz} z-planes, Zernike coeffs from ${cfg.zernikeSource}.`);
+  } catch(e){ log('PSF preview failed: '+e.message); }
+  btn.disabled=false;
+});
+$('psfScrub').addEventListener('input', e=>showPsfSlice(+e.target.value));
+$('psfScrubNum').addEventListener('change', e=>showPsfSlice((+e.target.value||1)-1));
+
 // Keep the in-column line short and fixed-height so the sidebar never reflows;
 // the detail (RMS, ratio range) goes to the log instead.
 function updateCalStatus(){
@@ -12912,12 +13251,13 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02e — documented the new Render
-mode setting (docs/DOCUMENTATION.md's Rendering settings section + its
-in-app "more info…" popup): precision/fixed/dither, why the splat is
-capped, dither's Average-Shifted-Histogram/Monte-Carlo-kernel-density
-basis (Scott 1985; Bourel/Fraiman/Ghattas 2014) with real citations, and
-Live streaming's automatic use of dither for its cadence render.
+log(`webSMLM v0.12.0-dev · build 2026-09-02f — added a Zernike-aberrated PSF
+model to Simulation settings (Phase 1, docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md):
+optical/Gibson-Lanni params, z-range/step, oversampling, and a curated
+Zernike-preset dropdown (plus a milliwave custom-coefficients field). "Preview PSF"
+builds an oversampled, cached kernel and shows it as a z-scrollable slice in the
+raw panel. Not yet wired into the actual "Simulate movie" emitter render loop —
+preview/validation step only, see the doc's roadmap for the deferred phases.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

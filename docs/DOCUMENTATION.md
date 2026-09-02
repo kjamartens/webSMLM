@@ -956,6 +956,17 @@ this panel's gain) — a static per-pixel offset pattern looks identical to read
 Fourier content, so leaving it out biases the fitted offset the same way.</p>
 <p><b>Drift (px, total)</b> — total sample drift over all frames, in a random direction (linear from
 frame 0). 0 = none. Used to test drift correction — the true drift is stored for scoring.</p>
+<p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
+Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
+wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
+lateral oversampling, kernel width) and a curated <b>Zernike aberration preset</b> dropdown
+(astigmatism/coma/spherical/trefoil/mixed, at a few preset strengths) — magnitudes are
+order-of-magnitude estimates, not paper-sourced calibrated values. A <b>Custom Zernike</b> text
+field accepts 15 comma-separated milliwave coefficients (one per OSA Zernike index 0-14; 1000 =
+one full wave) to override the preset entirely. <b>Preview PSF</b> builds this (cached, oversampled)
+kernel and shows it as a z-scrollable slice in the raw panel — this is a preview/validation step
+only; "Simulate movie" itself still always renders the plain Gaussian PSF for now (see
+<code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
 <!-- /HINT:simulation -->
 
 `dens` is a **physical areal density** (ON emitters/µm²/frame), not tied to

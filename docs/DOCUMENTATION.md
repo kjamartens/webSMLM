@@ -963,7 +963,12 @@ lateral oversampling, kernel width) and a curated <b>Zernike aberration preset</
 (astigmatism/coma/spherical/trefoil/mixed, at a few preset strengths) — magnitudes are
 order-of-magnitude estimates, not paper-sourced calibrated values. A <b>Custom Zernike</b> text
 field accepts 15 comma-separated milliwave coefficients (one per OSA Zernike index 0-14; 1000 =
-one full wave) to override the preset entirely. <b>Preview PSF</b> builds this (cached, oversampled)
+one full wave) to override the preset entirely. <b>Emitter depth into sample</b> is compensated for
+its own depth-induced focal shift (a real Gibson-Lanni effect: imaging deeper into a lower-index
+sample through a higher-index immersion medium moves the true focal plane away from the
+microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
+step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
+nominal focus offset by the depth. <b>Preview PSF</b> builds this (cached, oversampled)
 kernel and shows it as a z-scrollable slice in the raw panel — this is a preview/validation step
 only; "Simulate movie" itself still always renders the plain Gaussian PSF for now (see
 <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>

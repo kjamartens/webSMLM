@@ -21,7 +21,7 @@
   edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2476   PARAMS registry, single source of truth for params;
+    params          2490   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3226   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3240   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3525   synthetic stack generator ("Simulate movie");
+    simulation      3539   synthetic stack generator ("Simulate movie");
                            Zernike-aberrated PSF kernel (Phase 1: build +
                            raw-panel z-scrollable preview only, not yet wired
                            into generateSynthetic()'s emitter render loop —
@@ -45,8 +45,8 @@
                            when available, falling back to
                            buildPsfPlanesSerial() otherwise (~5x measured
                            speedup at default settings, 8-core test machine)
-    detect          4682   per-frame band-pass + local-maxima detection
-    fit             4959   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          4710   per-frame band-pass + local-maxima detection
+    fit             4987   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -56,7 +56,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          5468   accumulate to offscreen buffer; view/colour/blur;
+    render          5496   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -78,7 +78,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         6753   frame-parallel detect/fit worker pool; dedicated
+    workers         6781   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -88,14 +88,14 @@
                            getPsfWorkerPool(), a third separate worker
                            family, pool-shaped like the detect/fit pool since
                            z-planes are independent batchable work)
-    export          7159   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  7451   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          7187   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  7479   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           7868   AIM drift correction (2D+z); drift-vs-frame or
+    drift           7896   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -105,16 +105,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    8374   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    8402   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           9083   spectrally resolved SMLM pair-finding; merged
+    sSMLM           9111   spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             9553   single particle tracking, trackpy-inspired;
+    spt             9581   single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -145,7 +145,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        11055  top-level orchestration, *Core()/wrapper split;
+    pipeline        11083  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -154,7 +154,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   11676  Micro-Manager/pycromanager camera bridge
+    liveStreaming   11704  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -198,9 +198,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           13545  localizations table, filtering, histograms;
+    table           13578  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    14120  window.webSMLM.analyze()/analyzeBatch();
+    headless API    14153  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1892,7 +1892,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02g</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02h</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2076,7 +2076,12 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           (astigmatism/coma/spherical/trefoil/mixed, at a few preset strengths) — magnitudes are
           order-of-magnitude estimates, not paper-sourced calibrated values. A <b>Custom Zernike</b> text
           field accepts 15 comma-separated milliwave coefficients (one per OSA Zernike index 0-14; 1000 =
-          one full wave) to override the preset entirely. <b>Preview PSF</b> builds this (cached, oversampled)
+          one full wave) to override the preset entirely. <b>Emitter depth into sample</b> is compensated for
+          its own depth-induced focal shift (a real Gibson-Lanni effect: imaging deeper into a lower-index
+          sample through a higher-index immersion medium moves the true focal plane away from the
+          microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
+          step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
+          nominal focus offset by the depth. <b>Preview PSF</b> builds this (cached, oversampled)
           kernel and shows it as a z-scrollable slice in the raw panel — this is a preview/validation step
           only; "Simulate movie" itself still always renders the plain Gaussian PSF for now (see
           <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
@@ -3713,7 +3718,21 @@ const PSF_ZERNIKE_PRESETS = {
 // source) plus the Zernike phase, on a polar (rho,phi) quadrature grid.
 function computePsfPupilForZPlane(z, nz, params){
   const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs} = params;
-  const ti = ti0 + zStep*(z-(nz-1)/2);
+  // Depth-induced "focal shift": expanding opd1/opd3 below to 2nd order in rho shows the
+  // rho^2 (defocus-shaped) term vanishes — i.e. the emitter is actually IN FOCUS — at
+  // ti = ti0 - particleAxialPosition*(ni/ns), not at ti0 itself (a real, textbook Gibson-Lanni
+  // effect: imaging deeper into a lower-index sample through a higher-index immersion medium
+  // shifts the true focal plane away from the microscope's own nominal working distance).
+  // Centering the z-sweep on that shifted plane (subtracting it here) rather than on bare ti0
+  // is what makes "z range ± nm"/"z step" probe symmetrically AROUND the emitter, matching what
+  // a user actually does at the microscope (refocus on the emitter, then scan around that) —
+  // without this, a real, reported bug: at particleAxialPosition=500nm (ns=1.33, ni=1.518) the
+  // emitter's own sharpest plane sits ~571nm away from the sweep's center, so a ±500nm sweep
+  // never actually reaches it at all, and the visible-in-range PSF only gets sharper toward one
+  // edge instead of peaking in the middle. Verified via a standalone Node harness
+  // (computePsfIntensityPlane's own peak-intensity plane index) before/after this fix.
+  const focalShift = particleAxialPosition*(ni/ns);
+  const ti = (ti0-focalShift) + zStep*(z-(nz-1)/2);
   const k0 = 2*Math.PI/lambda;
   const bMax = Math.min(1, ns/NA);
   const dRho = bMax/PSF_N_RHO, dPhi = 2*Math.PI/PSF_N_PHI;
@@ -13426,18 +13445,22 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02g — PSF preview: fixed a real kernel-
-sizing bug (halfWidthPx was already in oversampled-px units but got multiplied
-by the oversampling factor again, inflating the kernel 16x at the default
-oversample=4, 64x at oversample=8 — the actual cause of a slow build, not a
-fundamental limit). Also added a dedicated PSF worker POOL
-(PSF_WORKER_PRELUDE/psfWorkerSource()/getPsfWorkerPool()): z-planes are
-independent, so they're farmed out across cores the same way detect/fit frame
-batches are, falling back to the single-threaded build wherever workers aren't
-usable. Measured ~5x speedup at default settings (8-core test machine),
-verified byte-identical output between the pooled and serial paths via a
-Playwright smoke test. Per-plane debug logging (from the previous build) now
-also reports which path ran and how many workers.
+log(`webSMLM v0.12.0-dev · build 2026-09-02h — PSF preview: fixed a real depth-
+centering bug. Emitter depth (particleAxialPosition) creates a genuine Gibson-
+Lanni focal shift — imaging deeper into a lower-index sample through a higher-
+index immersion medium moves the true focal plane away from the microscope's
+own nominal working distance (ti0) — but the z-plane sweep was still centered
+on bare ti0 regardless of depth, so "PSF z range ± nm" never actually probed
+around the emitter itself; at depth=500nm (ns=1.33, ni=1.518) the emitter's
+own sharpest plane sat ~571nm away from the sweep's center, well outside a
+±500nm window. Fixed by subtracting the paraxial focal-shift estimate
+(depth*(ni/ns)) from ti0 before building the sweep, so the center plane now
+lands on (or very near — a residual few-hundred-nm offset from higher-order/
+high-NA terms is expected and physically real) the emitter's own actual
+focus. Verified two ways: the degenerate ns=ni case (no index mismatch) now
+centers EXACTLY regardless of NA/depth, and the real-mismatch case's residual
+offset dropped from ~571nm to ~120nm at default optics — both checked with a
+standalone Node harness against the shipped physics functions directly.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

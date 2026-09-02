@@ -52,8 +52,8 @@
                            MODULE: locprecision) is a mathematically-exact
                            reformulation measured 76x-970x faster than the
                            default 'direct' path, kernel-size dependent
-    detect          4900   per-frame band-pass + local-maxima detection
-    fit             5177   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          4889   per-frame band-pass + local-maxima detection
+    fit             5166   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -63,7 +63,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          5686   accumulate to offscreen buffer; view/colour/blur;
+    render          5675   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -85,7 +85,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         6971   frame-parallel detect/fit worker pool; dedicated
+    workers         6960   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -95,14 +95,14 @@
                            getPsfWorkerPool(), a third separate worker
                            family, pool-shaped like the detect/fit pool since
                            z-planes are independent batchable work)
-    export          7390   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  7682   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          7379   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  7671   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           8099   AIM drift correction (2D+z); drift-vs-frame or
+    drift           8088   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -112,16 +112,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    8605   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    8594   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           9314   spectrally resolved SMLM pair-finding; merged
+    sSMLM           9303   spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             9784   single particle tracking, trackpy-inspired;
+    spt             9773   single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -152,7 +152,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        11286  top-level orchestration, *Core()/wrapper split;
+    pipeline        11275  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -161,7 +161,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   11907  Micro-Manager/pycromanager camera bridge
+    liveStreaming   11896  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -205,9 +205,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           13785  localizations table, filtering, histograms;
+    table           13764  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    14360  window.webSMLM.analyze()/analyzeBatch();
+    headless API    14339  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1899,7 +1899,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02i</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02j</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3999,23 +3999,14 @@ function readPsfConfigFromUI(){
   if(evalMethod==='fft') cfg.fftDk=psfFftDkForCfg(cfg);   // Cartesian grid's own k-space spacing — see psfFftDkForCfg()
   return cfg;
 }
-// One debug log line per z-plane, shared by both the serial and worker-parallel build paths below
-// — under the parallel path these can arrive OUT OF ORDER (whichever worker finishes first), which
-// is expected/correct, not a bug: each line names its own plane index.
-function logPsfPlane(z, cfg, focusIndex, planeMax, ms){
-  const ti=cfg.ti0+cfg.zStep*(z-focusIndex), zNm=Math.round((z-focusIndex)*cfg.zStep*1e9);
-  log(`  plane ${z+1}/${cfg.nz} (z=${zNm>=0?'+':''}${zNm}nm, ti=${(ti*1e6).toFixed(2)}µm): `+
-      `max=${planeMax.toExponential(3)}, ${ms.toFixed(1)}ms`);
-}
 // Serial fallback — the original main-thread loop, used whenever the dedicated PSF worker pool
 // (getPsfWorkerPool(), below) isn't available. Still yields periodically on a time budget exactly
 // like generateSynthetic()'s own frame loop does, so the UI stays responsive either way.
-async function buildPsfPlanesSerial(cfg, nx, ny, focusIndex){
+async function buildPsfPlanesSerial(cfg, nx, ny){
   const useFFT=cfg.evalMethod==='fft';
   const slices=new Array(cfg.nz);
   let globalMax=0, lastYield=performance.now();
   for(let z=0; z<cfg.nz; z++){
-    const tPlaneStart=performance.now();
     let slice;
     if(useFFT){
       const cart=computePsfPupilCartesianForZPlane(z, cfg.nz, cfg, PSF_FFT_M, cfg.fftDk);
@@ -4027,7 +4018,6 @@ async function buildPsfPlanesSerial(cfg, nx, ny, focusIndex){
     let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
     if(planeMax>globalMax) globalMax=planeMax;
     slices[z]=slice;
-    logPsfPlane(z, cfg, focusIndex, planeMax, performance.now()-tPlaneStart);
     if(performance.now()-lastYield>50){ setProg(100*z/cfg.nz); await tick(); lastYield=performance.now(); }
   }
   return {slices, globalMax};
@@ -4038,7 +4028,7 @@ async function buildPsfPlanesSerial(cfg, nx, ny, focusIndex){
 // naturally even if per-plane cost ever stops being uniform (it currently is: same nx/ny/N_RHO/
 // N_PHI every plane). No batching/chunking needed at only ~dozens of planes — one postMessage per
 // plane keeps per-worker idle time low without meaningful message-passing overhead.
-async function buildPsfPlanesParallel(cfg, nx, ny, focusIndex, pool){
+async function buildPsfPlanesParallel(cfg, nx, ny, pool){
   const slices=new Array(cfg.nz);
   let globalMax=0, nextZ=0, done=0;
   async function runWorker(w){
@@ -4052,7 +4042,6 @@ async function buildPsfPlanesParallel(cfg, nx, ny, focusIndex, pool){
       slices[z]=resp.slice;
       if(resp.planeMax>globalMax) globalMax=resp.planeMax;
       done++;
-      logPsfPlane(z, cfg, focusIndex, resp.planeMax, resp.ms);
       setProg(100*done/cfg.nz);
     }
   }
@@ -4081,10 +4070,10 @@ async function buildPsfKernelStack(cfg){
       `${cfg.nz} z-planes × ${cfg.zStep*1e9}nm (focus @ plane ${focusIndex}), `+
       `Zernike[${cfg.zernikeSource}]=[${cfg.zernikeCoeffs.map(v=>v.toFixed(3)).join(',')}], `+
       `eval=${cfg.evalMethod}${cfg.evalMethod==='fft'?` (Cartesian grid ${PSF_FFT_M}×${PSF_FFT_M}, dk=${cfg.fftDk.toExponential(3)})`:''}`+
-      (pool?`, using ${pool.length} PSF worker(s) (plane logs below may arrive out of order)`:', running single-threaded (no worker pool available)'));
+      (pool?`, using ${pool.length} PSF worker(s)`:', running single-threaded (no worker pool available)'));
   const t0=performance.now();
-  const {slices, globalMax} = pool ? await buildPsfPlanesParallel(cfg, nx, ny, focusIndex, pool)
-                                    : await buildPsfPlanesSerial(cfg, nx, ny, focusIndex);
+  const {slices, globalMax} = pool ? await buildPsfPlanesParallel(cfg, nx, ny, pool)
+                                    : await buildPsfPlanesSerial(cfg, nx, ny);
   setProg(null);
   const totalMs=performance.now()-t0;
   log(`PSF build done: ${cfg.nz} planes in ${totalMs.toFixed(0)}ms (${(totalMs/cfg.nz).toFixed(1)}ms/plane`+
@@ -13648,31 +13637,12 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02i — added an opt-in FFT/chirp-Z
-evaluation method for the PSF preview (PSF evaluation method: Direct
-quadrature [default, unchanged] vs FFT / chirp-Z). The new path evaluates the
-SAME Gibson-Lanni + Zernike pupil physics on a Cartesian (kx,ky) grid instead
-of the original polar (rho,phi) one, then gets the whole image-plane field in
-one shot via a separable 2D chirp-Z transform (Bluestein's algorithm, reusing
-this file's own fft1d() from the FRC code) instead of a per-pixel direct sum
-— a mathematically EXACT reformulation, not an approximation.
-Measured 76x-970x faster than direct quadrature depending on kernel size
-(bigger kernels benefit more), on top of the worker-pool speedup already
-shipped. Verified extensively before wiring into the UI: the 1D chirp-Z
-transform matches a brute-force direct sum to ~1e-13 relative error across
-many random parameter combinations; the full PSF output converges toward the
-direct method's own output as the new path's internal grid resolution
-increases (0.88%->0.18% RMS difference from a 16x16 to a 96x96 grid;
-0.25% at the shipped 64x64 default); the unaberrated case is radially
-symmetric to floating-point precision (x-axis vs y-axis intensity, exact
-match at every radius tested); it correctly inherits the depth-focal-shift
-fix above (identical best-focus plane to the direct method); and it stays
-finite and positive across the full realistic NA/refractive-index range,
-including extreme index-mismatch cases. End-to-end tested through the real
-UI/worker pool (Playwright): both methods build without error for the same
-config, and the new path measured a genuine ~10x additional speedup over the
-already-parallelized direct method at default settings. Kept OPT-IN, not a
-replacement — the direct method is more field-tested and remains the default.
+log(`webSMLM v0.12.0-dev · build 2026-09-02j — trimmed the PSF preview's own
+debug logging: the per-z-plane log line (one per plane, up to dozens per
+build) is gone, keeping just the config summary, the done/timing summary,
+and any warning/error — the per-plane detail was useful while first
+validating the worker-pool/FFT paths but is noise for normal use now that
+both are verified. No behaviour change beyond less log output.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

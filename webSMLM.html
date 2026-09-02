@@ -39,9 +39,14 @@
                            into generateSynthetic()'s emitter render loop —
                            see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md);
                            buildPsfKernelStack()/getOrBuildPsfKernelStack()
-                           (cached), PSF_ZERNIKE_PRESETS, Preview PSF button
-    detect          4616   per-frame band-pass + local-maxima detection
-    fit             4893   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+                           (cached), PSF_ZERNIKE_PRESETS, Preview PSF button;
+                           z-planes farmed out across the dedicated PSF
+                           worker pool (getPsfWorkerPool(), MODULE: workers)
+                           when available, falling back to
+                           buildPsfPlanesSerial() otherwise (~5x measured
+                           speedup at default settings, 8-core test machine)
+    detect          4682   per-frame band-pass + local-maxima detection
+    fit             4959   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -51,7 +56,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          5402   accumulate to offscreen buffer; view/colour/blur;
+    render          5468   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -73,20 +78,24 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         6687   frame-parallel detect/fit worker pool; dedicated
+    workers         6753   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
                            fit pool — never shares it, see that code's own
-                           comment for why)
-    export          6993   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  7285   astigmatic sigma_x/sigma_y vs z bead curves;
+                           comment for why); dedicated PSF-kernel-build
+                           worker POOL (PSF_WORKER_PRELUDE/psfWorkerSource()/
+                           getPsfWorkerPool(), a third separate worker
+                           family, pool-shaped like the detect/fit pool since
+                           z-planes are independent batchable work)
+    export          7159   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  7451   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           7702   AIM drift correction (2D+z); drift-vs-frame or
+    drift           7868   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -96,16 +105,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    8208   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    8374   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           8917   spectrally resolved SMLM pair-finding; merged
+    sSMLM           9083   spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             9387   single particle tracking, trackpy-inspired;
+    spt             9553   single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -136,7 +145,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        10889  top-level orchestration, *Core()/wrapper split;
+    pipeline        11055  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -145,7 +154,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   11510  Micro-Manager/pycromanager camera bridge
+    liveStreaming   11676  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -189,9 +198,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           13379  localizations table, filtering, histograms;
+    table           13545  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    13954  window.webSMLM.analyze()/analyzeBatch();
+    headless API    14120  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1883,7 +1892,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02f</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02g</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3790,28 +3799,94 @@ function readPsfConfigFromUI(){
            resLateralM:resLateralNm*1e-9, halfWidthPx, oversample, cameraPxNm, kernelWidthNm,
            zernikeCoeffs, zernikeSource };
 }
-// Builds the full oversampled PSF kernel stack (one 2D intensity slice per z-plane), yielding
-// periodically on a time budget exactly like generateSynthetic()'s own frame loop above. Per
-// docs/VECTORIAL_PSF_SIMULATION.md §5's "oversample once, cache, reuse" design — see
-// getOrBuildPsfKernelStack() for the cache wrapper actually called from the UI.
-async function buildPsfKernelStack(cfg){
-  const nx=2*cfg.halfWidthPx*cfg.oversample+1, ny=nx;
+// One debug log line per z-plane, shared by both the serial and worker-parallel build paths below
+// — under the parallel path these can arrive OUT OF ORDER (whichever worker finishes first), which
+// is expected/correct, not a bug: each line names its own plane index.
+function logPsfPlane(z, cfg, focusIndex, planeMax, ms){
+  const ti=cfg.ti0+cfg.zStep*(z-focusIndex), zNm=Math.round((z-focusIndex)*cfg.zStep*1e9);
+  log(`  plane ${z+1}/${cfg.nz} (z=${zNm>=0?'+':''}${zNm}nm, ti=${(ti*1e6).toFixed(2)}µm): `+
+      `max=${planeMax.toExponential(3)}, ${ms.toFixed(1)}ms`);
+}
+// Serial fallback — the original main-thread loop, used whenever the dedicated PSF worker pool
+// (getPsfWorkerPool(), below) isn't available. Still yields periodically on a time budget exactly
+// like generateSynthetic()'s own frame loop does, so the UI stays responsive either way.
+async function buildPsfPlanesSerial(cfg, nx, ny, focusIndex){
   const slices=new Array(cfg.nz);
   let globalMax=0, lastYield=performance.now();
   for(let z=0; z<cfg.nz; z++){
+    const tPlaneStart=performance.now();
     const pupil=computePsfPupilForZPlane(z, cfg.nz, cfg);
     const slice=computePsfIntensityPlane(nx, ny, cfg.resLateralM, pupil);
-    for(let i=0;i<slice.length;i++) if(slice[i]>globalMax) globalMax=slice[i];
+    let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
+    if(planeMax>globalMax) globalMax=planeMax;
     slices[z]=slice;
+    logPsfPlane(z, cfg, focusIndex, planeMax, performance.now()-tPlaneStart);
     if(performance.now()-lastYield>50){ setProg(100*z/cfg.nz); await tick(); lastYield=performance.now(); }
   }
+  return {slices, globalMax};
+}
+// Worker-parallel path: z-planes are fully independent (each rebuilt from scratch from cfg, no
+// shared state), so this is a simple "pull the next plane" queue spread across the whole pool —
+// every worker races to grab planes as fast as it finishes the last one, which load-balances
+// naturally even if per-plane cost ever stops being uniform (it currently is: same nx/ny/N_RHO/
+// N_PHI every plane). No batching/chunking needed at only ~dozens of planes — one postMessage per
+// plane keeps per-worker idle time low without meaningful message-passing overhead.
+async function buildPsfPlanesParallel(cfg, nx, ny, focusIndex, pool){
+  const slices=new Array(cfg.nz);
+  let globalMax=0, nextZ=0, done=0;
+  async function runWorker(w){
+    while(nextZ<cfg.nz){
+      const z=nextZ++;
+      const resp=await dispatchPsfWorker(w, {z, nz:cfg.nz, nx, ny, resLateralM:cfg.resLateralM,
+        NA:cfg.NA, lambda:cfg.lambda, ns:cfg.ns, ni:cfg.ni, ti0:cfg.ti0,
+        particleAxialPosition:cfg.particleAxialPosition, zStep:cfg.zStep, zernikeCoeffs:cfg.zernikeCoeffs});
+      if(resp.err) throw new Error(`PSF worker failed on plane ${z+1}/${cfg.nz}: ${resp.err}`);
+      slices[z]=resp.slice;
+      if(resp.planeMax>globalMax) globalMax=resp.planeMax;
+      done++;
+      logPsfPlane(z, cfg, focusIndex, resp.planeMax, resp.ms);
+      setProg(100*done/cfg.nz);
+    }
+  }
+  await Promise.all(pool.map(runWorker));
+  return {slices, globalMax};
+}
+// Builds the full oversampled PSF kernel stack (one 2D intensity slice per z-plane). Per
+// docs/VECTORIAL_PSF_SIMULATION.md §5's "oversample once, cache, reuse" design — see
+// getOrBuildPsfKernelStack() for the cache wrapper actually called from the UI. Tries the
+// dedicated PSF worker pool first (z-planes farmed out across cores), falling back to the serial
+// main-thread loop wherever workers aren't usable (file://, an older browser, etc.) — same
+// "probe once, fall back cleanly" convention as getPool()/getRenderWorker() above.
+async function buildPsfKernelStack(cfg){
+  // cfg.halfWidthPx is already in OVERSAMPLED-pixel units (readPsfConfigFromUI() divides the
+  // physical kernelWidthNm by resLateralNm = cameraPxNm/oversample, the oversampled pixel size) —
+  // do NOT multiply by cfg.oversample again here. A real, shipped bug: an earlier version did,
+  // inflating nx/ny by a further factor of `oversample` (16x the intended pixel count at the
+  // default oversample=4, 64x at the max oversample=8) — the actual cause of a slow build, not a
+  // fundamental performance limit of the algorithm itself.
+  const nx=2*cfg.halfWidthPx+1, ny=nx;
+  const focusIndex=Math.floor((cfg.nz-1)/2);
+  const pool=await getPsfWorkerPool();
+  log(`PSF build: NA=${cfg.NA}, λ=${(cfg.lambda*1e9).toFixed(0)}nm, ns=${cfg.ns}, ni=${cfg.ni}, `+
+      `ti0=${(cfg.ti0*1e6).toFixed(1)}µm, depth=${(cfg.particleAxialPosition*1e9).toFixed(0)}nm, `+
+      `kernel ${nx}×${ny}px (oversample ${cfg.oversample}×, res=${(cfg.resLateralM*1e9).toFixed(1)}nm/px), `+
+      `${cfg.nz} z-planes × ${cfg.zStep*1e9}nm (focus @ plane ${focusIndex}), `+
+      `Zernike[${cfg.zernikeSource}]=[${cfg.zernikeCoeffs.map(v=>v.toFixed(3)).join(',')}]`+
+      (pool?`, using ${pool.length} PSF worker(s) (plane logs below may arrive out of order)`:', running single-threaded (no worker pool available)'));
+  const t0=performance.now();
+  const {slices, globalMax} = pool ? await buildPsfPlanesParallel(cfg, nx, ny, focusIndex, pool)
+                                    : await buildPsfPlanesSerial(cfg, nx, ny, focusIndex);
   setProg(null);
-  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm:cfg.zStep*1e9, focusIndex:Math.floor((cfg.nz-1)/2), globalMax };
+  const totalMs=performance.now()-t0;
+  log(`PSF build done: ${cfg.nz} planes in ${totalMs.toFixed(0)}ms (${(totalMs/cfg.nz).toFixed(1)}ms/plane`+
+      (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
+  if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
+  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm:cfg.zStep*1e9, focusIndex, globalMax };
 }
 let _psfKernelCacheKey=null, _psfKernelCache=null;
 async function getOrBuildPsfKernelStack(cfg){
   const key=JSON.stringify(cfg);
-  if(key===_psfKernelCacheKey && _psfKernelCache) return _psfKernelCache;
+  if(key===_psfKernelCacheKey && _psfKernelCache){ log('PSF build: parameters unchanged, reusing cached kernel.'); return _psfKernelCache; }
   const result=await buildPsfKernelStack(cfg);
   _psfKernelCacheKey=key; _psfKernelCache=result;
   return result;
@@ -6987,6 +7062,106 @@ async function getRenderWorker(){
     wireRenderWorker(probe);
     return _renderWorker=probe;
   }catch(err){ log(`  (render worker unavailable: ${err.message} — SR reconstruction will run on the main thread)`); return _renderWorker=null; }
+}
+
+/* ---------------------------------------------------------------------------
+   Dedicated PSF-kernel-build worker POOL (MODULE: simulation's
+   buildPsfKernelStack()) — a third, separate worker family alongside the
+   detect/fit pool and the single dedicated render worker above, per this
+   file's own Web Worker gotcha (a job never shares another job's pool/
+   worker: each worker has exactly one onmessage property, not a queue). This
+   one IS a pool (like getPool(), not a lone worker like getRenderWorker())
+   because z-planes are independent, batchable work at real plane counts
+   (dozens), the same shape as detect/fit's frame batches — one worker would
+   leave every other core idle for no reason.
+   --------------------------------------------------------------------------- */
+// Only two constants, both declared literally right here (not derived from a
+// generic missing-identifier scan like WORKER_PRELUDE/RENDER_WORKER_PRELUDE
+// above) — computePsfPupilForZPlane/computePsfIntensityPlane touch no other
+// module-level state, so there's nothing else this prelude could omit today.
+// If a future edit gives either function a new module-level dependency, add
+// it here too, or the worker throws a ReferenceError and silently falls back
+// to the serial path (buildPsfKernelStack()'s own try/catch around getPsfWorkerPool()).
+const PSF_WORKER_PRELUDE="const PSF_N_RHO="+PSF_N_RHO+", PSF_N_PHI="+PSF_N_PHI+";";
+function psfWorkerSource(){
+  const body=[
+    psfIndexToNM.toString(), psfBinomial.toString(), psfZernikeRadial.toString(), psfZernikeValue.toString(),
+    computePsfPupilForZPlane.toString(), computePsfIntensityPlane.toString(),
+    `onmessage=function(e){
+      const d=e.data;
+      if(d.ping){
+        // Self-test the whole numeric path (not just the message channel) with a tiny
+        // unaberrated plane, and confirm it isn't silently all-zero — the exact worker-init
+        // gotcha docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5 warns about (a skipped
+        // init step upstream producing all-zero output with no exception at all).
+        try{
+          const cfg={NA:1.4, lambda:660e-9, ns:1.33, ni:1.518, ti0:150e-6, particleAxialPosition:0, zStep:20e-9, zernikeCoeffs:new Array(15).fill(0)};
+          const pupil=computePsfPupilForZPlane(0,1,cfg);
+          const slice=computePsfIntensityPlane(9,9,25e-9,pupil);
+          let mx=0; for(let i=0;i<slice.length;i++) if(slice[i]>mx) mx=slice[i];
+          if(!(mx>0)) throw new Error('self-test produced all-zero output');
+          postMessage({pong:1});
+        }catch(err){ postMessage({pong:0,err:String(err&&err.message||err)}); }
+        return;
+      }
+      const {seq,z,nz,nx,ny,resLateralM,NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs}=d;
+      try{
+        const t0=performance.now();
+        const pupil=computePsfPupilForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs});
+        const slice=computePsfIntensityPlane(nx, ny, resLateralM, pupil);
+        let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
+        postMessage({seq,z,slice,planeMax,ms:performance.now()-t0},[slice.buffer]);
+      }catch(err){ postMessage({seq,z,err:String(err&&err.message||err)}); }
+    };`
+  ].join('\n');
+  return PSF_WORKER_PRELUDE+'\n'+body;
+}
+// Persistent onmessage/seq-map dispatch, same shape as wireRenderWorker()/dispatchRenderWorker()
+// above — but shared across the WHOLE pool via one Map (seq is a single global counter, unique
+// regardless of which pool member a given request/response pair actually runs on), since unlike
+// the render worker there's more than one physical worker answering.
+const _psfWorkerPending=new Map();
+let _psfWorkerSeq=0;
+function wirePsfWorker(worker){
+  worker.onmessage=ev=>{
+    const d=ev.data, pending=_psfWorkerPending.get(d.seq);
+    if(!pending) return;
+    _psfWorkerPending.delete(d.seq);
+    pending.resolve(d);   // resolve even on d.err — buildPsfPlanesParallel() checks it itself, so one bad plane doesn't reject/strand every other in-flight request
+  };
+  worker.onerror=ev=>{
+    for(const {resolve} of _psfWorkerPending.values()) resolve({err:ev.message||'PSF worker error'});
+    _psfWorkerPending.clear();
+  };
+}
+function dispatchPsfWorker(worker,payload){
+  return new Promise(resolve=>{
+    const seq=++_psfWorkerSeq;
+    _psfWorkerPending.set(seq,{resolve});
+    worker.postMessage({seq,...payload});
+  });
+}
+let _psfPool=undefined;                              // undefined = not probed yet
+async function getPsfWorkerPool(){
+  if(_psfPool!==undefined) return _psfPool;
+  try{
+    const url=URL.createObjectURL(new Blob([psfWorkerSource()],{type:'text/javascript'}));
+    const probe=new Worker(url);
+    const ok=await new Promise(res=>{
+      const t=setTimeout(()=>res({pong:0,err:'timeout'}),3000);
+      probe.onmessage=ev=>{clearTimeout(t);res(ev.data||{pong:0});};
+      probe.onerror  =ev=>{clearTimeout(t);res({pong:0,err:ev.message||'worker error'});};
+      probe.postMessage({ping:1});
+    });
+    probe.terminate();
+    if(!ok.pong){
+      log(`(PSF workers unavailable${ok.err?' — '+ok.err:''}; building the PSF kernel on the main thread)`);
+      return _psfPool=null;
+    }
+    const nw=Math.max(1,Math.min(8, navigator.hardwareConcurrency||4));
+    const pool=[]; for(let i=0;i<nw;i++){ const w=new Worker(url); wirePsfWorker(w); pool.push(w); }
+    return _psfPool=pool;
+  }catch(err){ log(`(PSF workers unavailable: ${err.message} — building the PSF kernel on the main thread)`); return _psfPool=null; }
 }
 
 /* ===========================================================================
@@ -12416,7 +12591,7 @@ $('psfPreviewBtn').addEventListener('click', async ()=>{
     $('psfScrubRow').style.display='flex';
     $('psfScrub').max=psfPreviewStack.nz-1; $('psfScrubNum').max=psfPreviewStack.nz;
     showPsfSlice(psfPreviewIndex);
-    log(`PSF preview: ${psfPreviewStack.nx}×${psfPreviewStack.ny}px kernel (oversample ${cfg.oversample}×), ${psfPreviewStack.nz} z-planes, Zernike coeffs from ${cfg.zernikeSource}.`);
+    log(`PSF preview shown, starting at focus (plane ${psfPreviewIndex+1}/${psfPreviewStack.nz}).`);
   } catch(e){ log('PSF preview failed: '+e.message); }
   btn.disabled=false;
 });
@@ -13251,13 +13426,18 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02f — added a Zernike-aberrated PSF
-model to Simulation settings (Phase 1, docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md):
-optical/Gibson-Lanni params, z-range/step, oversampling, and a curated
-Zernike-preset dropdown (plus a milliwave custom-coefficients field). "Preview PSF"
-builds an oversampled, cached kernel and shows it as a z-scrollable slice in the
-raw panel. Not yet wired into the actual "Simulate movie" emitter render loop —
-preview/validation step only, see the doc's roadmap for the deferred phases.
+log(`webSMLM v0.12.0-dev · build 2026-09-02g — PSF preview: fixed a real kernel-
+sizing bug (halfWidthPx was already in oversampled-px units but got multiplied
+by the oversampling factor again, inflating the kernel 16x at the default
+oversample=4, 64x at oversample=8 — the actual cause of a slow build, not a
+fundamental limit). Also added a dedicated PSF worker POOL
+(PSF_WORKER_PRELUDE/psfWorkerSource()/getPsfWorkerPool()): z-planes are
+independent, so they're farmed out across cores the same way detect/fit frame
+batches are, falling back to the single-threaded build wherever workers aren't
+usable. Measured ~5x speedup at default settings (8-core test machine),
+verified byte-identical output between the pooled and serial paths via a
+Playwright smoke test. Per-plane debug logging (from the previous build) now
+also reports which path ran and how many workers.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

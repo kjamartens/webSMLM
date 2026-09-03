@@ -199,7 +199,7 @@ relevant one before editing rather than scrolling:
   oversampled, physically-modelled Gibson-Lanni+Zernike kernel the PSF preview builds (see
   `docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §10) — **2D only** (one fixed
   `simulation_psfDepth` for the whole movie; that same section spells out the per-emitter-z/3D
-  follow-up). `simulation_psfInterp` (`'nearest'|'linear'`(default)`|'cubic'`) selects how
+  follow-up). `simulation_psfInterp` (`'nearest'|'linear'|'cubic'`(default)`|'fft'`) selects how
   `splatZernikeEmitter()` interpolates the oversampled kernel at each emitter's exact sub-pixel
   position before SUMMING (not averaging — each kernel entry is a probability mass, so summing is
   what conserves photon count) the sub-cell samples down to the camera pixel grid — the "oversample

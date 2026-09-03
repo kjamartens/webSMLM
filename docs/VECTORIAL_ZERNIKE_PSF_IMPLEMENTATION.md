@@ -375,11 +375,28 @@ nearest-plane lookup" open question for webSMLM specifically.
 - The built slice is normalized to `sum===1` once (a probability MASS over the oversampled grid,
   not a density) before the frame loop starts, so per-emitter photon count is exact by
   construction rather than approximated.
-- **`simulation_psfInterp`** (`'nearest'|'linear'|'cubic'`, default `'linear'`) selects how
+- **`simulation_psfInterp`** (`'nearest'|'linear'|'cubic'|'fft'`, default `'cubic'`) selects how
   `sampleKernelAt()` reads the oversampled kernel at a continuous (fractional) index — nearest,
-  bilinear, or separable bicubic (Catmull-Rom, `a=-0.5`). This is the user-facing choice the two
-  companion docs left open (neither commits to one scheme); `'linear'` matches both documents' own
-  baseline recommendation.
+  bilinear, separable bicubic (Catmull-Rom, `a=-0.5`), or a whole-kernel Fourier phase-shift. This
+  is the user-facing choice the two companion docs left open (neither commits to one scheme).
+  Default moved from `'linear'` (both companion docs' original baseline recommendation) to
+  `'cubic'` once a wider literature check confirmed bilinear is well documented as too inaccurate
+  for subpixel placement near Nyquist-level sampling, while cubic (bicubic/spline) is the standard
+  practical speed/accuracy trade-off actually shipped across SMLM PSF tooling — e.g. the
+  cubic-spline PSF model in Babcock & Zhuang, "Isotropic real-time 3D single-molecule localization
+  microscopy," *bioRxiv* (2017), later published *Nature Methods* 12(4), 449–452, and the same
+  cubic-spline family used by SMAP and DECODE. `'fft'` (Fourier-shift-theorem placement via
+  `splatZernikeEmitterFFT()`/`fftShiftKernelTile()`, reusing `fft2d()` from MODULE: locprecision)
+  is deliberately **not** the default — see `docs/VECTORIAL_PSF_SIMULATION.md` §3/§4 for why: it
+  needs a full 2D FFT + inverse per emitter (versus `'cubic'`'s fixed `4×4`-tap sum), assumes
+  periodic boundaries so a non-periodic kernel tile risks wraparound (Gibbs) ringing without
+  padding, and the accuracy gap versus `'cubic'` is small at the oversampling factors this tool
+  already uses (2–5×) — see Guizar-Sicairos, Thurman & Fienup, "Efficient subpixel image
+  registration algorithms," *Optics Letters* 33(2), 156–158 (2008) for the field's efficient
+  variant of the same technique. It's kept opt-in purely so it can be A/B-compared against
+  `'cubic'` directly; a Node-harness numerical check (not checked in) confirmed the two agree to
+  ~0.02% of peak value on a synthetic symmetric test kernel across several sub-pixel offsets, with
+  photon count conserved exactly by both.
 - **`splatZernikeEmitter()`** does the actual placement: for every camera pixel within `camRad` of
   an emitter, it samples `oversample²` sub-cell points of the (fractionally shifted, per the
   emitter's own exact position) kernel via `sampleKernelAt()` and **sums** them (not averages —
@@ -389,10 +406,10 @@ nearest-plane lookup" open question for webSMLM specifically.
   step is the literal "interpolate for sub-pixel placement, then box-downsample" pipeline both
   `docs/VECTORIAL_PSF_SIMULATION.md` §2 and this document's own §5 describe.
 - Verified (standalone Node harness, not checked in): for a synthetic symmetric test kernel, all
-  three interpolation modes conserve total photon count exactly regardless of emitter sub-pixel
-  position; `'linear'`/`'cubic'` reproduce the emitter's exact sub-pixel centroid to floating-point
-  precision, `'nearest'` quantizes to the oversampled grid's own `1/oversample`-camera-pixel
-  resolution (expected — it's the cheap/coarse option, not a bug).
+  four interpolation modes conserve total photon count exactly regardless of emitter sub-pixel
+  position; `'linear'`/`'cubic'`/`'fft'` reproduce the emitter's exact sub-pixel centroid to
+  floating-point precision, `'nearest'` quantizes to the oversampled grid's own
+  `1/oversample`-camera-pixel resolution (expected — it's the cheap/coarse option, not a bug).
 - The existing Gaussian path (`generateSynthetic()`'s original `sigma=1.3` render loop) is
   untouched — purely an additive `if(zKernel){…}else{…}` branch, per this doc's own §7 instruction.
 

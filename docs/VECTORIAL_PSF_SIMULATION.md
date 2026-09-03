@@ -204,6 +204,14 @@ Methods*, 2022). It combines much of Option 1's smoothness/accuracy without stor
 grid step, and sidesteps Option 2's FFT-ringing risk — but it is explicitly out of scope for the
 current decision.
 
+**Update**: `simulation_psfInterp`'s eventual default landed on `'cubic'` (Catmull-Rom bicubic —
+close in spirit to, though not literally, the cubic B-spline models above), matching this
+footnote's own observation that cubic is the field's actual default. Option 2 (this section's
+FFT-shift approach) was also later added as a genuinely opt-in `'fft'` mode on the same setting —
+not because the rejection reasoning above changed, but purely so it can be loaded and A/B-compared
+against `'cubic'` directly. See `docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §10 for what
+shipped.
+
 ## 7. Open questions for implementation (not answered here)
 
 - Which vectorial PSF formulation/reference implementation to base generation on — e.g. a

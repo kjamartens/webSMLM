@@ -1919,7 +1919,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02p</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02q</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2058,10 +2058,10 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="psfNiRow" style="display:none">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
         <label class="row" id="psfTi0Row" style="display:none">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
         <label class="row" id="psfDepthRow" style="display:none">Emitter depth into sample (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
-        <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="500" class="num"></label>
-        <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="20" class="num"></label>
+        <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="2000" class="num"></label>
+        <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="10" class="num"></label>
         <label class="row" id="psfOversampleRow" style="display:none">PSF lateral oversampling (×) <input type="number" id="simulation_psfOversample" min="4" max="8" step="1" value="4" class="num"></label>
-        <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="2000" class="num"></label>
+        <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="6000" class="num"></label>
         <label class="row" id="psfZernikePresetRow" style="display:none">Zernike aberration preset
           <select id="simulation_psfZernikePreset" class="sel">
             <option value="none">None (unaberrated)</option>
@@ -2922,15 +2922,15 @@ const PARAMS = {
   simulation_psfDepth: { type:'number', id:'simulation_psfDepth', label:'Emitter depth into sample (nm)', min:0, max:5000, step:10, default:0, int:false },
   // simulation_psfZRange/ZStep define the z-plane grid the kernel is built over: nz =
   // 2*round(zRange/zStep)+1 planes, centred on focus at index (nz-1)/2 — see buildPsfKernelStack().
-  simulation_psfZRange: { type:'number', id:'simulation_psfZRange', label:'PSF z range (± nm)', min:50, max:2000, step:10, default:500, int:false },
-  simulation_psfZStep: { type:'number', id:'simulation_psfZStep', label:'PSF z step (nm)', min:1, max:100, step:1, default:20, int:false },
+  simulation_psfZRange: { type:'number', id:'simulation_psfZRange', label:'PSF z range (± nm)', min:50, max:2000, step:10, default:2000, int:false },
+  simulation_psfZStep: { type:'number', id:'simulation_psfZStep', label:'PSF z step (nm)', min:1, max:100, step:1, default:10, int:false },
   // simulation_psfOversample = lateral oversampling factor relative to the camera pixel
   // (simulation_pxnm) — 4-8x per docs/VECTORIAL_PSF_SIMULATION.md §5's literature-supported range.
   simulation_psfOversample: { type:'number', id:'simulation_psfOversample', label:'PSF lateral oversampling (×)', min:4, max:8, step:1, default:4, int:true },
   // simulation_psfKernelWidth = kernel FULL WIDTH in physical nm (not px) — independent of camera
   // pixel size, more informative than a raw pixel count; rescaled to an oversampled-px half-width
   // only where the kernel is actually built (readPsfConfigFromUI()), never stored as px itself.
-  simulation_psfKernelWidth: { type:'number', id:'simulation_psfKernelWidth', label:'PSF kernel width (nm)', min:500, max:6000, step:50, default:2000, int:false },
+  simulation_psfKernelWidth: { type:'number', id:'simulation_psfKernelWidth', label:'PSF kernel width (nm)', min:500, max:6000, step:50, default:6000, int:false },
   // simulation_psfZernikePreset = curated coefficient-set dropdown (PSF_ZERNIKE_PRESETS) — a
   // deliberately narrow subset of the full 15-coefficient OSA basis; see that constant's own
   // comment for the "order-of-magnitude, not paper-sourced" caveat these presets carry.
@@ -14103,16 +14103,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02p — "Simulate movie" gains a
-Random seed field (simulation_seed, 0=random/unseeded as before). Setting
-it to a nonzero value makes every random draw in generateSynthetic() —
-emitter site pick, ON/OFF timing, drift direction, all simulated camera
-noise — reproducible via a seeded PRNG (mulberry32), so two runs with the
-same seed and only PSF placement interpolation changed differ ONLY in the
-PSF placement itself: useful for directly A/B-comparing the 'nearest'/
-'linear'/'cubic'/'fft' modes added in the previous build on identical
-underlying data. gauss()/poisson() now take an optional rng source
-(default Math.random, unchanged for every other caller).
+log(`webSMLM v0.12.0-dev · build 2026-09-02q — Changed 3 Simulation defaults:
+PSF kernel width 2000->6000nm, PSF z range ±500->±2000nm, PSF z step
+20->10nm — a wider, finer z-sweep for 3D simulation/calibration-stack
+generation. Note: at these defaults nz = 2*round(2000/10)+1 = 401 z-planes
+(vs 51 before), so building the full kernel STACK (3D simulation / Simulate
+calib. stack) takes noticeably longer than before, even on the fast
+FFT/chirp-Z evaluation path — lower PSF z step or narrow PSF z range if
+that matters more than resolution for a given test.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

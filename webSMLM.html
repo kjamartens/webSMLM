@@ -78,9 +78,13 @@
                            MODULE: workers) when available, falling back to
                            simulateFramesSerial() otherwise — simFrameSeed()
                            gives each frame its own independent noise stream
-                           so simulation_seed reproducibility holds either way
-    detect          5390   per-frame band-pass + local-maxima detection
-    fit             5667   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+                           so simulation_seed reproducibility holds either way;
+                           generateCalibrationStack()'s own per-z-plane splat+
+                           noise loop shares the SAME worker pool
+                           (simulateCalibFramesParallel()/
+                           simulateCalibFramesSerial(), splatBeadsFrame())
+    detect          5461   per-frame band-pass + local-maxima detection
+    fit             5738   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -90,7 +94,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          6176   accumulate to offscreen buffer; view/colour/blur;
+    render          6247   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -112,7 +116,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         7461   frame-parallel detect/fit worker pool; dedicated
+    workers         7532   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -131,15 +135,21 @@
                            simFrameSeed() derives a per-frame-independent
                            mulberry32() seed so a seeded Simulate movie run
                            reproduces byte-identical frames regardless of
-                           worker availability/dispatch order)
-    export          8011   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  8303   astigmatic sigma_x/sigma_y vs z bead curves;
+                           worker availability/dispatch order); the SAME sim
+                           worker pool also splats+noises
+                           generateCalibrationStack()'s own bead z-planes
+                           (splatBeadsFrame()/simulateCalibFramesParallel(),
+                           calibInit/calibBatch message types alongside
+                           simInit/simBatch — no seeded-reproducibility
+                           scheme there, calibration stacks were never seeded)
+    export          8101   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  8393   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           8720   AIM drift correction (2D+z); drift-vs-frame or
+    drift           8810   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -149,16 +159,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    9226   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    9316   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           9935   spectrally resolved SMLM pair-finding; merged
+    sSMLM           10025  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             10405  single particle tracking, trackpy-inspired;
+    spt             10495  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -189,7 +199,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        11907  top-level orchestration, *Core()/wrapper split;
+    pipeline        11997  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -198,7 +208,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   12528  Micro-Manager/pycromanager camera bridge
+    liveStreaming   12618  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -242,9 +252,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           14443  localizations table, filtering, histograms;
+    table           14533  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    15018  window.webSMLM.analyze()/analyzeBatch();
+    headless API    15108  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1936,7 +1946,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-03a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-03b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3773,6 +3783,15 @@ function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng){
     img[i]=adu<0?0:adu;
   }
 }
+// generateCalibrationStack()'s own splat step — a fixed bead grid (beadXY, same x,y at every
+// z-plane, unlike generateSynthetic()'s blinking emitters) imaged through ONE already-selected
+// z-plane's kernel. Pure/parameter-only for the same reason splatSimFrame() is: stringified into
+// the simulation worker (simWorkerSource()) as well as called directly by the serial fallback.
+function splatBeadsFrame(w, h, bg, beadXY, photPerFrame, kernelObj, camRad, interpMode){
+  const img=new Float32Array(w*h).fill(bg);
+  for(const [bx,by] of beadXY) splatZernikeEmitter(img, w, h, bx, by, photPerFrame, kernelObj, camRad, interpMode);
+  return img;
+}
 // Single-threaded fallback for the movie's per-frame splat+noise stage — used when no worker
 // pool is available. Loops fi in order but, unlike the pre-parallelization version, draws each
 // frame's camera noise from its OWN simFrameSeed(baseSeed,fi)-derived stream rather than
@@ -3795,6 +3814,59 @@ async function simulateFramesSerial(ctx){
     if(performance.now()-lastYield>50){ onProgress(100*fi/n); await tick(); lastYield=performance.now(); }
   }
   return {frames, zClampedCount, zTotalCount};
+}
+// Single-threaded fallback for generateCalibrationStack()'s own per-z-plane splat+noise stage.
+// Unlike generateSynthetic()'s frames, calibration z-planes were never seeded/reproducible to
+// begin with (the original serial loop always called poisson()/gauss() with the default
+// Math.random()) — so, unlike simulateFramesSerial()'s simFrameSeed() scheme, there's no
+// reproducibility contract to preserve here; each plane just draws from Math.random() same as
+// before, whether this fallback or simulateCalibFramesParallel() below ends up running it.
+async function simulateCalibFramesSerial(ctx){
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,onProgress}=ctx;
+  const frames=new Array(nz);
+  let lastYield=performance.now();
+  for(let z=0; z<nz; z++){
+    const kernelObj={kernel:norm[z], nx:kernelNx, ny:kernelNy, oversample};
+    const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
+    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random);
+    frames[z]=img;
+    if(performance.now()-lastYield>50){ onProgress(100*z/nz); await tick(); lastYield=performance.now(); }
+  }
+  return {frames};
+}
+// Splats+noises every z-plane of generateCalibrationStack()'s bead stack across `pool` —
+// otherwise the same batched dispatch shape as simulateFramesParallel() above (same
+// workerBatchMin/Max/Target knobs), just keyed by z-plane index instead of frame index, and with
+// no per-plane context to init once (each plane's own norm[z] kernel differs, so it travels with
+// its batch entry instead of a one-time simInit — beadXY/offsetMap/etc are still shared and DO go
+// through calibInit, sent once per worker before any batch).
+async function simulateCalibFramesParallel(pool, ctx){
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({calibInit:true,w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx:kernelNx,ny:kernelNy,oversample,offsetMap,simGain,readNoiseE}));
+  const frames=new Array(nz);
+  let done=0, err=null;
+  const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(nz/(pool.length*paramValue('workerBatchTarget')))));
+  let next=0, inflight=0;
+  await new Promise((resolve,reject)=>{
+    const finish=()=>{ if(inflight===0 && (err||next>=nz)) (err?reject(err):resolve()); };
+    const dispatch=wk=>{
+      if(err||next>=nz){ finish(); return; }
+      const s=next, e=Math.min(nz,s+BATCH); next=e;
+      inflight++;
+      const batch=[]; for(let z=s; z<e; z++) batch.push({z, kernel:norm[z]});
+      wk.onmessage=ev=>{
+        const d=ev.data, N=w*h;
+        for(let i=0;i<d.count;i++) frames[s+i]=d.buf.subarray(i*N,(i+1)*N);
+        done+=d.count; onProgress(100*done/nz); inflight--;
+        dispatch(wk);
+      };
+      wk.onerror=ev=>{ err=new Error('calibration worker failed: '+(ev.message||'unknown')); inflight--; finish(); };
+      wk.postMessage({calibBatch:true, start:s, batch});
+    };
+    pool.forEach(dispatch);
+    finish();
+  });
+  return {frames};
 }
 
 // Builds a full synthetic TIFF-like stack ("Simulate movie") — Poisson
@@ -4001,19 +4073,18 @@ async function generateCalibrationStack(){
   const offsetMap=new Float32Array(w*h);
   for(let i=0;i<offsetMap.length;i++) offsetMap[i]=simOffset+simOffsetStd*gauss();
 
-  const frames=[];
-  let lastYield=performance.now();
-  for(let z=0; z<nz; z++){
-    const img=new Float32Array(w*h).fill(bg);
-    const kernelObj={kernel:norm[z], nx:kstack.nx, ny:kstack.ny, oversample:cfg.oversample};
-    for(const [bx,by] of beadXY) splatZernikeEmitter(img, w, h, bx, by, photPerFrame, kernelObj, camRad, interpMode);
-    for(let i=0;i<img.length;i++){
-      const adu=offsetMap[i]+(poisson(img[i])+readNoiseE*gauss())/simGain;
-      img[i]=adu<0?0:adu;
-    }
-    frames.push(img);
-    if(performance.now()-lastYield>50){ setProg(100*z/nz); await tick(); lastYield=performance.now(); }
-  }
+  // Splat+noise every z-plane — frame-parallel across the SAME simulation worker pool
+  // generateSynthetic() uses (simulateCalibFramesParallel(), MODULE: workers), each worker
+  // computing its own batch's beads through its own kernel plane; falls back to
+  // simulateCalibFramesSerial() otherwise. See that function's own comment for why this path has
+  // no seeded-reproducibility scheme to preserve (there never was one here).
+  const calibCtx={w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,
+                  kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,norm,
+                  offsetMap,simGain,readNoiseE,onProgress:setProg};
+  const calibPool=await getSimWorkerPool();
+  const {frames} = calibPool && calibPool.length>1
+    ? await simulateCalibFramesParallel(calibPool, calibCtx)
+    : await simulateCalibFramesSerial(calibCtx);
   setProg(null);
   groundTruth=null; simTrueDrift=null;   // no filament ground truth / drift to score for a calibration stack
   log(`Simulated calibration stack: ${nz} z-planes × ${zStepNm}nm (focus @ frame ${focusIndex+1}/${nz}), `+
@@ -7890,7 +7961,7 @@ async function getPsfWorkerPool(){
    --------------------------------------------------------------------------- */
 // _g is gauss()'s own Box-Muller spare-value cache (MODULE: simulation) — reset by
 // applySimCameraNoise() itself before every frame, so its initial value here never matters.
-const SIM_WORKER_PRELUDE="let _g=null;\nlet _simCtx=null;";
+const SIM_WORKER_PRELUDE="let _g=null;\nlet _simCtx=null;\nlet _calibCtx=null;";
 function simWorkerSource(){
   const body=[
     gauss.toString(), poisson.toString(), mulberry32.toString(), simFrameSeed.toString(),
@@ -7898,7 +7969,7 @@ function simWorkerSource(){
     catmullRomWeights.toString(), sampleKernelBicubic.toString(), sampleKernelAt.toString(),
     nextPow2.toString(), fft1d.toString(), fft2d.toString(), fftShiftKernelTile.toString(),
     splatZernikeEmitterFFT.toString(), splatZernikeEmitter.toString(),
-    splatSimFrame.toString(), applySimCameraNoise.toString(),
+    splatSimFrame.toString(), splatBeadsFrame.toString(), applySimCameraNoise.toString(),
     `onmessage=function(e){
       const d=e.data;
       if(d.ping){
@@ -7936,6 +8007,25 @@ function simWorkerSource(){
           buf.set(r.img, i*N);
         }
         postMessage({seq:d.seq,start,count:batch.length,buf,zClamped,zTotal},[buf.buffer]);
+        return;
+      }
+      if(d.calibInit){
+        // One-time per-worker context for generateCalibrationStack()'s own dispatch — see
+        // simulateCalibFramesParallel()'s comment for why no ack is needed.
+        _calibCtx=d;
+        return;
+      }
+      if(d.calibBatch){
+        const {w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx,ny,oversample,offsetMap,simGain,readNoiseE}=_calibCtx;
+        const {start,batch}=d, N=w*h;
+        const buf=new Float32Array(batch.length*N);
+        for(let i=0;i<batch.length;i++){
+          const kernelObj={kernel:batch[i].kernel, nx, ny, oversample};
+          const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
+          applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random);
+          buf.set(img, i*N);
+        }
+        postMessage({seq:d.seq,start,count:batch.length,buf},[buf.buffer]);
         return;
       }
     };`
@@ -14314,7 +14404,7 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-03a — Simulate movie now splats+noises frames across a
+log(`webSMLM v0.12.0-dev · build 2026-09-03b — Simulate movie now splats+noises frames across a
 dedicated worker pool (getSimWorkerPool(), MODULE: workers) instead of one at a time on the main
 thread, when workers are available — a real speedup on multi-core machines for large frame counts
 or the Zernike 3D PSF path. Reproducibility for a given random seed is preserved: each frame now
@@ -14322,6 +14412,9 @@ draws its camera noise from its own simFrameSeed(seed,frame)-derived stream rath
 continuing sequential stream, so a seeded run reproduces the exact same movie regardless of
 worker availability or dispatch order (verified: parallel and single-threaded fallback produce
 byte-identical frames for the same seed).
+"Simulate calib. stack" (3D calibration tab) now shares the SAME worker pool for its own
+per-z-plane bead splat+noise loop (simulateCalibFramesParallel()/simulateCalibFramesSerial()) —
+no seeded-reproducibility scheme there since that path was never seeded to begin with.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

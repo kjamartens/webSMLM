@@ -932,6 +932,7 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 | `simulation_readnoise` | Simulation read noise σ (e⁻) | number | 0 | 200 | 0.1 | 2.7 |
 | `simbg` | Simulation background (photons/px) | number | 0 | 500 | 1 | 0 |
 | `driftpx` | Simulated total drift (px) | number | 0 | 30 | 0.5 | 0 |
+| `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
 
 **In-app "more info…" popup** (`hint-simulation` in `webSMLM.html`; synced
 by `tools/sync_hints.mjs` — edit here, then run the script, never edit the
@@ -956,6 +957,12 @@ this panel's gain) — a static per-pixel offset pattern looks identical to read
 Fourier content, so leaving it out biases the fitted offset the same way.</p>
 <p><b>Drift (px, total)</b> — total sample drift over all frames, in a random direction (linear from
 frame 0). 0 = none. Used to test drift correction — the true drift is stored for scoring.</p>
+<p><b>Random seed (0 = random)</b> — 0 (default) keeps the original unseeded behaviour: a fresh
+random layout every "Simulate movie" click. Any other value makes every random draw (emitter site
+pick, ON/OFF timing, drift direction, and all simulated camera noise) reproducible via a seeded PRNG
+instead, so two runs with the same seed and only <b>PSF placement interpolation</b> changed differ
+ONLY in the PSF placement itself — useful for A/B-comparing interpolation modes on identical
+underlying data.</p>
 <p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
 Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
 wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,

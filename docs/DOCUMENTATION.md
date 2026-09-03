@@ -961,7 +961,14 @@ Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil opti
 wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
 lateral oversampling, kernel width) and a curated <b>Zernike aberration preset</b> dropdown
 (astigmatism/coma/spherical/trefoil/mixed, at a few preset strengths) — magnitudes are
-order-of-magnitude estimates, not paper-sourced calibrated values. A <b>Custom Zernike</b> text
+order-of-magnitude estimates, not paper-sourced calibrated values. Selecting <code>zernike</code>
+also makes <b>Simulate movie</b> itself splat every emitter from this kernel (2D only — one fixed
+<b>Emitter depth into sample</b> for the whole movie), not just the preview below.
+<b>PSF placement interpolation</b> (<code>nearest</code>/<code>linear</code>/<code>cubic</code>,
+default <code>linear</code>) chooses how an emitter's exact sub-pixel position is read off the
+oversampled kernel before it's summed down (photon-count-conserving) to the camera pixel grid — a
+higher-quality but more expensive option than the fixed-σ Gaussian path ever needed. A <b>Custom
+Zernike</b> text
 field accepts 15 comma-separated milliwave coefficients (one per OSA Zernike index 0-14; 1000 =
 one full wave) to override the preset entirely. <b>Emitter depth into sample</b> is compensated for
 its own depth-induced focal shift (a real Gibson-Lanni effect: imaging deeper into a lower-index

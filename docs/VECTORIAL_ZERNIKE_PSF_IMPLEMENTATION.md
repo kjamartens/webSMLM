@@ -357,6 +357,72 @@ at the time:
   surface more of it in the visible UI** — start curated (§6), revisit if users ask for finer
   control than the presets offer.
 
+## 10. Shipped: 2D movie-generation wiring, and how to extend to 3D
+
+`generateSynthetic()` now actually consumes `simulation_psfModel==='zernike'` (previously build/
+preview only, per §7 above) — this section documents what shipped and, concretely, how a future
+per-emitter-z (3D) version should build on it, resolving §9's "Z-plane interpolation vs
+nearest-plane lookup" open question for webSMLM specifically.
+
+**What shipped (2D — one fixed emitter depth for the whole movie).**
+
+- `readPsfConfigForSimulation()` (`webSMLM.html`, `MODULE: simulation`) calls the existing
+  `readPsfConfigFromUI()` and forces `cfg.nz=1` — an actual movie applies one global
+  `simulation_psfDepth` to every emitter (there is no per-emitter z yet), so only the single
+  focus-plane kernel is ever built for movie generation, via the same
+  `getOrBuildPsfKernelStack()` cache the preview uses. This one line is the entire "2D" scope
+  boundary — see below for what changes to lift it.
+- The built slice is normalized to `sum===1` once (a probability MASS over the oversampled grid,
+  not a density) before the frame loop starts, so per-emitter photon count is exact by
+  construction rather than approximated.
+- **`simulation_psfInterp`** (`'nearest'|'linear'|'cubic'`, default `'linear'`) selects how
+  `sampleKernelAt()` reads the oversampled kernel at a continuous (fractional) index — nearest,
+  bilinear, or separable bicubic (Catmull-Rom, `a=-0.5`). This is the user-facing choice the two
+  companion docs left open (neither commits to one scheme); `'linear'` matches both documents' own
+  baseline recommendation.
+- **`splatZernikeEmitter()`** does the actual placement: for every camera pixel within `camRad` of
+  an emitter, it samples `oversample²` sub-cell points of the (fractionally shifted, per the
+  emitter's own exact position) kernel via `sampleKernelAt()` and **sums** them (not averages —
+  since each kernel entry is a probability mass, summing conserves total photon count; averaging,
+  tried first, silently discarded a factor of `1/oversample²` of every emitter's photons — caught
+  by a standalone photon-conservation check, not by inspection). This sum-of-interpolated-samples
+  step is the literal "interpolate for sub-pixel placement, then box-downsample" pipeline both
+  `docs/VECTORIAL_PSF_SIMULATION.md` §2 and this document's own §5 describe.
+- Verified (standalone Node harness, not checked in): for a synthetic symmetric test kernel, all
+  three interpolation modes conserve total photon count exactly regardless of emitter sub-pixel
+  position; `'linear'`/`'cubic'` reproduce the emitter's exact sub-pixel centroid to floating-point
+  precision, `'nearest'` quantizes to the oversampled grid's own `1/oversample`-camera-pixel
+  resolution (expected — it's the cheap/coarse option, not a bug).
+- The existing Gaussian path (`generateSynthetic()`'s original `sigma=1.3` render loop) is
+  untouched — purely an additive `if(zKernel){…}else{…}` branch, per this doc's own §7 instruction.
+
+**How to extend to 3D (per-emitter z) — next step, not yet implemented.**
+
+1. Give each simulated event its own `z` (a new field alongside the existing
+   `{x,y,tStart,tEnd}` in `generateSynthetic()`'s `events`/`frameEvents`), drawn from a new
+   PARAMS-controlled distribution (e.g. uniform over a configurable ± range) — §6 above already
+   flagged this as new plumbing, not a parameter tweak.
+2. In `readPsfConfigForSimulation()`, **stop forcing `cfg.nz=1`** — build (and cache, via the
+   existing `getOrBuildPsfKernelStack()`) the full multi-plane stack the preview already builds,
+   swept over `simulation_psfZRange`/`ZStep` around the focal-shift-corrected best-focus plane
+   (`MODULE: simulation`'s own `computePsfPupilForZPlane()` already handles that shift correctly,
+   see `docs/PSF_PHYSICS.md` §4.2).
+3. Per emitter, per frame, pick which slice(s) feed `splatZernikeEmitter()` based on that emitter's
+   own `z`: either nearest-plane lookup (`slices[Math.round((z-zMin)/zStep)]`, matching the
+   reference C++ project's own choice) or a linear blend of the two nearest planes
+   (`(1-f)*slices[z0] + f*slices[z0+1]`) before normalizing/splatting — **only this slice-selection
+   step is new**; `sampleKernelAt()`/`splatZernikeEmitter()`'s lateral interpolation-and-downsample
+   logic needs no changes at all, since it already operates on "whatever single 2D slice it's
+   handed."
+4. Record the per-emitter `z` on `groundTruthEvents` (currently 2D-only, no `z` field) so a 3D
+   validation run can compare recovered-vs-true depth, the same way `docs/
+   VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §8's existing 2D astigmatism validation plan compares
+   recovered `sigma_x(z)`/`sigma_y(z)` shape.
+5. Performance note: cost now scales with the full stack's `nz` (kernel BUILD cost only — the
+   per-emitter splat cost is unchanged, since it only ever touches one or two slices per
+   placement), so the existing "keep the z-range modest" guidance in §5 above applies with the
+   same force here.
+
 ## Reference map
 
 **In `demoCam_SMLM_MM`** (read-only reference, not to be copied wholesale):

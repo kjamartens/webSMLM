@@ -21,7 +21,7 @@
   edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2517   PARAMS registry, single source of truth for params;
+    params          2534   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3284   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3311   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3583   synthetic stack generator ("Simulate movie");
+    simulation      3610   synthetic stack generator ("Simulate movie");
                            Zernike-aberrated PSF kernel: build + raw-panel
                            z-scrollable preview, AND (§10 of
                            docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) wired
@@ -60,8 +60,8 @@
                            MODULE: locprecision) is a mathematically-exact
                            reformulation measured 76x-970x faster than the
                            default 'direct' path, kernel-size dependent
-    detect          5025   per-frame band-pass + local-maxima detection
-    fit             5302   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          5065   per-frame band-pass + local-maxima detection
+    fit             5342   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -71,7 +71,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          5811   accumulate to offscreen buffer; view/colour/blur;
+    render          5851   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -93,7 +93,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         7096   frame-parallel detect/fit worker pool; dedicated
+    workers         7136   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -103,14 +103,14 @@
                            getPsfWorkerPool(), a third separate worker
                            family, pool-shaped like the detect/fit pool since
                            z-planes are independent batchable work)
-    export          7515   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  7807   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          7555   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  7847   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           8224   AIM drift correction (2D+z); drift-vs-frame or
+    drift           8264   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -120,16 +120,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    8730   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    8770   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           9439   spectrally resolved SMLM pair-finding; merged
+    sSMLM           9479   spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             9909   single particle tracking, trackpy-inspired;
+    spt             9949   single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -160,7 +160,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        11411  top-level orchestration, *Core()/wrapper split;
+    pipeline        11451  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -169,7 +169,7 @@
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
                            PARAMS registry) on success — see MODULE: params
-    liveStreaming   12032  Micro-Manager/pycromanager camera bridge
+    liveStreaming   12072  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -213,9 +213,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           13901  localizations table, filtering, histograms;
+    table           13946  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    14476  window.webSMLM.analyze()/analyzeBatch();
+    headless API    14521  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1907,7 +1907,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02k</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-02l</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2036,6 +2036,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
         <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
+        <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
+        <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
         <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike">Zernike-aberrated</option></select></label>
         <label class="row" id="psfNARow" style="display:none">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
         <label class="row" id="psfWavelengthRow" style="display:none">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
@@ -2858,6 +2860,16 @@ const PARAMS = {
   simulation_readnoise: { type:'number', id:'simulation_readnoise', label:'Simulation read noise σ (e⁻)', min:0, max:200, step:0.1, default:2.7, int:false },
   // driftpx = total simulated sample drift (px) over the whole synthetic stack, for testing drift correction
   driftpx: { type:'number', id:'driftpx', label:'Simulated total drift (px)', min:0, max:30, step:0.5, default:0, int:false },
+  // simulation_3d = when checked, buildStructure()'s three sine-wave filaments also oscillate
+  // in Z, using the SAME sin(k*x+phase) term (same k/phase per filament) that already drives
+  // their Y offset — so a filament corkscrews in Y and Z together rather than the two moving
+  // independently. Ground-truth-only for now (stored per emitter, exported on groundTruthEvents)
+  // — generateSynthetic()'s own render loop doesn't yet vary the PSF per emitter Z; that's a
+  // follow-up (see MODULE: simulation's own generateSynthetic() comment).
+  simulation_3d: { type:'bool', id:'simulation_3d', label:'3D simulation?', default:false },
+  // simulation_zRange = the +/- half-range (nm) the filament Z-oscillation is scaled to; the ring
+  // structure point are unaffected (z=0) since they have no sinusoidal pattern to mirror.
+  simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:1000, int:false },
 
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — an optional, additive
   // Zernike-aberrated PSF model for "Simulate movie", alongside the always-available fixed-
@@ -3612,13 +3624,20 @@ function poisson(l){ if(l>60) return Math.max(0,Math.round(l+Math.sqrt(l)*gauss(
 
 // Candidate emitter-site positions for the synthetic sample: three sine-wave
 // "filaments" plus one ring, used by generateSynthetic() as the structure
-// simulated emitters attach to.
-function buildStructure(w,h){
+// simulated emitters attach to. Each point is [x,y,z] — z is 0 unless `zRange`
+// (nm, half-range) is given, in which case each filament's z ALSO follows its
+// own sin(k*x+ph) term (same k/ph as the y-offset, so the filament corkscrews
+// in y and z together rather than the two oscillating independently); the
+// ring has no such pattern to mirror, so its z stays 0.
+function buildStructure(w,h,zRange=0){
   const pts=[], cx=w/2, cy=h/2;
   for(let f=0; f<3; f++){ const y0=h*(0.25+0.25*f), amp=8+4*f, k=0.09+0.02*f, ph=f*2;
-    for(let x=6; x<w-6; x+=0.35) pts.push([x, y0+amp*Math.sin(k*x+ph)]); }
+    for(let x=6; x<w-6; x+=0.35){
+      const s=Math.sin(k*x+ph);
+      pts.push([x, y0+amp*s, zRange*s]);
+    } }
   const R=Math.min(w,h)*0.28;
-  for(let a=0; a<Math.PI*2; a+=0.012) pts.push([cx+R*Math.cos(a), cy+R*Math.sin(a)-6]);
+  for(let a=0; a<Math.PI*2; a+=0.012) pts.push([cx+R*Math.cos(a), cy+R*Math.sin(a)-6, 0]);
   return pts;
 }
 
@@ -3639,7 +3658,10 @@ async function generateSynthetic(){
   const driftPx=paramValue('driftpx'), dang=Math.random()*2*Math.PI;
   const ddx=Math.cos(dang), ddy=Math.sin(dang);
   const driftAt=fi=> n>1 ? fi/(n-1)*driftPx : 0;   // magnitude at frame fi
-  const gt=buildStructure(w,h), rad=Math.ceil(sigma*3);
+  // is3d/zRange: ground-truth-only for now (see PARAMS.simulation_3d) — buildStructure()'s
+  // filaments carry a real z per site, but the render loop below doesn't vary the PSF with it yet.
+  const is3d=paramValue('simulation_3d'), zRange=is3d?paramValue('simulation_zRange'):0;
+  const gt=buildStructure(w,h,zRange), rad=Math.ceil(sigma*3);
 
   // Zernike-aberrated PSF path (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §10) — builds/reuses
   // the same oversampled kernel the PSF preview uses, forced to a single z-plane (readPsfConfig
@@ -3677,22 +3699,22 @@ async function generateSynthetic(){
   const arrivalRate=lifetime>0 ? (dens*areaUm2)/lifetime : 0;
   const lead=5*lifetime, rangeLen=n+lead;
   const nEvents=poisson(arrivalRate*rangeLen);
-  const events=[];                                 // ground-truth {x,y,tStart,tEnd} per emitter
-  const frameEvents=Array.from({length:n}, ()=>[]); // per-frame [x,y,overlapFraction]
+  const events=[];                                 // ground-truth {x,y,z,tStart,tEnd} per emitter
+  const frameEvents=Array.from({length:n}, ()=>[]); // per-frame [x,y,z,overlapFraction]
   for(let e=0;e<nEvents;e++){
-    const gi=Math.floor(Math.random()*gt.length), ex=gt[gi][0], ey=gt[gi][1];
+    const gi=Math.floor(Math.random()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
     const tStart=-lead+Math.random()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-Math.random());   // exponential duration, mean=lifetime
-    events.push({x:ex, y:ey, tStart, tEnd});
+    events.push({x:ex, y:ey, z:ez, tStart, tEnd});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
-      if(ov>0) frameEvents[fi].push([ex, ey, ov]);
+      if(ov>0) frameEvents[fi].push([ex, ey, ez, ov]);
     }
   }
   groundTruthEvents = events.map(e=>{
     const s=Math.max(e.tStart,0), t=Math.min(e.tEnd,n);
-    return {x:e.x, y:e.y, tStart:e.tStart, tEnd:e.tEnd, photonsTotal:photPerFrame*Math.max(0,t-s)};
+    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, photonsTotal:photPerFrame*Math.max(0,t-s)};
   });
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
@@ -3706,12 +3728,12 @@ async function generateSynthetic(){
     const dmag=driftAt(fi), drx=dmag*ddx, dry=dmag*ddy;
     const img=new Float32Array(w*h).fill(bg);
     if(zKernel){
-      for(const [ex,ey,ov] of frameEvents[fi]){
+      for(const [ex,ey,ez,ov] of frameEvents[fi]){
         const mx=ex+drx, my=ey+dry;
         splatZernikeEmitter(img, w, h, mx, my, photPerFrame*ov, zKernel, zKernel.camRad, zKernel.interpMode);
       }
     } else {
-      for(const [ex,ey,ov] of frameEvents[fi]){
+      for(const [ex,ey,ez,ov] of frameEvents[fi]){
         const mx=ex+drx, my=ey+dry, A=(photPerFrame*ov)/(2*Math.PI*sigma*sigma), x0=Math.round(mx), y0=Math.round(my);
         for(let dy=-rad;dy<=rad;dy++)for(let dx=-rad;dx<=rad;dx++){
           const x=x0+dx,y=y0+dy; if(x<0||y<0||x>=w||y>=h) continue;
@@ -3736,6 +3758,7 @@ async function generateSynthetic(){
   // store the true per-frame drift (nm) so drift correction can be scored
   simTrueDrift = driftPx>0 ? {n, px, dx:fi=>driftAt(fi)*ddx, dy:fi=>driftAt(fi)*ddy, total:driftPx} : null;
   if(driftPx>0) log(`Simulated ${driftPx} px total drift along (${ddx.toFixed(2)}, ${ddy.toFixed(2)}).`);
+  if(is3d) log(`3D simulation: filaments oscillate in z over ±${zRange} nm (ground truth only — the render loop is still 2D).`);
   log(`Simulated ${events.length} emitters (of ${gt.length} candidates) over ${n} frames.`);
   return makeStack(w,h,n,px, fi=>frames[fi]);
 }
@@ -12946,6 +12969,12 @@ function updatePsfModelUI(){
 $('simulation_psfModel').addEventListener('change',updatePsfModelUI);
 updatePsfModelUI();
 
+function updateSimulation3dUI(){
+  $('simulation_zRangeRow').style.display = paramValue('simulation_3d') ? 'flex' : 'none';
+}
+$('simulation_3d').addEventListener('change',updateSimulation3dUI);
+updateSimulation3dUI();
+
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
   try{
@@ -13790,13 +13819,12 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-02k — wired the Zernike-aberrated PSF
-into "Simulate movie" itself (previously preview-only): simulation_psfModel=
-'zernike' now splats each emitter from the same oversampled kernel, with a
-new PSF placement interpolation choice (nearest/linear/cubic) and photon-
-conserving box-downsampling to the camera pixel grid. 2D only for now (one
-fixed emitter depth per movie) — see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md
-§10 for what shipped and how a 3D (per-emitter z) follow-up would extend it.
+log(`webSMLM v0.12.0-dev · build 2026-09-02l — added a "3D simulation?" checkbox
+to Simulate movie: when on, buildStructure()'s three sine-wave filaments also
+oscillate in z (same sin(k·x+phase) term driving the y-offset), scaled to a
+new "Structure Z range (± nm)" parameter (default 1000). Ground-truth-only
+for now — z is stored per emitter (groundTruthEvents) but the render loop
+still isn't varied per-emitter-z; that's a follow-up.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

@@ -1946,7 +1946,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3863,6 +3863,19 @@ function buildStructure(w,h,zRange=0,kind='filaments',sizeNm=500,px=100,rng=Math
 // One-line "how this structure distributes z", for generateSynthetic()'s own 3D log line. Kept
 // next to buildStructure() so the two can't drift apart — the log used to hardcode the filament
 // description, which read as plainly wrong for every other object.
+// The half-extent in z (nm) a structure actually reaches — NOT simply zRange, since filaments add
+// a per-strand offset on top of their sine (so they reach ~1.5x it), the shell is sized by its own
+// radius, and a nanoruler's pair offset extends past its centre range. Used to check the structure
+// against what the PSF can encode; keep in step with buildStructure().
+function structureZExtent(kind,zRange,sizeNm){
+  switch(kind){
+    case 'shell':       return sizeNm;
+    case 'nanoruler3D': return zRange + sizeNm/2*Math.SQRT1_2;
+    case 'filaments':   return 1.5*zRange;
+    default:            return zRange;              // tiltedPlane / uniform3D / staircase
+  }
+}
+
 function structureZDescription(kind,zRange,sizeNm){
   switch(kind){
     case 'tiltedPlane':  return `tilted plane, z ramping linearly with x from −${zRange} to +${zRange} nm`;
@@ -3886,13 +3899,42 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
   const img=new Float32Array(w*h).fill(bg);
   let zClamped=0, zTotal=0;
   if(zKernelStack){
+    // Emitter z -> kernel plane, LINEARLY INTERPOLATED between the two planes straddling it.
+    // Nearest-plane lookup (what this used to do) quantizes every emitter's depth to the kernel's
+    // own z-step — +/-5 nm at the default 10 nm step — which would otherwise sit underneath any
+    // axial-accuracy measurement made against this simulator's ground truth and be mistaken for
+    // fitter error.
+    //
+    // Blending the two SLICES first would mean allocating a full kernel-sized array per emitter.
+    // Instead we splat twice at weights (1-f) and f: splatZernikeEmitter() only ever does
+    // `img[...] += photons * <kernel sample>`, so it is exactly linear in `photons`, and summing
+    // two weighted splats is mathematically identical to splatting one blended kernel — for the
+    // cost of a second pass and no allocation at all. Photon count is conserved either way, since
+    // the weights sum to 1 and each slice is independently normalized to sum 1.
+    const {focusIndex, zStepNm, nz, norm, nx, ny, oversample, camRad, interpMode}=zKernelStack;
+    const kernelObj={kernel:null, nx, ny, oversample};
     for(const [ex,ey,ez,ov] of evList){
-      const mx=ex+drx, my=ey+dry;
+      const mx=ex+drx, my=ey+dry, phot=photPerFrame*ov;
       zTotal++;
-      let zi=zKernelStack.focusIndex + Math.round(ez/zKernelStack.zStepNm);
-      if(zi<0){ zi=0; zClamped++; } else if(zi>=zKernelStack.nz){ zi=zKernelStack.nz-1; zClamped++; }
-      const kernelObj={kernel:zKernelStack.norm[zi], nx:zKernelStack.nx, ny:zKernelStack.ny, oversample:zKernelStack.oversample};
-      splatZernikeEmitter(img, w, h, mx, my, photPerFrame*ov, kernelObj, zKernelStack.camRad, zKernelStack.interpMode);
+      const t=focusIndex + ez/zStepNm;
+      let z0=Math.floor(t), f=t-z0;
+      // Outside the built z-range there is no second plane to blend towards, so clamp to the
+      // edge plane and drop the interpolation (f=0) rather than extrapolating a PSF we never
+      // computed. Counted, as before, so generateSynthetic() can warn about it.
+      if(z0<0){ z0=0; f=0; zClamped++; }
+      else if(z0>=nz-1){ z0=nz-1; f=0; zClamped++; }
+      if(f<1e-3){                                   // lands on (or within rounding of) plane z0
+        kernelObj.kernel=norm[z0];
+        splatZernikeEmitter(img, w, h, mx, my, phot, kernelObj, camRad, interpMode);
+      } else if(f>1-1e-3){                          // ...or on plane z0+1
+        kernelObj.kernel=norm[z0+1];
+        splatZernikeEmitter(img, w, h, mx, my, phot, kernelObj, camRad, interpMode);
+      } else {
+        kernelObj.kernel=norm[z0];
+        splatZernikeEmitter(img, w, h, mx, my, phot*(1-f), kernelObj, camRad, interpMode);
+        kernelObj.kernel=norm[z0+1];
+        splatZernikeEmitter(img, w, h, mx, my, phot*f, kernelObj, camRad, interpMode);
+      }
     }
   } else if(zKernel){
     for(const [ex,ey,ez,ov] of evList){
@@ -4068,10 +4110,13 @@ async function generateSynthetic(){
       if(ksum>0) for(let i=0;i<slice.length;i++) n[i]=slice[i]/ksum;
       norm[z]=n;
     }
+    // zUsableNm rides along purely so generateSynthetic() can warn below; splatSimFrame() never
+    // reads it. It is a plain number, so the whole object stays structured-clonable for the
+    // simInit postMessage to the sim worker pool.
     zKernelStack={ norm, nx:kstack.nx, ny:kstack.ny, oversample:cfg.oversample,
                    camRad:Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample)),
                    interpMode:paramValue('simulation_psfInterp'), focusIndex:kstack.focusIndex,
-                   zStepNm:kstack.zStepNm, nz:kstack.nz };
+                   zStepNm:kstack.zStepNm, nz:kstack.nz, zUsableNm:kstack.zUsableNm };
     log(`Simulate movie: Zernike PSF kernel STACK ready for 3D simulation (${kstack.nx}×${kstack.ny}px `+
         `oversampled, ${kstack.nz} z-planes × ${kstack.zStepNm}nm, camRad=${zKernelStack.camRad}px, `+
         `interp=${zKernelStack.interpMode}).`);
@@ -4163,6 +4208,20 @@ async function generateSynthetic(){
           `z range (PSF z range/step, Simulation settings) — clamped to the nearest available z-plane. Widen `+
           `PSF z range to cover the full structure Z range if this matters.`);
     }
+    // Separate from the clamp warning above, and the more important of the two: the kernel can
+    // cover a z perfectly well while the PSF still fails to ENCODE it uniquely there. Emitters
+    // past ±zUsableNm are simulated correctly but cannot be recovered correctly by any
+    // width-based 3D fit — z folds back on itself — so a run set up like this will look like a
+    // fitter failure when it is really a physics limit of the chosen aberration.
+    if(zKernelStack && zKernelStack.zUsableNm>0){
+      const zExtent=structureZExtent(structure,zRange,structureSize);
+      if(zExtent>zKernelStack.zUsableNm)
+        log(`⚠ Structure z extent (±${zExtent.toFixed(0)} nm) exceeds the range this PSF encodes `+
+            `single-valued (±${zKernelStack.zUsableNm.toFixed(0)} nm). Emitters beyond that are simulated `+
+            `faithfully but two z values there share one σx/σy pair, so a width-based 3D fit cannot `+
+            `resolve which — expect z to fold back. Narrow Structure Z range, or pick a stronger `+
+            `astigmatism preset (which widens the usable range, at the cost of a broader in-focus PSF).`);
+    }
   }
   log(`Simulated ${events.length} emitters (of ${gt.length} candidates) over ${n} frames.`);
   return makeStack(w,h,n,px, fi=>frames[fi]);
@@ -4192,7 +4251,6 @@ async function generateCalibrationStack(){
   const cfg=readPsfConfigFromUI();               // FULL nz-plane kernel (see comment above)
   const kstack=await getOrBuildPsfKernelStack(cfg);
   const {nz, focusIndex, zStepNm}=kstack;
-  const camRad=Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample));
 
   // Photon-normalize each z-plane independently (own sum=1), same convention
   // readPsfConfigForSimulation()'s 2D path already uses, so a bead's TOTAL photon count per
@@ -4205,6 +4263,7 @@ async function generateCalibrationStack(){
     if(ksum>0) for(let i=0;i<slice.length;i++) n[i]=slice[i]/ksum;
     norm[z]=n;
   }
+  const camRad=Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample));
 
   // A small grid of ALWAYS-ON fixed beads (unlike generateSynthetic()'s own blinking Poisson
   // emitter process) — the same x,y every frame, matching a real calibration acquisition (a
@@ -4641,7 +4700,66 @@ async function buildPsfKernelStack(cfg){
   log(`PSF build done: ${cfg.nz} planes in ${totalMs.toFixed(0)}ms (${(totalMs/cfg.nz).toFixed(1)}ms/plane`+
       (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
   if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
-  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm:cfg.zStep*1e9, focusIndex, globalMax };
+  const zStepNm=cfg.zStep*1e9;
+  const zUsableNm=psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, cfg.oversample);
+  if(zUsableNm>0)
+    log(`PSF z encoding is single-valued to ±${zUsableNm.toFixed(0)} nm — beyond that σy/σx turns back, so two z values give the same width pair and no width-based 3D fit can tell them apart.`);
+  else
+    log(`PSF z encoding: σy/σx never separates monotonically around focus — this PSF carries no usable width-based z information (an unaberrated PSF is symmetric by construction; pick an astigmatism preset for 3D).`);
+  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm, focusIndex, globalMax, zUsableNm };
+}
+
+// How far either side of focus this PSF actually encodes z UNIQUELY, in nm.
+//
+// Astigmatic 3D reads z from the width pair (σx,σy) — directly in zFromWidths(), or via the
+// equivalent phasor magnitude ratio. That inversion only works while ln(σy/σx) is monotonic in z.
+// It is not monotonic forever: past a certain defocus both axes are growing and the ratio turns
+// back towards 1, so two different z values produce the same width pair. zFromWidths() does a
+// least-squares search over the z grid and will silently return whichever of the two the cost
+// function happens to favour — its `clamped` flag only catches the EDGES of the calibrated range,
+// not this ambiguous interior.
+//
+// Measured from the kernel itself rather than assumed, and measured the way the CONSUMER measures:
+// each plane is binned down to camera pixels and fitted with gaussianFitElliptical() — the very
+// fitter MODULE: 3D calibration runs on a bead z-stack to build the sigma(z) curves zFromWidths()
+// then inverts. Intensity second moments were tried first and are cheaper, but they are dominated
+// by the PSF's rings and tails, which spread well before the Gaussian core does: they put the
+// turn-around ~200 nm earlier (325 vs 525 nm at the default astigModerate preset), i.e. they
+// answer a different question than the one that matters here.
+//
+// Caveat worth knowing: the answer depends on the fit WINDOW, exactly as a real calibration's does
+// — truncating a defocused PSF's lobes changes its fitted width. The window here follows the
+// kernel's own mass-based splat radius, so it adapts with the PSF rather than being a magic number.
+function psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, oversample){
+  const bw=Math.floor(nx/oversample), bh=Math.floor(ny/oversample);
+  if(bw<5||bh<5) return 0;                          // too few camera pixels to fit anything
+  const cx=(bw-1)>>1, cy=(bh-1)>>1;
+  const rad=Math.min(cx,cy), win=2*rad+1;
+  const lr=new Float64Array(slices.length);         // ln(σy/σx) per plane
+  for(let k=0;k<slices.length;k++){
+    const s=slices[k], img=new Float32Array(bw*bh);
+    for(let y=0;y<bh*oversample;y++){
+      const row=y*nx, orow=((y/oversample)|0)*bw;
+      for(let x=0;x<bw*oversample;x++) img[orow+((x/oversample)|0)]+=s[row+x];
+    }
+    const L=gaussianFitElliptical(img,bw,bh,cx,cy,win,1.3);
+    lr[k] = (L && L.sx>0 && L.sy>0) ? Math.log(L.sy/L.sx) : 0;
+  }
+  // Walk outwards in both directions; the usable half-range is the smaller of the two, so the
+  // reported figure holds on both sides of focus.
+  let up=0;
+  for(let k=focusIndex+1;k<slices.length;k++){ if(Math.abs(lr[k])<=Math.abs(lr[k-1])) break; up=k-focusIndex; }
+  let dn=0;
+  for(let k=focusIndex-1;k>=0;k--){ if(Math.abs(lr[k])<=Math.abs(lr[k+1])) break; dn=focusIndex-k; }
+  const n=Math.min(up,dn);
+  if(n===0) return 0;
+  // A radially symmetric PSF has no width-based z information at all, but its fitted σy/σx still
+  // wobbles at the 1e-3 level on pure numerics, which would otherwise "grow monotonically" for a
+  // plane or two and report a spurious tens-of-nm range. Require a real separation (2% in σ) at
+  // the outermost plane before calling any of it usable.
+  const MIN_LN_RATIO=0.02;
+  if(Math.abs(lr[focusIndex+n])<MIN_LN_RATIO || Math.abs(lr[focusIndex-n])<MIN_LN_RATIO) return 0;
+  return n*zStepNm;
 }
 let _psfKernelCacheKey=null, _psfKernelCache=null;
 async function getOrBuildPsfKernelStack(cfg){
@@ -14567,19 +14685,26 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-04a — Simulation settings gains a **Test structure**
-selector: the original filaments+ring, plus a tilted plane, a uniform 3D volume, a spherical
-shell, a z-staircase and 3D nanorulers. The filaments tie each strand's z to its own y (one
-sine drives both), so a z error cannot be separated from a y error, and they pile emitters up
-at the extremes of the Z range — the new objects sample z independently of x/y instead. A
-**Structure size (nm)** field appears for the three objects that have their own dimension
-(shell radius, staircase spacing, nanoruler separation). Structures behave identically with
-“3D simulation?” off: the same lateral geometry is built and z is simply flattened to 0, so
-the checkbox means only “z varies or it doesn't”.
-Fixes: the drift score against simulated ground truth (“vs simulated ground truth: RMS x …”)
-compared a nanometre quantity against a pixel one, so with any simulated drift it reported
-roughly the drift magnitude instead of the residual; and groundTruthEvents was never cleared
-when a new stack was loaded, so a previous simulation's truth could outlive it.
+log(`webSMLM v0.12.0-dev · build 2026-09-04b — 3D simulation z accuracy. Emitters are now
+splatted from a LINEAR BLEND of the two PSF kernel planes straddling their own z, instead of the
+nearest single plane — the old lookup quantized every emitter's depth to the kernel z-step (±5 nm
+at the 10 nm default), which would sit underneath any axial-accuracy measurement and be mistaken
+for fitter error. Photon count is unaffected: the two weights sum to 1 and the splat is exactly
+linear in photons, so two weighted splats equal one blended kernel, with no allocation. Verified
+photon-exact at every z including the halfway case, and byte-identical output across two seeded
+runs through the worker pool.
+The PSF build now reports how far either side of focus that PSF encodes z SINGLE-VALUED, measured
+by fitting each kernel plane with the same elliptical Gaussian fitter 3D calibration uses. Past
+that point sigma_y/sigma_x turns back, two z values share one width pair, and no width-based 3D
+fit can resolve them — z folds back. Simulate movie warns when the chosen structure reaches
+beyond it. At NA 1.4 / 660 nm the limit is about ±450 nm (astig. weak), ±475 nm (moderate, the
+default) and ±550 nm (strong) — all well inside the ±1000 nm default Structure Z range — and 0
+for unaberrated and for spherical aberration, both being axisymmetric.
+Measured and NOT changed: the splat window was expected to be far wider than the PSF needs, but
+this PSF's Airy tails are heavy — 3.2% of an in-focus emitter's photons land beyond a 10-camera
+-pixel radius and 0.8% beyond 20 — so shrinking the window to the kernel's mass would discard a
+few percent of every emitter's photons. The existing geometric window is right; "PSF kernel width
+(nm)" remains the honest place to trade support against speed.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

@@ -23,9 +23,9 @@ Each popup's content lives inside a `<!-- HINT:<name> --> ... <!-- /HINT:<name>
 directly (see `CLAUDE.md`'s **Documentation build** section for the full
 mechanism).
 
-Line/anchor references below point at `webSMLM.html` as of **v0.10.3**;
-exact line numbers will drift as the file grows, but the `id=`/function names
-they're built from won't.
+References below point at `webSMLM.html`'s own `id=`/function names, which
+stay stable across versions — exact line numbers aren't given, since they
+drift as the file grows.
 
 ---
 
@@ -73,7 +73,7 @@ below for what it does.
 | **Stop** | `stopBtn` | Requests an early stop of a running **Localize** or **3D calibration**. Localize keeps whatever localizations were gathered so far (a partial result is still valid). Calibration discards everything instead — a calibration fit needs the WHOLE configured z-range, so a partial one would be silently biased, not just smaller; press **3D calibration** again to restart with a narrower/correct frame range. |
 | **Save data** | `saveBtn` | Exports the current (filtered) localizations as a ThunderSTORM-compatible CSV — see [§6](#6-csv-export-format). Disabled until there are localizations. |
 | **Save plot/image** | `saveImgBtn` | Opens a chooser (if both panels have content) to export the raw/reconstruction/plot window shown. The raw frame or reconstruction always saves as a supersampled PNG. A plot (calibration/drift/NeNA/FRC/PCFO/line-profile/histogram) instead opens a save dialog offering **both** PNG and SVG as file types — pick the format in the dialog's own "Save as type" dropdown. (Browsers without a native save-file dialog, e.g. Safari/Firefox, fall back to a PNG download — SVG needs the native dialog to choose.) |
-| **View data/filtering** | `tableBtn` | Opens the sortable, filterable localizations table — see [§5](#5-table--filter-grammar). Disabled until there are localizations. Loading a CSV back in (via **Load movie/data** above) works exactly as after a Run — table, reconstruction, NeNA/FRC/drift/re-export all function on it, using only what's in the CSV plus the *current* Pixel size / Magnification controls; there's no raw frame data, so `stack` is left untouched and re-detection/live preview stay unavailable for CSV-loaded data — see [§6](#6-csv-export-format). |
+| **View data/filtering** | `tableBtn` | Opens the sortable, filterable localizations table — see [§5](#5-table--filter-grammar). Disabled until there are localizations; during **Live streaming** this enables as soon as any localization has arrived, same as **Correct drift**/NeNA/FRC — see [§2](#table)'s "Available during Live streaming" note for what's restricted (committing a new filter) vs. not (browsing/sorting/histograms). Loading a CSV back in (via **Load movie/data** above) works exactly as after a Run — table, reconstruction, NeNA/FRC/drift/re-export all function on it, using only what's in the CSV plus the *current* Pixel size / Magnification controls; there's no raw frame data, so `stack` is left untouched and re-detection/live preview stay unavailable for CSV-loaded data — see [§6](#6-csv-export-format). |
 | **Quick guide** | `helpBtn` | Opens the in-app quick-reference modal (guided workflow, acknowledgements, licence). Shares its row with **View data/filtering**. |
 
 **Keyboard hotkeys**: hold **Alt** (the same physical key macOS labels
@@ -955,6 +955,21 @@ decides whether the table's base row set is raw `lastResult.locs` or
 `clusterEvents()`-derived merged events; everything downstream (render,
 export, NeNA, FRC) is unaware of the distinction.
 
+**Available during Live streaming** (enabled as soon as any localization
+has arrived, same condition as **Correct drift**/NeNA/FRC — reported that
+it stayed disabled for the whole session even though locs were visibly
+rendering). Sorting, browsing and per-column histograms all work on
+whatever has accumulated so far, since they read `_tableData`/
+`_tableFiltered` directly and need no filter to work at all. *Committing a
+new filter* (typing an expression and pressing Enter, or the reconstruction
+panel's own crop tool — see `cropBtn`, [§2](#render)) is refused with a
+logged message while a session is active: a committed filter restricts
+`renderLocs` to a one-time snapshot that is never re-applied as later
+chunks arrive, which would otherwise silently freeze the visible
+reconstruction while the real, growing dataset kept moving underneath it.
+**Reset** (typing `reset`) always stays available, since clearing is never
+harmful. Stop the session first to filter/crop normally.
+
 ---
 
 ## 3 · Parameters (`PARAMS` registry)
@@ -1003,21 +1018,29 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 `memgb`/`chunkmb` above, below its own separator. See [§8](#live-streaming) for the full
 `window.webSMLM.liveStream` API.
 
-| id | Label | Type | Min | Max | Step | Default |
-|---|---|---|---|---|---|---|
-| `liveStreamRenderEvery` | Render every N frames | number (int) | 1 | 1000 | 1 | 10 |
+No `PARAMS` entries of its own — the render cadence reuses `srPreviewMs`/
+`srPreviewMaxMs` ([§3](#pipeline-tuning-params)'s "reconstruction
+live-preview interval", the same adaptive interval `runCore()`'s own live
+preview uses), rather than a separate manual "Render every N frames"
+setting an earlier version had. That setting's behaviour depended on
+external chunk granularity a bridge controls, not this app — the same N
+meant completely different things depending on whether a bridge pushed one
+frame per chunk or a hundred — so it was removed once cadence tracked
+actual elapsed time instead.
 
 **In-app "more info…" popup** (`hint-liveStreaming` in `webSMLM.html`; synced by
 `tools/sync_hints.mjs` — edit here, then run the script, never edit the
 `.hint` div directly):
 
 <!-- HINT:liveStreaming -->
+<p><i>Live streaming is new and still <b>experimental</b> — real and used, but younger and less battle-tested than the rest of the app.</i></p>
 <p>Lets an external process push frame chunks into webSMLM as they're acquired, localized and rendered here live, without a full stack ever being loaded upfront. Two ways in:</p>
 <ul>
-<li><b>WebSocket</b> (for hooking into a tab you already have open, in any browser) — a local process you run (e.g. <code>tools/test_livestream_demo.py</code>) opens a WebSocket <i>server</i>; this page only ever <i>connects out</i> to it as a client, opt-in, when you click <b>Connect</b> — webSMLM never listens for incoming connections itself. <b>Connect</b> arms the session using whatever pxnm/gain/method/etc. the sidebar is currently set to at that moment; <b>Disconnect</b> (or the connection dropping unexpectedly) ends it, without closing this tab. Each binary WebSocket message is treated as one chunk's raw TIFF bytes; a text message <code>{"cmd":"stop"}</code> also finalizes the session without disconnecting.</li>
-<li><b>tools/webSMLM-livestream-bridge.mjs</b> (for a fully automated/headless session, e.g. a Gladoscopy RT node) — a Playwright-driven bridge that launches and owns its own browser window, feeding chunks in via <code>window.webSMLM.liveStream.pushChunk()</code>. This path never touches Connect/Disconnect either — the session arms itself automatically on the very first pushed chunk, using whatever pxnm/gain/method/etc. the sidebar is set to at that moment, and <code>window.webSMLM.liveStream.end()</code> ends it.</li>
+<li><b>WebSocket</b> (for hooking into a tab you already have open, in any browser) — a local process you run (e.g. <code>tools/test_livestream_demo.py</code>) opens a WebSocket <i>server</i>; this page only ever <i>connects out</i> to it as a client, opt-in, when you click <b>Connect</b> — webSMLM never listens for incoming connections itself. <b>Connect</b> arms the session using whatever pxnm/gain/method/etc. the sidebar is currently set to at that moment. The connection dropping unexpectedly also ends the session, without closing this tab. Each binary WebSocket message is treated as one chunk's raw TIFF bytes; a text message <code>{"cmd":"stop"}</code> also finalizes the session, leaving the connection itself open.</li>
+<li><b>tools/webSMLM-livestream-bridge.mjs</b> (for a fully automated/headless session, e.g. a Gladoscopy RT node) — a Playwright-driven bridge that launches and owns its own browser window, feeding chunks in via <code>window.webSMLM.liveStream.pushChunk()</code>. This path never touches Connect either — the session arms itself automatically on the very first pushed chunk, using whatever pxnm/gain/method/etc. the sidebar is set to at that moment, and <code>window.webSMLM.liveStream.end()</code> ends it.</li>
 </ul>
-<p>Each chunk is localized independently (no cross-chunk context) and appended to a running total, so temporal median filtering (FTM) — which needs surrounding frames a chunk doesn't have — is not available in streaming mode; routine per-chunk log lines are also suppressed (only genuine warnings still reach the log) so a fast, small-chunk session — down to one frame per chunk — doesn't flood it, replaced by a single compact "N frames received since streaming start" milestone line each time the reconstruction repaints. <b>Render every N frames</b> throttles how often that repaint (and milestone line) happens (localizations are always accumulated every chunk regardless, and this counts real frames, not chunks, so it stays meaningful whatever the chunk size is), trading live-view freshness for redraw/log cost on a long acquisition.</p>
+<p>The top-level <b>Stop</b> button (used to interrupt a Localize/drift/calibration run) is the one control that ends an active streaming session from either path — closing the WebSocket first if one is open — so there's one consistent way to end a session regardless of how it was started, including the bridge path, which has no Connect of its own to click. (An earlier version of this sidebar had a separate Disconnect button; folded into Stop and removed, since Stop does everything it did and also covers the bridge path.)</p>
+<p>Each chunk is localized independently (no cross-chunk context) and appended to a running total, so temporal median filtering (FTM) — which needs surrounding frames a chunk doesn't have — is not available in streaming mode; routine per-chunk log lines are also suppressed (only genuine warnings still reach the log) so a fast, small-chunk session — down to one frame per chunk — doesn't flood it, replaced by a single compact "N frames received since streaming start" milestone line each time the reconstruction repaints. That repaint (and milestone line) is throttled adaptively by elapsed time, not a frame count — frequent while cheap, self-throttling once the growing dataset makes a render expensive — the same mechanism a normal Localize run's own live preview uses.</p>
 <p>The <b>Raw frame</b> panel gets its own Frame scrubber during streaming, just like a loaded movie — it auto-follows the newest incoming frame by default; dragging it back inspects history (any accepted localizations for that frame still overlay, from the running total) and stops auto-following until you drag it back to the newest frame. Unlike a loaded file, raw pixel data can't all stay in memory forever for an open-ended acquisition — only the most recent frames are kept, sized from <b>Memory budget (GB)</b> (Memory &amp; streaming section) the same way a loaded stack's own frame cache is; scrubbing further back than that shows a note instead of a frame, though every accepted localization from the whole acquisition remains in the reconstruction regardless of whether its raw frame is still retained.</p>
 <p><b>Clear localizations</b> discards every localization/frame accumulated so far — the reconstruction, the raw-frame scrub history, the table/CSV export state — and restarts the reconstruction from empty, WITHOUT stopping the session or closing the connection: new chunks keep arriving and accumulating (from frame 1 again) right through the click. Use it to throw away a bad start (focus drift, wrong sample, a settings mistake) partway through an open-ended acquisition without having to reconnect. It's also available once a session has ended, to clear a finished run's leftovers before a fresh <b>Connect</b>/first pushed chunk.</p>
 <p><b>Correct drift</b>/<b>NeNA</b>/<b>FRC</b> become available as soon as any localizations have been accumulated, and can be run at any point — including while the session is still active — the same as after a normal Localize. Re-running <b>Correct drift</b> mid-stream always re-estimates from scratch across everything accumulated so far, so it stays safe to re-run as more chunks arrive, but localizations that arrive <i>after</i> a click won't retroactively pick up that correction until it's run again. Temporal median filtering (FTM), by contrast, genuinely isn't available in streaming mode (no cross-chunk context, see above) — for that, run a full accurate Localize on the complete saved acquisition file afterwards (e.g. via <code>tools/webSMLM-cli.mjs</code>).</p>
@@ -1556,22 +1579,58 @@ headless equivalent.
 <p>All render settings apply instantly — no refit. Scroll/pinch to zoom, drag to pan, double-click/tap to reset.</p>
 <!-- /HINT:render -->
 
+**Choosing Magnification relative to localization precision.** `mag` (with
+`pxnm`) sets the super-resolution pixel size (`pxnm`/`mag`) — too coarse a
+pixel actively limits the resolution a reconstruction can show, independent
+of how good the underlying localizations are. Nieuwenhuizen et al. (2013,
+*Nat. Methods* 10, 557–562, §5.2 "Discretization" of the Supplementary
+Information) derive this quantitatively for FRC-measured resolution:
+binning into a pixel of size `l` acts as a low-pass filter on the FRC,
+equivalent (at the resolution frequency) to inflating the effective
+localization uncertainty from σ to a larger σ_eff via a `sinc(πql)` factor
+(their Eq. S.79–S.80). Requiring the resulting resolution loss stay under
+10% (their Eq. S.81–S.83) gives their stated conclusion: keep pixel size
+`l` < R/4, where R ≈ 2πσ is the FRC resolution implied by precision σ —
+i.e. **keep the super-resolution pixel size smaller than ≈1.57× the
+dataset's typical localization precision** (R/4 = 2πσ/4 = πσ/2). Above
+that, the pixel grid itself — not the fits — is what's limiting
+resolution, regardless of `renderMode` below.
+The same section (§5.3 "Data visualization") also shows that any
+*isotropic linear* filter applied on top of binning — `fixed`'s own uniform
+blur (`rblur`) included — does not change the FRC-measured resolution
+(verified there to ~10⁻⁴, negligible against the FRC's own variance): FRC
+depends only on the correlation between two half-datasets, not on the
+magnitude of the frequency components a linear filter suppresses. A
+*non-linear* visualization (their point, not this app's), by contrast,
+cannot both stay unbiased (linear in localization density) and improve the
+FRC over plain binning.
+
 **Render mode.** `precision` renders each localization as its own bounded
 (±3σ) 2D Gaussian, sized by its OWN fitted precision (`lpx`/`lpy`, the CRLB
 from an MLE fit; a method with no true CRLB, e.g. phasor, falls back to
 `rblur` for that localization) — the same convention Picasso's own default
 renderer uses (`_draw_gaussian_loc`, `picasso/render.py`; Schnitzbauer,
 Strauss, Schlichthaerle, Schueder & Jungmann, *Nat. Protoc.* 12, 1198–1228,
-2017). The rendered σ is capped at 6 super-resolution pixels regardless of
-magnification or how poor a single fit's precision is — the ±3σ bound alone
-only trims a *given* Gaussian's negligible tail, it doesn't stop σ itself
-(∝ precision × magnification) from growing arbitrarily large for a
-badly-localized outlier, which otherwise dominates render time out of
+2017). This is a known trade-off, not a free improvement: rendering a
+localization's own precision AS its display width convolves the true
+structure with an extra Gaussian of that same width on top of the
+localization error already inherent in it, which Martens, Turkowyd &
+Endesfelder's SMLM analysis review (2022, *Front. Bioinform.* 1, 817254,
+Module 6 "Image Generation") describes as "a loss of visual resolution …
+resulting in a √2 resolution loss" relative to the precision alone — the
+same review's Nyquist-Shannon argument for `mag` above this paragraph is
+also theirs. The rendered σ is capped at 6 super-resolution pixels
+regardless of magnification or how poor a single fit's precision is — the
+±3σ bound alone only trims a *given* Gaussian's negligible tail, it doesn't
+stop σ itself (∝ precision × magnification) from growing arbitrarily large
+for a badly-localized outlier, which otherwise dominates render time out of
 proportion to its share of the dataset. `fixed` is the original behaviour:
 bin every localization into the reconstruction grid, then apply one uniform
 blur (`rblur`) to the whole buffer — cost scales with the buffer's pixel
 area, not the dataset, so it can get disproportionately expensive at high
-magnification even for a sparse dataset, independent of precision quality.
+magnification even for a sparse dataset, independent of precision quality;
+per Nieuwenhuizen et al. above, this uniform blur is at least harmless to
+the FRC-measured resolution, whatever its cost.
 
 `dither` is a stochastic alternative to `precision`, for datasets large and
 dense enough that the per-localization Gaussian's own cost (∝ σ², so ∝
@@ -1592,14 +1651,18 @@ reconstruction. The trade-off is visible single-sample grain that only
 resolves into a smooth shape once many localizations overlap — on a sparse
 dataset a single jittered dot doesn't converge to anything and looks like
 noise rather than the soft blob `precision` still renders correctly there,
-which is why `dither` isn't the default. It IS used automatically —
-regardless of this setting — for **Live streaming**'s own repeating cadence
-render (see [§8](#live-streaming)), since that
-render repeats for the life of a streaming session and speed matters more
-there than any single render's grain; the final render on Stop still honours
-whatever `renderMode` is actually selected here. The random offsets are
-seeded (not `Math.random()`), so the same localizations always dither
-identically — panning/zooming or reopening the same dataset doesn't flicker.
+which is why `dither` isn't the default — including for **Live streaming**'s
+own repeating cadence render (see [§8](#live-streaming)): an early version
+of this feature forced that specific render to `dither` regardless of this
+setting, on the reasoning that it repeats for the life of a session and
+speed matters more there than any single render's grain — reverted after
+testing, since a session looks grainy for as long as it stays small, which
+is exactly the part of a live acquisition a user watches most closely.
+`renderMode` is fully respected everywhere, including mid-session — switch
+to `dither` by hand once a stream has grown large/dense enough that render
+speed matters more than per-render grain. The random offsets are seeded
+(not `Math.random()`), so the same localizations always dither identically
+— panning/zooming or reopening the same dataset doesn't flicker.
 
 `hsvBlue` is a closed-loop full HSV hue cycle (240°, blue → cyan → green →
 yellow → red → magenta → violet → 240° again, saturation/value pinned to 1)
@@ -2389,6 +2452,9 @@ speeding anything up. Fails fast: one bad file rejects the whole batch.
 
 ### Live streaming (Micro-Manager camera bridge, `window.webSMLM.liveStream`) {#live-streaming}
 
+Marked **experimental** — real and used, but younger and less battle-tested
+than the rest of the app.
+
 A different shape from `analyze()`: rather than one complete, DOM-free batch
 run, `window.webSMLM.liveStream` lets an external process push frame *chunks*
 in one at a time — e.g. a persistent bridge script
@@ -2406,7 +2472,7 @@ armed:
 
 - `window.webSMLM.liveStream.isActive()` — `true` once a session has armed
   itself (the first successful `pushChunk()` call, or **Connect**), `false`
-  before that and after `end()`/**Disconnect**.
+  before that and after `end()`/**Stop**.
 - `window.webSMLM.liveStream.pushChunk()` — reads whatever file the caller
   has just placed into the hidden `#liveStreamChunkInput` (e.g. via
   Playwright's `page.setInputFiles('#liveStreamChunkInput', {name, mimeType,
@@ -2414,11 +2480,13 @@ armed:
   active yet, localizes the file as one chunk, appends the result to the
   running total (frame numbers offset so they stay meaningful across the
   whole streamed acquisition), and repaints the reconstruction — throttled
-  by the **Render every N frames** field (`PARAMS.liveStreamRenderEvery`) so
-  a long acquisition with many small chunks doesn't pay a full redraw every
-  single one. Returns `{chunkFrames, chunkLocs, totalFrames, totalLocs}`.
-- `window.webSMLM.liveStream.end()` — same as clicking **Disconnect**: logs
-  a summary and leaves the current reconstruction on screen.
+  adaptively by elapsed time (`srPreviewMs`/`srPreviewMaxMs`,
+  [§3](#pipeline-tuning-params)), the same mechanism a normal Localize
+  run's own live preview uses, so a long acquisition with many small chunks
+  doesn't pay a full redraw on every single one. Returns
+  `{chunkFrames, chunkLocs, totalFrames, totalLocs}`.
+- `window.webSMLM.liveStream.end()` — same as clicking the top-level **Stop**
+  button: logs a summary and leaves the current reconstruction on screen.
 
 Each chunk is localized independently — there is no cross-chunk context, so
 temporal median filtering (FTM) is not available in streaming mode. Drift
@@ -2716,7 +2784,13 @@ What this tool borrows from, and where to read more.
 - "A simple method to estimate the average localization precision of a single-molecule localization microscopy experiment," U. Endesfelder, S. Malkusch, F. Fricke, M. Heilemann, *Histochem. Cell Biol.* **141**, 629–638 (2014). [doi:10.1007/s00418-014-1192-3](https://doi.org/10.1007/s00418-014-1192-3)
 
 **Image resolution (FRC)**
-- "Measuring image resolution in optical nanoscopy," R. P. J. Nieuwenhuizen, K. A. Lidke, M. Bates, D. L. Puig, D. Grünwald, S. Stallinga, B. Rieger, *Nat. Methods* **10**, 557–562 (2013). [doi:10.1038/nmeth.2448](https://doi.org/10.1038/nmeth.2448)
+- "Measuring image resolution in optical nanoscopy," R. P. J. Nieuwenhuizen, K. A. Lidke, M. Bates, D. L. Puig, D. Grünwald, S. Stallinga, B. Rieger, *Nat. Methods* **10**, 557–562 (2013). [doi:10.1038/nmeth.2448](https://doi.org/10.1038/nmeth.2448) — also the source for the Render mode section's ([§2](#render)) super-resolution-pixel-size-vs-precision guidance (§5.2 of its Supplementary Information).
+
+**Rendering (Render mode)**
+- "Super-resolution microscopy with DNA-PAINT," J. Schnitzbauer, M. T. Strauss, T. Schlichthaerle, F. Schueder, R. Jungmann, *Nat. Protoc.* **12**, 1198–1228 (2017). [doi:10.1038/nprot.2017.024](https://doi.org/10.1038/nprot.2017.024) — Picasso's own default per-localization Gaussian rendering, the model for `precision` mode's splat.
+- "Raw Data to Results: A Hands-On Introduction and Overview of Computational Analysis for Single-Molecule Localization Microscopy," K. J. A. Martens, B. Turkowyd, U. Endesfelder, *Front. Bioinform.* **1**, 817254 (2022). [doi:10.3389/fbinf.2021.817254](https://doi.org/10.3389/fbinf.2021.817254) — histogram-vs-Gaussian rendering trade-offs, including the √2 resolution loss `precision` mode's own docs cite.
+- "Averaged shifted histograms: effective nonparametric density estimators in several dimensions," D. W. Scott, *Ann. Statist.* **13**(3), 1024–1040 (1985). [projecteuclid.org/euclid.aos/1176349654](https://projecteuclid.org/euclid.aos/1176349654) — the statistical basis for `dither` mode: shift-and-bin converges to a kernel density estimate.
+- "Random average shifted histograms," M. Bourel, R. Fraiman, B. Ghattas, *Comput. Stat. Data Anal.* **79**, 149–164 (2014). [doi:10.1016/j.csda.2014.05.004](https://doi.org/10.1016/j.csda.2014.05.004) — the randomized-shift refinement `dither` mode's single seeded jitter per localization is closer in spirit to.
 
 **Temporal median filtering (FTM)**
 - Originates with the Nieuwenhuizen et al. paper above; ported from the Hohlbein Lab's own newer implementation, [FTM2](https://github.com/HohlbeinLab/FTM2), used in "Enabling single-molecule localization microscopy in turbid food emulsions," A. Jabermoradi, S. Yang, M. I. Gobes, J. P. M. van Duynhoven, J. Hohlbein, *Phil. Trans. R. Soc. A* **380**(2220), 20200164 (2022). [doi:10.1098/rsta.2020.0164](https://doi.org/10.1098/rsta.2020.0164)

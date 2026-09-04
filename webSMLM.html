@@ -1950,7 +1950,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04d</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04e</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3933,6 +3933,19 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
     // two weighted splats is mathematically identical to splatting one blended kernel — for the
     // cost of a second pass and no allocation at all. Photon count is conserved either way, since
     // the weights sum to 1 and each slice is independently normalized to sum 1.
+    //
+    // KNOW THE LIMIT, measured against ground truth rather than assumed: blending two PSF
+    // INTENSITIES is not the same as interpolating the PSF's WIDTH. A mixture of two Gaussians of
+    // different width is wider than the Gaussian halfway between them, so at coarse z-steps the
+    // blended PSF is systematically too broad and its fitted sigma_x/sigma_y maps to the wrong z.
+    // Measured (uniform 3D volume, astig. moderate, same seed): at a 25 nm step blending and
+    // nearest-plane are indistinguishable (axial RMSE 82.4 vs 80.4 nm, uncertainty ~2.7 nm), but
+    // at a 100 nm step blending is genuinely worse (84.7 vs 81.8 nm) — the interpolation error it
+    // introduces then exceeds the +/-50 nm quantization it removes. So this is the right default
+    // for a properly sampled kernel and the wrong one for a coarse one; buildPsfKernelStack()
+    // warns above PSF_ZSTEP_BLEND_WARN_NM. Keep the z-step fine and it is strictly an improvement:
+    // the quantization it removes is systematic, and it is what would otherwise put a floor under
+    // any axial-accuracy measurement made against this simulator.
     const {focusIndex, zStepNm, nz, norm, nx, ny, oversample, camRad, interpMode}=zKernelStack;
     const kernelObj={kernel:null, nx, ny, oversample};
     for(const [ex,ey,ez,ov] of evList){
@@ -4498,6 +4511,9 @@ function computePsfIntensityPlane(nx, ny, resLateralM, pupil){
    tested) in the zero-Zernike case, and to agree on the depth-focal-shift-
    corrected best-focus plane exactly.
    --------------------------------------------------------------------------- */
+// Above this PSF z step, splatSimFrame()'s two-plane blend stops paying for itself — measured,
+// see that function's own comment and buildPsfKernelStack()'s warning.
+const PSF_ZSTEP_BLEND_WARN_NM=50;
 const PSF_FFT_M=64;
 // Chirp-Z transform (Bluestein's algorithm): computes, for M uniformly-spaced complex input
 // samples at k_m=k0+m*dk (m=0..M-1), the P uniformly-spaced OUTPUT samples at x_p=x0+p*dx
@@ -4723,6 +4739,15 @@ async function buildPsfKernelStack(cfg){
       (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
   if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
   const zStepNm=cfg.zStep*1e9;
+  // Above this, splatSimFrame()'s two-plane blend starts costing more accuracy (linear blending of
+  // two intensities is not width interpolation) than the quantization it removes — see its own
+  // comment for the measurement.
+  if(zStepNm>PSF_ZSTEP_BLEND_WARN_NM)
+    log(`⚠ PSF z step ${zStepNm.toFixed(0)} nm is coarse: 3D emitters are splatted from a linear blend of `+
+        `adjacent z-planes, and blending two PSF intensities is not the same as interpolating the PSF's width, `+
+        `so above ~${PSF_ZSTEP_BLEND_WARN_NM} nm the blend adds more error than the quantization it removes. `+
+        `Measured at 100 nm: axial RMSE 84.7 nm blended vs 81.8 nm nearest-plane. Use a finer z step for `+
+        `accuracy work.`);
   const zUsableNm=psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, cfg.oversample);
   if(zUsableNm>0)
     log(`PSF z encoding is single-valued to ±${zUsableNm.toFixed(0)} nm — beyond that σy/σx turns back, so two z values give the same width pair and no width-based 3D fit can tell them apart.`);
@@ -14995,15 +15020,22 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-04d — **Score vs truth** is now available headlessly
-too: analyze({scoreVsTruth:true}) returns a truthScore result, and with exportPlots also renders
-plots.truthScore. Skipped silently when there is no ground truth to score against, since a
-loaded file has none. Documentation caught up across the board — the new validation module and
-its parameters, the test-structure library, the two-plane z interpolation and the single-valued
-z-range guard are all written up in docs/DOCUMENTATION.md (the Read the Docs source) and
-CLAUDE.md, and the MODULE INDEX line numbers refreshed. CLAUDE.md's simulation entry had also
-drifted before any of this: it still described the Zernike PSF path as 2D-only and defaulting to
-the Gaussian model, neither of which had been true since 2026-09-02.
+log(`webSMLM v0.12.0-dev · build 2026-09-04e — Findings from actually scoring the simulator
+against its own ground truth, now that it can be.
+1) The default **Filaments + ring** test object overstates lateral error by ~50%, and not because
+of depth: at the SAME depth band its lateral RMSE is 22.7 nm against 14.6 nm for a uniform 3D
+volume at identical emitter density. The cause is self-crowding — emitters sit along 1D curves,
+so 15.3% of them are within 500 nm of another simultaneously-active emitter versus ~7% for the
+scattered structures, and overlapping PSFs are fitted with a single-emitter model. Accuracy
+figures measured on the default object are pessimistic; use Uniform 3D volume or Tilted plane.
+2) The two-plane z blend has a sampling limit, measured rather than assumed: blending two PSF
+INTENSITIES is not interpolating the PSF's WIDTH, and a mixture of two differently-wide PSFs is
+broader than the one halfway between them. At a 25 nm z step blending and nearest-plane are
+indistinguishable (axial RMSE 82.4 vs 80.4 nm, uncertainty ~2.7 nm); at 100 nm blending is
+genuinely worse (84.7 vs 81.8 nm). It is the right default for a properly sampled kernel and the
+wrong one for a coarse one, so the PSF build now warns above a 50 nm z step.
+3) 2D and 3D agree as intended: same object and seed, Jaccard 0.784 vs 0.774 and lateral RMSE
+13.4 vs 15.6 nm, the gap being defocus, since flattening z puts every emitter in focus.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

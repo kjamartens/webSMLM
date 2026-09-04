@@ -6,6 +6,28 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
 
 ## Next
 
+- **Ground-truth scoring findings** (v0.12.0-dev, build 2026-09-04e) — measured once **Score vs
+  truth** (MODULE: validation) made them measurable, and worth acting on:
+  - The default **Filaments + ring** test object overstates lateral error by roughly 50%, and not
+    through defocus: at the *same* depth band its lateral RMSE is 22.7 nm against 14.6 nm for a
+    uniform 3D volume at identical emitter density. The cause is self-crowding — emitters lie along
+    1-D curves, so 15.3% of them sit within 500 nm of another simultaneously-active emitter versus
+    ~7% for the scattered structures, and overlapping PSFs go through a single-emitter fitter.
+    Accuracy figures quoted from the default object are pessimistic; prefer **Uniform 3D volume**
+    (statistics) or **Tilted plane** (diagnostics). Worth revisiting whether the default should
+    change, which would alter every existing comparison.
+  - **Sub-plane z placement**: blending two PSF *intensities* is not interpolating the PSF's
+    *width*, and a mixture of two differently-wide PSFs is broader than the one halfway between
+    them. Measured: at a 25 nm kernel z step blending and nearest-plane are indistinguishable
+    (axial RMSE 82.4 vs 80.4 nm, uncertainty ~2.7 nm); at 100 nm blending is worse (84.7 vs
+    81.8 nm). Currently handled by warning above a 50 nm step. A width-aware interpolation (or a
+    spline through the z-stack, which the cubic-spline PSF item below would bring anyway) would
+    remove the trade-off rather than manage it.
+  - Not yet done: cross-validating **Phasor 3D against Gaussian MLE 3D** on the same scored
+    dataset. The tooling for it now exists — run both over one simulated stack and compare the
+    axial bias/RMS-versus-depth curves.
+
+
 - **Cubic-spline PSF fitting** (`picasso/fitting/splinefit.py`) for PSFs that deviate from
   Gaussian — meaningfully bigger scope than the rotated-elliptical MLE fitter (shipped): its own
   3D calibration volume and PSF-model representation, not just another free parameter. Key

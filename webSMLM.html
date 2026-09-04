@@ -1946,7 +1946,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-03i</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04a</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2076,6 +2076,17 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
         <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
         <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
+        <label class="row" id="structureRow" title="Which synthetic object the emitters attach to. 'Filaments + ring' ties each filament's z to its own y (the same sine drives both), so a z error cannot be told apart from a y error — the other structures sample z independently of x/y. Without '3D simulation?' the very same lateral geometry is used with z flattened to 0.">Test structure
+          <select id="simulation_structure" class="sel">
+            <option value="filaments" selected>Filaments + ring</option>
+            <option value="tiltedPlane">Tilted plane</option>
+            <option value="uniform3D">Uniform 3D volume</option>
+            <option value="shell">Spherical shell</option>
+            <option value="staircase">z-staircase</option>
+            <option value="nanoruler3D">3D nanoruler</option>
+          </select>
+        </label>
+        <label class="row" id="structureSizeRow" style="display:none" title="Meaning depends on the selected structure: spherical shell radius, z-staircase plane spacing, or 3D nanoruler point separation.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
         <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
         <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
         <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike" selected>Zernike-aberrated</option></select></label>
@@ -2915,16 +2926,32 @@ const PARAMS = {
   // simulation_psfInterp changed differ ONLY in PSF placement, letting placement-interpolation
   // modes be A/B-compared on identical underlying data.
   simulation_seed: { type:'number', id:'simulation_seed', label:'Random seed (0 = random)', min:0, max:2147483647, step:1, default:0, int:true },
-  // simulation_3d = when checked, buildStructure()'s three sine-wave filaments also oscillate
-  // in Z, using the SAME sin(k*x+phase) term (same k/phase per filament) that already drives
-  // their Y offset — so a filament corkscrews in Y and Z together rather than the two moving
-  // independently. Ground-truth-only for now (stored per emitter, exported on groundTruthEvents)
-  // — generateSynthetic()'s own render loop doesn't yet vary the PSF per emitter Z; that's a
-  // follow-up (see MODULE: simulation's own generateSynthetic() comment).
+  // simulation_3d = whether emitters get a Z spread at all. It means exactly ONE thing —
+  // "z varies or it doesn't" — and nothing else: buildStructure() always builds its object in
+  // 3D and flattens every z to 0 when this is off, so the LATERAL geometry is identical either
+  // way and the same controls, log lines and plots apply in both states. With it on, each
+  // emitter is splatted from the PSF kernel plane matching its own z (see splatSimFrame()); with
+  // it off, one global simulation_psfDepth applies to the whole movie.
   simulation_3d: { type:'bool', id:'simulation_3d', label:'3D simulation?', default:false },
-  // simulation_zRange = the +/- half-range (nm) the filament Z-oscillation is scaled to; the ring
-  // structure point are unaffected (z=0) since they have no sinusoidal pattern to mirror.
+  // simulation_zRange = the +/- half-range (nm) the structure's Z extent is scaled to. What that
+  // means is per structure (see buildStructure()): filaments oscillate sinusoidally over it and
+  // are additionally offset from one another, so they reach ~1.5x it; tiltedPlane ramps linearly
+  // across x; uniform3D draws uniformly from it; staircase places its planes across it. The
+  // shell ignores it entirely and uses simulation_structureSize as its radius instead.
   simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:1000, int:false },
+  // simulation_structure = which synthetic object buildStructure() builds. 'filaments' stays the
+  // default so existing settings JSONs and earlier runs reproduce unchanged. The other five exist
+  // because filaments cannot separate a z error from a y error: the SAME sin(k*x+ph) term drives
+  // both their y offset and their z, so the two are perfectly correlated by construction, and the
+  // sinusoid also piles emitters up at its extremes — exactly where an astigmatic PSF stops
+  // encoding z uniquely. Applies in 2D as much as in 3D (see simulation_3d).
+  simulation_structure: { type:'enum', id:'simulation_structure', label:'Test structure',
+    options:['filaments','tiltedPlane','uniform3D','shell','staircase','nanoruler3D'], default:'filaments' },
+  // simulation_structureSize = the one dimension whose meaning is per structure: shell radius,
+  // staircase plane spacing, nanoruler separation. Deliberately ONE field rather than three
+  // structure-specific ones so the sidebar doesn't grow a row per object; the tooltip says what
+  // it means for the selected one, and the row hides for structures that don't use it.
+  simulation_structureSize: { type:'number', id:'simulation_structureSize', label:'Structure size (nm)', min:10, max:5000, step:10, default:500, int:false },
 
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — a Zernike-aberrated PSF
   // model for "Simulate movie", alongside the fixed-sigma=1.3 isotropic Gaussian fallback. These
@@ -3364,8 +3391,10 @@ let originalStack=null;
 let rawFtmView=false;   // raw panel toggle: show the FTM-corrected preview instead of the raw frame — see ftmFrame()
 let simTrueDrift=null;   // ground-truth per-frame drift from the simulator (for scoring drift correction)
 // ground-truth ON events from the simulator — one entry per instantiated emitter's single
-// activation ({x,y,tStart,tEnd,photonsTotal}, frame units) — kept for later comparison against
-// recovered localizations; not consumed anywhere yet.
+// activation ({x,y,z,tStart,tEnd,photonsTotal}; x,y in camera px, z in nm, tStart/tEnd in
+// fractional frame units) — for comparison against recovered localizations. Reset alongside
+// groundTruth/simTrueDrift everywhere a new stack replaces the simulated one, so a score can
+// never silently run against a PREVIOUS simulation's truth after a real dataset is loaded.
 let groundTruthEvents=null;
 const readBudget = ()=> paramValue('memgb')*1073741824;   // frame-cache memory budget
 
@@ -3708,18 +3737,22 @@ function simFrameSeed(baseSeed, fi){
   return (h^(h>>>16))>>>0;
 }
 
-// Candidate emitter-site positions for the synthetic sample: three sine-wave
-// "filaments" plus one ring, used by generateSynthetic() as the structure
-// simulated emitters attach to. Each point is [x,y,z] — z is 0 unless `zRange`
-// (nm, half-range) is given, in which case each filament's z ALSO follows its
-// own sin(k*x+ph) term (same k/ph as the y-offset, so the filament corkscrews
-// in y and z together rather than the two oscillating independently); the
-// ring has no such pattern to mirror, so its z stays 0. The 3 filaments are
-// also offset from one another in z (first centred a half-range BELOW 0,
-// last a half-range ABOVE 0, middle one left centred on 0) so a 3D-simulated
-// movie shows genuinely different focus across the 3 structures, not just
-// each one individually bobbing through the same focal plane.
-function buildStructure(w,h,zRange=0){
+// The original synthetic sample: three sine-wave "filaments" plus one ring. Each point is
+// [x,y,z] — z is 0 unless `zRange` (nm, half-range) is given, in which case each filament's z
+// ALSO follows its own sin(k*x+ph) term (same k/ph as the y-offset, so the filament corkscrews
+// in y and z together rather than the two oscillating independently); the ring has no such
+// pattern to mirror, so its z stays 0. The 3 filaments are also offset from one another in z
+// (first centred a half-range BELOW 0, last a half-range ABOVE 0, middle one left centred on 0)
+// so a 3D-simulated movie shows genuinely different focus across the 3 structures, not just each
+// one individually bobbing through the same focal plane — which is also why a filament's z
+// reaches ~1.5x zRange, not zRange.
+//
+// Kept as the DEFAULT structure for backwards compatibility, but note what it cannot do: the one
+// sine drives both y and z, so y and z are perfectly correlated and a z error is indistinguishable
+// from a y error; and sin's own arcsine-shaped value distribution piles emitters up at ±zRange,
+// exactly where an astigmatic PSF stops encoding z uniquely. buildStructure()'s other options
+// exist to sample z independently of x/y — see there.
+function buildFilaments(w,h,zRange){
   const pts=[], cx=w/2, cy=h/2;
   const zOffsets=[-zRange/2, 0, zRange/2];
   for(let f=0; f<3; f++){ const y0=h*(0.25+0.25*f), amp=8+4*f, k=0.09+0.02*f, ph=f*2, zOff=zOffsets[f];
@@ -3730,6 +3763,115 @@ function buildStructure(w,h,zRange=0){
   const R=Math.min(w,h)*0.28;
   for(let a=0; a<Math.PI*2; a+=0.012) pts.push([cx+R*Math.cos(a), cy+R*Math.sin(a)-6, 0]);
   return pts;
+}
+
+// Roughly how many candidate sites each non-filament structure generates. Matched to what
+// buildFilaments() happens to produce (~1400) so switching structure doesn't visibly change the
+// simulation's character. The count does NOT set emitter density — `dens` is a physical areal
+// density and generateSynthetic() draws sites uniformly at random from this list, so a site can
+// host several arrivals over a movie; the count only sets how finely the object is sampled.
+const STRUCTURE_SITES=2000;
+const STRUCTURE_MARGIN_PX=6;    // keep every site this far from the frame edge, as filaments do
+
+// Candidate emitter-site positions for the synthetic sample — the structure simulated emitters
+// attach to. Returns [[x,y,z], …] with x,y in CAMERA PIXELS (origin top-left, pixel X centred on
+// integer X) and z in NANOMETRES relative to the focal plane; buildPsfKernelStack() centres its
+// planes on focus, so z=0 here lines up with the kernel's own focal plane.
+//
+// `kind` picks the object (PARAMS.simulation_structure), `sizeNm` is the per-object dimension
+// (PARAMS.simulation_structureSize), `px` the camera pixel size so physical sizes can be placed
+// in a fixed-size frame, and `rng` the (possibly seeded) source every draw must go through —
+// never Math.random directly, or simulation_seed stops reproducing.
+//
+// is3d=false flattens every z to 0 as the LAST step, uniformly, with no per-object special case.
+// That is what makes the "3D simulation?" checkbox mean exactly one thing: the lateral geometry
+// is identical either way and only the z varies, so every control, log line and plot applies
+// unchanged in both states.
+function buildStructure(w,h,zRange=0,kind='filaments',sizeNm=500,px=100,rng=Math.random,is3d=true){
+  const cx=w/2, cy=h/2, M=STRUCTURE_MARGIN_PX;
+  const spanX=w-2*M, spanY=h-2*M;
+  const nmToPx=nm=>nm/px;
+  let pts;
+  switch(kind){
+    // z ramps linearly with x across the whole frame, independent of y. One plot of fitted z
+    // against x then shows bias, axial compression and the point where z stops being invertible
+    // (the fitted ramp folds back on itself) in a single picture — the cheapest 3D diagnostic here.
+    case 'tiltedPlane':
+      pts=[];
+      for(let i=0;i<STRUCTURE_SITES;i++){
+        const x=M+rng()*spanX, y=M+rng()*spanY;
+        pts.push([x, y, (x-cx)/(w/2)*zRange]);
+      }
+      break;
+    // Uniform in x, y AND z — the only structure that samples z without any correlation to
+    // position or any pile-up, so bias/RMS binned against true z are unbiased estimates rather
+    // than a reflection of how the object happens to distribute its own z.
+    case 'uniform3D':
+      pts=[];
+      for(let i=0;i<STRUCTURE_SITES;i++)
+        pts.push([M+rng()*spanX, M+rng()*spanY, (rng()*2-1)*zRange]);
+      break;
+    // Hollow sphere of radius sizeNm centred in the frame at z=0, sampled uniformly over its
+    // SURFACE via normalized Gaussian vectors (Marsaglia) — the classic 3D-SMLM test object.
+    // A sphere that reconstructs flattened is direct evidence of axial compression, which this
+    // simulator can genuinely produce: the Gibson-Lanni model carries the ns/ni mismatch.
+    // Deliberately uses sizeNm rather than zRange, since a sphere's z extent IS its radius.
+    case 'shell': {
+      pts=[];
+      const Rpx=nmToPx(sizeNm);
+      for(let i=0;i<STRUCTURE_SITES;i++){
+        let vx,vy,vz,n2;
+        do{ vx=gauss(rng); vy=gauss(rng); vz=gauss(rng); n2=vx*vx+vy*vy+vz*vz; }while(n2<1e-12);
+        const n=Math.sqrt(n2);
+        pts.push([cx+Rpx*vx/n, cy+Rpx*vy/n, sizeNm*vz/n]);
+      }
+      break;
+    }
+    // Discrete z planes at known depths, each confined to its own horizontal band so the planes
+    // are separated laterally too — you can see which band lands at which depth instead of having
+    // to trust the colour scale. Measures axial separability directly.
+    case 'staircase': {
+      pts=[];
+      const nSteps=5, bandH=spanY/nSteps;
+      for(let i=0;i<STRUCTURE_SITES;i++){
+        const s=Math.min(nSteps-1, (rng()*nSteps)|0);
+        pts.push([M+rng()*spanX, M+s*bandH+rng()*bandH, -zRange+(2*zRange)*s/(nSteps-1)]);
+      }
+      break;
+    }
+    // Point PAIRS a known 3D distance apart, oriented at 45° in the xz plane so the separation is
+    // split between a lateral and an axial component. Unlike every other structure here this one
+    // has a ground-truth DISTANCE, so it measures absolute 3D accuracy rather than per-point bias.
+    case 'nanoruler3D': {
+      pts=[];
+      const half=sizeNm/2, k=Math.SQRT1_2;                 // 45° in xz: dx=dz=size/2·(1/√2)
+      const dxPx=nmToPx(half*k), dzNm=half*k;
+      for(let i=0;i<STRUCTURE_SITES/2;i++){
+        const x=M+dxPx+rng()*Math.max(1,spanX-2*dxPx), y=M+rng()*spanY, z=(rng()*2-1)*zRange;
+        pts.push([x-dxPx, y, z-dzNm]);
+        pts.push([x+dxPx, y, z+dzNm]);
+      }
+      break;
+    }
+    default:
+      pts=buildFilaments(w,h,zRange);
+  }
+  if(!is3d) for(const p of pts) p[2]=0;
+  return pts;
+}
+
+// One-line "how this structure distributes z", for generateSynthetic()'s own 3D log line. Kept
+// next to buildStructure() so the two can't drift apart — the log used to hardcode the filament
+// description, which read as plainly wrong for every other object.
+function structureZDescription(kind,zRange,sizeNm){
+  switch(kind){
+    case 'tiltedPlane':  return `tilted plane, z ramping linearly with x from −${zRange} to +${zRange} nm`;
+    case 'uniform3D':    return `uniform 3D volume, z drawn uniformly over ±${zRange} nm`;
+    case 'shell':        return `spherical shell of radius ${sizeNm} nm, so z spans ±${sizeNm} nm`;
+    case 'staircase':    return `z-staircase, 5 planes spread over ±${zRange} nm, one per horizontal band`;
+    case 'nanoruler3D':  return `3D nanorulers, pairs ${sizeNm} nm apart at 45° in xz, centres over ±${zRange} nm`;
+    default:             return `filaments oscillate/offset in z over a ±${zRange} nm structure Z range`;
+  }
 }
 
 // Splats every emitter active in ONE frame (evList = frameEvents[fi], see generateSynthetic())
@@ -3895,11 +4037,13 @@ async function generateSynthetic(){
   const driftPx=paramValue('driftpx'), dang=rng()*2*Math.PI;
   const ddx=Math.cos(dang), ddy=Math.sin(dang);
   const driftAt=fi=> n>1 ? fi/(n-1)*driftPx : 0;   // magnitude at frame fi
-  // is3d/zRange: buildStructure()'s filaments carry a real z per site regardless; whether the
-  // render loop below actually VARIES the PSF with it depends on psfModel (see zKernelStack below
-  // — only the Zernike model has a z-dependent width to vary at all).
-  const is3d=paramValue('simulation_3d'), zRange=is3d?paramValue('simulation_zRange'):0;
-  const gt=buildStructure(w,h,zRange), rad=Math.ceil(sigma*3);
+  // is3d/zRange: the structure carries a real z per site whenever is3d is on (buildStructure()
+  // flattens every z to 0 otherwise, uniformly across all structures); whether the render loop
+  // below actually VARIES the PSF with that z depends on psfModel (see zKernelStack below — only
+  // the Zernike model has a z-dependent width to vary at all).
+  const is3d=paramValue('simulation_3d'), zRange=paramValue('simulation_zRange');
+  const structure=paramValue('simulation_structure'), structureSize=paramValue('simulation_structureSize');
+  const gt=buildStructure(w,h,zRange,structure,structureSize,px,rng,is3d), rad=Math.ceil(sigma*3);
 
   // Zernike-aberrated PSF path (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §10) — builds/reuses
   // the same oversampled kernel the PSF preview uses. Two shapes, chosen by is3d:
@@ -4001,11 +4145,17 @@ async function generateSynthetic(){
     : await simulateFramesSerial(simCtx);
   setProg(null);
   groundTruth=gt;
-  // store the true per-frame drift (nm) so drift correction can be scored
-  simTrueDrift = driftPx>0 ? {n, px, dx:fi=>driftAt(fi)*ddx, dy:fi=>driftAt(fi)*ddy, total:driftPx} : null;
+  // Store the true per-frame drift so drift correction can be scored. driftAt() is in CAMERA
+  // PIXELS (driftpx is "Simulated total drift (px)"), so the *px here is what actually makes
+  // dx()/dy() nanometres — which is both what this comment always claimed and what the sole
+  // consumer assumes: correctDrift()'s scoring block compares them against -d.fdx[f]*px, i.e.
+  // nm. Without the conversion the two sides differed by a factor of the pixel size (100x at
+  // the default), so the "vs simulated ground truth: RMS x … nm" line was meaningless — it
+  // reported roughly the drift magnitude itself rather than the residual.
+  simTrueDrift = driftPx>0 ? {n, px, dx:fi=>driftAt(fi)*ddx*px, dy:fi=>driftAt(fi)*ddy*px, total:driftPx} : null;
   if(driftPx>0) log(`Simulated ${driftPx} px total drift along (${ddx.toFixed(2)}, ${ddy.toFixed(2)}).`);
   if(is3d){
-    log(`3D simulation: filaments oscillate/offset in z over a ±${zRange} nm structure Z range`+
+    log(`3D simulation: ${structureZDescription(structure,zRange,structureSize)}`+
         (zKernelStack ? ' — each emitter is splatted from the PSF kernel plane matching its own z.' : '.'));
     if(zKernelStack && zClampedCount>0){
       const halfRangeNm=zKernelStack.zStepNm*(zKernelStack.nz-1)/2;
@@ -4086,7 +4236,7 @@ async function generateCalibrationStack(){
     ? await simulateCalibFramesParallel(calibPool, calibCtx)
     : await simulateCalibFramesSerial(calibCtx);
   setProg(null);
-  groundTruth=null; simTrueDrift=null;   // no filament ground truth / drift to score for a calibration stack
+  groundTruth=null; groundTruthEvents=null; simTrueDrift=null;   // no structure ground truth / drift to score for a calibration stack
   log(`Simulated calibration stack: ${nz} z-planes × ${zStepNm}nm (focus @ frame ${focusIndex+1}/${nz}), `+
       `${beadXY.length} bead(s) at fixed x,y.`);
   return { stack: makeStack(w,h,nz,px, fi=>frames[fi]), focusIndex, zStepNm };
@@ -13279,7 +13429,7 @@ $('genCalBtn').addEventListener('click',async()=>{
 async function loadMovieFiles(fs){
   if(!fs.length) return;
   const multi=fs.length>1;
-  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
+  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthEvents=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
   // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13559,6 +13709,19 @@ function updateSimulation3dUI(){
 }
 $('simulation_3d').addEventListener('change',updateSimulation3dUI);
 updateSimulation3dUI();
+
+// Structure size only means something for the three structures that have a size independent of
+// the Z range (shell radius / staircase spacing / nanoruler separation). Deliberately keyed off
+// the STRUCTURE only and never off simulation_3d: picking an object is a geometry choice, so
+// both its rows stay visible in 2D as well — the 3D checkbox only decides whether the z that
+// geometry carries is used or flattened (see buildStructure()).
+const STRUCTURE_SIZED=['shell','staircase','nanoruler3D'];
+function updateSimulationStructureUI(){
+  $('structureSizeRow').style.display =
+    STRUCTURE_SIZED.includes(paramValue('simulation_structure')) ? 'flex' : 'none';
+}
+$('simulation_structure').addEventListener('change',updateSimulationStructureUI);
+updateSimulationStructureUI();
 
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
@@ -14129,7 +14292,7 @@ function rawClickToNative(e){
 // the load handlers already guard against.
 function resetAfterCropChange(){
   lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false);
-  setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; simTrueDrift=null; lastDrift=null; lastNena=null;
+  setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthEvents=null; simTrueDrift=null; lastDrift=null; lastNena=null;
   $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   // lastResult=null above orphans any sSMLM pairing state too (unpairSSmlm()
   // would otherwise try to write lastResult.locs on a null lastResult) — same
@@ -14404,17 +14567,19 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-03i — Simulate movie now splats+noises frames across a
-dedicated worker pool (getSimWorkerPool(), MODULE: workers) instead of one at a time on the main
-thread, when workers are available — a real speedup on multi-core machines for large frame counts
-or the Zernike 3D PSF path. Reproducibility for a given random seed is preserved: each frame now
-draws its camera noise from its own simFrameSeed(seed,frame)-derived stream rather than one
-continuing sequential stream, so a seeded run reproduces the exact same movie regardless of
-worker availability or dispatch order (verified: parallel and single-threaded fallback produce
-byte-identical frames for the same seed).
-"Simulate calib. stack" (3D calibration tab) now shares the SAME worker pool for its own
-per-z-plane bead splat+noise loop (simulateCalibFramesParallel()/simulateCalibFramesSerial()) —
-no seeded-reproducibility scheme there since that path was never seeded to begin with.
+log(`webSMLM v0.12.0-dev · build 2026-09-04a — Simulation settings gains a **Test structure**
+selector: the original filaments+ring, plus a tilted plane, a uniform 3D volume, a spherical
+shell, a z-staircase and 3D nanorulers. The filaments tie each strand's z to its own y (one
+sine drives both), so a z error cannot be separated from a y error, and they pile emitters up
+at the extremes of the Z range — the new objects sample z independently of x/y instead. A
+**Structure size (nm)** field appears for the three objects that have their own dimension
+(shell radius, staircase spacing, nanoruler separation). Structures behave identically with
+“3D simulation?” off: the same lateral geometry is built and z is simply flattened to 0, so
+the checkbox means only “z varies or it doesn't”.
+Fixes: the drift score against simulated ground truth (“vs simulated ground truth: RMS x …”)
+compared a nanometre quantity against a pixel one, so with any simulated drift it reported
+roughly the drift magnitude instead of the residual; and groundTruthEvents was never cleared
+when a new stack was loaded, so a previous simulation's truth could outlive it.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

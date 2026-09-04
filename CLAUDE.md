@@ -301,6 +301,19 @@ relevant one before editing rather than scrolling:
   "Ground truth", and always hides `zcolorRow`/`zrangeRow` again in that fallback path (GT's own
   depth-colour state has no home once there's no real result or prior render to fall back to).
 
+  **`$('zmin')`/`$('zmax')` are SHARED text fields** with the real reconstruction's own zmin/zmax
+  auto-fill (`rerender()`, only fills them when EMPTY, by design — see its own comment — so a
+  user's manual override persists across settings-change re-renders of the SAME result).
+  `genBtn`'s click handler now explicitly clears both (`$('zmin').value=''; $('zmax').value='';`)
+  — a real, reported bug otherwise: nothing cleared them on a fresh Simulate movie, so clicking
+  **View GT localizations** right after could silently inherit zmin/zmax LEFT OVER from a
+  completely unrelated previous dataset (an earlier real Localize result, or an earlier Simulate
+  movie run) — GT's own `if($('zmin').value==='')` auto-fill guard (same pattern `rerender()`
+  uses) then saw them as already-set and never recomputed, clipping the depth-colour range to
+  values that had nothing to do with the new simulation. `run()` (Localize) already cleared them
+  at its own start for the same reason (real dataset vs. real dataset); `genBtn` needed the exact
+  same reset for GT vs. GT (or GT vs. real, either direction).
+
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),
   or **uniform box filter** (difference of two box averages, thresholded by a plain intensity

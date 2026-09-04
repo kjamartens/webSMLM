@@ -13544,6 +13544,12 @@ async function showStackProjection(){
 $('genBtn').addEventListener('click',async()=>{
   log('Simulating movie…');
   $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
+  // A fresh simulated stack means a fresh groundTruthLocs with its own z distribution — clear
+  // any zmin/zmax left typed in from a PREVIOUS dataset (a real Localize result, or an earlier
+  // Simulate movie run) so View GT localizations' own auto-fill (see its click handler) computes
+  // a range from THIS dataset instead of silently reusing a stale, unrelated one (a real,
+  // reported bug: GT clipped to z values that had nothing to do with the new simulation).
+  $('zmin').value=''; $('zmax').value='';
   try{
     stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; gtShowing=false; srFullBeforeGT=null;
     { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display = groundTruthLocs && groundTruthLocs.length ? 'flex' : 'none'; if(b) b.textContent='View GT localizations'; }

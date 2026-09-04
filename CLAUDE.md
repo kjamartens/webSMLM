@@ -1172,6 +1172,14 @@ reported bug, since each dispatcher only knew how to show/label its OWN button. 
 all four dispatchers (plus `drawRaw()`/`drawSegmentedImage()`) call `hideOtherRawToggleBtns()`
 first. Any FUTURE raw-panel toggle button must do the same — add its id to the helper's list.
 
+**And the other half of that rule, which was missing until v0.12.0-dev/2026-09-04h: a plot that
+owns NO toggle must call the helper too**, with no argument. Only toggle-owning dispatchers called
+it, so going from a plot WITH a toggle to one without (Correct drift → NeNA, or Score vs truth →
+FRC) left the previous toggle stranded on top of the new plot — clicking it then redrew the old
+plot over the new one. Fixed in `drawNenaPlot()`, `drawFrcPlot()`, `drawPcfoPlot()`,
+`renderProfile()` and `drawHistogram()`; the rule is now simply that **every** raw-panel plot
+clears the toggles it does not own.
+
 ### Live preview (real-time detect/fit on the scrubbed frame)
 
 `showFrame()` re-detects and re-fits whatever frame the raw-panel scrubber is on, so

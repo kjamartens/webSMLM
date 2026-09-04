@@ -21,7 +21,7 @@
   edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2776   PARAMS registry, single source of truth for params;
+    params          2722   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3658   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3604   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3957   synthetic stack generator ("Simulate movie");
+    simulation      3903   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6085   score localizations against the simulator's own
+    validation      6031   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6398   per-frame band-pass + local-maxima detection
-    fit             6675   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6344   per-frame band-pass + local-maxima detection
+    fit             6621   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7184   accumulate to offscreen buffer; view/colour/blur;
+    render          7130   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8469   frame-parallel detect/fit worker pool; dedicated
+    workers         8415   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9038   ThunderSTORM-compatible CSV; exportPlotEither()
+    export          8984   ThunderSTORM-compatible CSV; exportPlotEither()
     3D calibration  8685   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           9747   AIM drift correction (2D+z); drift-vs-frame or
+    drift           9693   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,7 +185,7 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10253   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10199   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
     sSMLM           10317  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
@@ -1990,7 +1990,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04g</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04h</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2114,53 +2114,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
-        <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
-        <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
-        <label class="row" id="structureSizeRow" style="display:none" title="Radius of the spherical shell structure, in nm.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
-        <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
-        <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
-        <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike" selected>Zernike-aberrated</option></select></label>
-        <label class="row" id="psfNARow" style="display:none">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
-        <label class="row" id="psfWavelengthRow" style="display:none">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
-        <label class="row" id="psfNsRow" style="display:none">Sample refractive index (ns) <input type="number" id="simulation_psfNs" min="1.0" max="1.7" step="0.001" value="1.33" class="num"></label>
-        <label class="row" id="psfNiRow" style="display:none">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
-        <label class="row" id="psfTi0Row" style="display:none">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
-        <label class="row" id="psfDepthRow" style="display:none">Emitter depth into sample (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
-        <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="2000" class="num"></label>
-        <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="10" class="num"></label>
-        <label class="row" id="psfOversampleRow" style="display:none">PSF lateral oversampling (×) <input type="number" id="simulation_psfOversample" min="4" max="8" step="1" value="4" class="num"></label>
-        <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="6000" class="num"></label>
-        <label class="row" id="psfZernikePresetRow" style="display:none">Zernike aberration preset
-          <select id="simulation_psfZernikePreset" class="sel">
-            <option value="none">None (unaberrated)</option>
-            <option value="astigWeak">Astigmatism (weak)</option>
-            <option value="astigModerate" selected>Astigmatism (moderate)</option>
-            <option value="astigStrong">Astigmatism (strong)</option>
-            <option value="comaWeak">Coma (weak)</option>
-            <option value="comaStrong">Coma (strong)</option>
-            <option value="sphericalWeak">Spherical (weak)</option>
-            <option value="sphericalStrong">Spherical (strong)</option>
-            <option value="trefoilModerate">Trefoil (moderate)</option>
-            <option value="mixedRealistic">Mixed (realistic objective)</option>
-          </select>
-        </label>
-        <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 comma-separated values, one per OSA Zernike index 0-14, in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
-        <label class="row" id="psfEvalMethodRow" style="display:none" title="'Direct quadrature' is the original, more field-tested evaluator. 'FFT/chirp-Z' is a mathematically exact reformulation measured 76x-970x faster (kernel-size dependent) in this project's own testing, kept opt-in since it's newer code on a differently-discretized grid.">PSF evaluation method
-          <select id="simulation_psfEvalMethod" class="sel">
-            <option value="direct">Direct quadrature</option>
-            <option value="fft" selected>FFT / chirp-Z (faster)</option>
-          </select>
-        </label>
-        <label class="row" id="psfInterpRow" style="display:none" title="How an emitter's exact sub-pixel position is sampled from the oversampled kernel before box-downsampling it to the camera pixel grid. Nearest is cheapest/coarsest; linear (bilinear) is a fast middle ground; cubic (bicubic) is the default, matching SMLM-tooling practice; FFT phase-shift is a mathematically-exact Fourier-shift-theorem placement kept opt-in for comparison — much slower, and prone to periodic-boundary ringing on a non-periodic kernel tile.">PSF placement interpolation
-          <select id="simulation_psfInterp" class="sel">
-            <option value="nearest">Nearest</option>
-            <option value="linear">Linear (bilinear)</option>
-            <option value="cubic" selected>Cubic (bicubic)</option>
-            <option value="fft">FFT phase-shift (slow, for comparison)</option>
-          </select>
-        </label>
-        <label class="row" id="psfPreviewBtnRow" style="display:none"><button type="button" id="psfPreviewBtn">Preview PSF</button></label>
-        <label class="row" id="genCalBtnRow" style="display:none" title="Builds a bead z-stack from the SAME PSF kernel as Preview PSF above (PSF z range/step), focus exactly on the centre frame, and writes z-step/z=0 ref frame straight into the 3D calibration section below — Localize/3D calibration → Calibrate then needs no other setting changed."><button type="button" id="genCalBtn">Simulate calib. stack</button></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation-user"><span class="pill">module: simulation</span>
 
@@ -2179,6 +2132,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <details class="subsim" id="simTypeBox">
           <summary>Simulation type</summary>
           <label class="row">Structure type <select id="simulation_structureType" class="sel"><option value="filaments_ring" selected>Filaments + ring</option><option value="nup">Nuclear pore complex (NPC)</option><option value="tiltedPlane">Tilted plane</option><option value="uniform3D">Uniform 3D volume</option><option value="shell">Spherical shell</option></select></label>
+          <label class="row" id="structureSizeRow" style="display:none" title="Radius of the spherical shell structure, in nm.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
           <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
           <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
           <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
@@ -6155,6 +6109,20 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   for(const L of locs){ const f=L.frame|0; if(f<first) first=f; if(f>last) last=f; }
   first=Math.max(0,first); last=Math.min(nFrames-1,last);
 
+  // Drift ambiguity, and the one case this cannot resolve for itself. Interactively, correctDrift()
+  // preserves the raw coordinates in x0/y0, so the score below compares UNcorrected positions
+  // against the drifted truth and therefore measures the fitter. A CSV export carries no x0/y0, so
+  // a CSV round-trip of a drift-CORRECTED session arrives here looking uncorrected while its
+  // coordinates already have the drift removed — and would then be scored against drifted truth,
+  // inflating the lateral error by roughly the drift magnitude (measured: 105 nm median instead of
+  // 6 nm, on a 600 nm total drift). Nothing in the data distinguishes the two cases, so say so
+  // rather than report a confident wrong number.
+  if(trueDrift && trueDrift.total>0 && !locs.some(L=>L.x0!==undefined) && onLog)
+    onLog(`⚠ this dataset was simulated WITH drift (${(trueDrift.total).toFixed(1)} px total) but carries no `+
+          `pre-correction coordinates, which a CSV round-trip drops. If drift correction was applied before `+
+          `export, the lateral figures below compare corrected positions against drifted truth and are `+
+          `inflated by roughly the drift; score before correcting, or in the same session.`);
+
   const byFrameGT=groundTruthByFrame(gtEvents, nFrames, first, last);
   const byFrameLoc=new Map();
   for(const L of locs){ const f=L.frame|0; let a=byFrameLoc.get(f); if(!a){ a=[]; byFrameLoc.set(f,a); } a.push(L); }
@@ -7949,7 +7917,9 @@ function renderProfile(){
   if(!profileData) return;
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
   const {dist,prof,totalNm,ymax}=profileData, {x0,x1}=profileView, xr=Math.max(1e-9,x1-x0);
-  rawFull=null; setRawPlot(true); rawPlotName='profile'; $('rawTitle').textContent='Line profile';
+  rawFull=null; setRawPlot(true); rawPlotName='profile';
+  hideOtherRawToggleBtns();   // this plot owns no toggle of its own, so clear every
+  // other one — otherwise the previous plot's toggle stays stranded on top of it. $('rawTitle').textContent='Line profile';
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   const mL=PROF_ML,mR=PROF_MR,mT=30,mB=48, pw=W-mL-mR, ph=H-mT-mB, yb=mT+ph;
@@ -10366,7 +10336,9 @@ async function nenaPrecision(locs, px, onProgress, onLog){
 // Plot the NeNA nearest-neighbour histogram + fit on the LEFT (raw) panel.
 function drawNenaPlot(res){
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
-  rawFull=null; setRawPlot(true); rawPlotName='nena'; $('rawTitle').textContent='NeNA: NN distances';
+  rawFull=null; setRawPlot(true); rawPlotName='nena';
+  hideOtherRawToggleBtns();   // this plot owns no toggle of its own, so clear every
+  // other one — otherwise the previous plot's toggle stays stranded on top of it. $('rawTitle').textContent='NeNA: NN distances';
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   const mL=56,mR=14,mT=30,mB=44, pw=W-mL-mR, ph=H-mT-mB;
@@ -10608,7 +10580,9 @@ async function frcResolution(locs, px, mag, onProgress=p=>setProg(100*p), onLog=
 // Plot the FRC curve + 1/7 threshold + resolution marker on the LEFT panel.
 function drawFrcPlot(r){
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
-  rawFull=null; setRawPlot(true); rawPlotName='frc'; $('rawTitle').textContent='FRC';
+  rawFull=null; setRawPlot(true); rawPlotName='frc';
+  hideOtherRawToggleBtns();   // this plot owns no toggle of its own, so clear every
+  // other one — otherwise the previous plot's toggle stays stranded on top of it. $('rawTitle').textContent='FRC';
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   const mL=52,mR=14,mT=30,mB=48, pw=W-mL-mR, ph=H-mT-mB;
@@ -10816,7 +10790,9 @@ function drawPcfoPlot(){
   if(!pcfoLastPts||!pcfoLastFit) return;
   const pts=pcfoLastPts, fit=pcfoLastFit;
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
-  rawFull=null; setRawPlot(true); rawPlotName='pcfo'; $('rawTitle').textContent='PCFO: signal vs. noise variance';
+  rawFull=null; setRawPlot(true); rawPlotName='pcfo';
+  hideOtherRawToggleBtns();   // this plot owns no toggle of its own, so clear every
+  // other one — otherwise the previous plot's toggle stays stranded on top of it. $('rawTitle').textContent='PCFO: signal vs. noise variance';
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   // zoom to the point cloud + fitted line's own extent, not the origin — the
@@ -15499,27 +15475,27 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-04g — Merge of two parallel lines of work on the
-simulator, plus the robust-statistics pass.
-**Structure type** is now ONE selector carrying both sides: Filaments + ring and the Nuclear pore
-complex (NPC) model, alongside Tilted plane, Uniform 3D volume and Spherical shell. The three
-geometric objects exist because neither filaments nor NPC can separate a z error from a y error
-the way a scoring run needs, and because filaments inflate the measured lateral spread ~50% at
-equal density through self-crowding along their 1-D curves — quote accuracy figures from Uniform
-3D volume, diagnose with Tilted plane. “3D simulation?” now flattens z for EVERY structure
-uniformly, NPC included, so the checkbox means exactly one thing everywhere.
-**Score vs truth** leads with the MEDIAN and percentiles rather than RMSE, and counts gross axial
-failures separately: the axial error distribution has heavy tails, and on a typical run the worst
-1% of pairs contributed 62% of the sum of squares while the RMSE swung 67–420 nm across seeds and
-the median barely moved. The score plot follows suit (median z error, ±MAD band, median lateral).
-Removed after measuring: the two-plane z blend (1.74x the simulation time for no measurable gain
-at a fine z step, measurably worse at a coarse one — blending two PSF intensities is not
-interpolating the PSF's width), and the z-staircase and 3D nanoruler structures (neither measured
-anything the others don't).
-Documented: the calibration/sample depth-mismatch scenario, which needs no new settings and
-reproduces the failure that silently corrupts real 3D data — calibrate at the coverslip, image
-2 um deep, and the axial scale comes back 0.65 with a 243 nm median z error while detection looks
-nearly untouched.
+log(`webSMLM v0.12.0-dev · build 2026-09-04h — Verification pass over the merge, and the four
+things it caught. **Two were my own merge damage**: a whole sidebar block was duplicated (39
+duplicate element ids — getElementById returns the first, so half the PSF controls were wired to
+invisible copies), and the repair briefly over-deleted six controls (Frames, FOV, pixel size,
+density, labeling efficiency, background). Both fixed; every one of the 108 PARAMS entries is now
+bound to a real control, with no duplicate ids anywhere.
+**One was pre-existing**: a raw-panel plot that owns no mode-toggle button never cleared the other
+toggles, so going from a plot WITH a toggle to one without — Correct drift → NeNA, or Score vs
+truth → FRC — left the previous toggle stranded on top, and clicking it redrew the old plot over
+the new one. Fixed in NeNA, FRC, PCFO, line-profile and the shared histogram; CLAUDE.md's rule now
+states both halves.
+**One was a trap in the new scoring**: a CSV export carries no pre-drift coordinates, so scoring a
+CSV round-trip of a drift-CORRECTED session compared corrected positions against drifted truth and
+inflated the lateral error (105 nm median instead of 6, on 600 nm of drift). Nothing in the data
+distinguishes the two cases, so it now says so rather than reporting a confident wrong number.
+Also verified: hint/documentation sync, all three worker pools' own numeric self-tests, all six fit
+methods scored end-to-end (lateral median MLE 6.1-6.2 < LS 7.1 < phasor 8.0 nm, and the three
+independent 3D routes agreeing within 5% at 23.4/23.8/24.6 nm axial), all five structures in both
+2D and 3D, every show/hide rule, theme switching with a plot up, the localizations table, the
+drift ground-truth score (35/62 nm residual on 600 nm simulated drift — the unit fix from build a
+working), and the headless API run for real.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));
@@ -15946,7 +15922,9 @@ function drawHistogram(){
   if(!histData||!histView) return;
   const {col,unit,lo,hi,nb,bw,hist,ymax,n,markers,logY,curve}=histData, {x0,x1}=histView;
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
-  rawFull=null; setRawPlot(true); rawPlotName='histogram'; $('rawTitle').textContent=`Histogram: ${col}`;
+  rawFull=null; setRawPlot(true); rawPlotName='histogram';
+  hideOtherRawToggleBtns();   // this plot owns no toggle of its own, so clear every
+  // other one — otherwise the previous plot's toggle stays stranded on top of it. $('rawTitle').textContent=`Histogram: ${col}`;
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   const mL=HIST_ML,mR=HIST_MR,mT=30,mB=48, pw=W-mL-mR, ph=H-mT-mB, xr=Math.max(1e-9,x1-x0), decX=(x1-x0)<10?2:0;

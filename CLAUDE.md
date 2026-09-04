@@ -225,6 +225,114 @@ relevant one before editing rather than scrolling:
   implementation doc's own §5 call for. Downstream of filling `img` (Poisson shot noise, read
   noise, gain/offset) is identical for both PSF paths.
 
+  **`simulation_fov`** (default 128px, square) replaced a previously-hardcoded `w=128,h=128` at
+  BOTH `generateSynthetic()`'s and `generateCalibrationStack()`'s own top — the one true source
+  of the simulated camera's field of view now, no other hardcoded `128` remains for it anywhere
+  in the file (checked). **`simulation_labelEfficiency`** (%, default 70) is applied exactly ONCE,
+  right after `buildStructure()` returns, as a seeded random keep/drop filter over its candidate
+  site list (`gtAll` → `gt`) — BEFORE the Poisson emitter-arrival process ever gets to pick a
+  site, so a dropped site can never light up at any frame, not just less often; matches real
+  labeling chemistry (antibody/SNAP/Halo/FP) never reaching 100% of its target. Structure-type
+  agnostic by construction (filters whatever `buildStructure()` returned, regardless of which
+  generator produced it) — meaningful for any discrete-site structure (NUP) and harmless (if less
+  physically interesting) for the continuously-sampled filament/ring points.
+
+  **Structure type** (`simulation_structureType`, `'filaments_ring'` default, `'nup'`, or one of
+  `'tiltedPlane'`/`'uniform3D'`/`'shell'`) picks
+  which ground-truth structure `buildStructure()` generates — a plain dispatcher now, over
+  `buildFilamentsRingStructure()` (the original 3-filament+ring layout, unchanged) or
+  `buildNupStructure()` (nuclear pore complexes). Both return the same shape (an array of
+  `[x,y,z]` candidate emitter sites, x/y camera px, z nm), so nothing downstream of
+  `buildStructure()` — the Poisson emitter-arrival process, per-frame splat/noise — needed to
+  change for a new structure type; a future structure type is just a third case in that switch.
+
+  **NUP structure** (`buildNupAttachmentPoints()`/`displaceByLinker()`/`buildNupLocalPoints()`/
+  `buildNupStructure()`) models the endogenously SNAP-tagged Nup96 nuclear pore complex (NPC)
+  reference standard from Thevathasan et al., *Nat. Methods* 16, 1045–1053 (2019),
+  DOI:10.1038/s41592-019-0574-9 — 8-fold symmetric ring (`simulation_nup_radius`, default 53.5 nm,
+  the paper's measured value), 8 corners of 4 Nup96 each — arranged in a half-circle ARC bulging
+  outward from the ring (`NUP_CORNER_ARC_ANGLES`, four points spread across 180°), not a 2x2
+  square (a first version got this wrong — corrected against the paper's own Fig. 1e, which shows
+  the real cluster shape), diameter `simulation_nup_cornerSpread` (default 12 nm, matching the
+  figure's own ~12 nm corner-cluster scale vs. ~42 nm corner-to-corner spacing) — 2 rings
+  along the pore axis (`simulation_nup_ringSeparation`, default 50 nm = the user's "25 nm
+  above/below") = **64 attachment points per NPC**. Geometry stays fully PARAMS-driven rather than
+  hardcoded, following the parametrized-NPC-simulation approach of Wanninger et al. ("CIR4MICS"),
+  *Bioinformatics* 39(10), btad587 (2023), DOI:10.1093/bioinformatics/btad587. Each attachment
+  point is then displaced by `displaceByLinker()` — a uniform-in-volume radius between
+  `simulation_nup_linkerLengthMin`/`Max` (default 2–5 nm), uniform direction on the sphere — to
+  get the actual emitter position, modelling the real fluorophore (SNAP/Halo+dye, or antibody)
+  sitting some finite distance from its Nup96 attachment site rather than exactly on it.
+  `buildNupStructure()` scatters `simulation_nup_count` NPCs over a small membrane patch
+  (rejection-sampled for `simulation_nup_minSpacing`, each with a random azimuthal rotation), then
+  maps each NPC's local `(a,b,c)` frame (ring plane `a,b`; pore axis `c`) into world
+  `[x,y,z]` per `simulation_nup_membraneType`: **`topdown`** keeps the pore axis along the optical
+  (Z) axis — ring plane → world X,Y, ring separation + a gentle `simulation_nup_curvature`
+  bowl (mean-subtracted, centred at ~0) → Z — reusing the existing per-emitter-z `zKernelStack`
+  path unchanged (see `simulation_3d`'s own comment above) as long as `simulation_3d` is checked.
+  **`sideways`** rotates the pore axis into image-Y instead (viewing the envelope edge-on, matching
+  the paper's own side-view NPC images) — ring's `a` → world X, ring's `b` → Z (depth/defocus),
+  ring separation + curvature (`c`) → image Y. `buildNupStructure()`'s own `rng` parameter is the
+  SAME seeded `mulberry32(simulation_seed)` stream `generateSynthetic()` already threads through
+  `buildStructure()`, so a seeded Simulate-movie run reproduces the identical NPC layout too.
+
+  **Debug single-NUP viewer** (`nupDebugBtn`/`drawNupDebugView()`, MODULE: pipeline) is an
+  explicitly temporary aid — shows one NPC's 64 attachment (gray) and post-linker-displacement
+  emitter (green/magenta by ring) points as a top-view + side-view scatter on the raw panel, via
+  `setupPlot(cv,true)`, independent of any actual Simulate-movie run (its own fresh
+  `Math.random()`, not the seeded stream) — meant to be lifted out cleanly once no longer needed.
+
+  **GT localizations viewer** (`groundTruthLocs`/`gtShowing`/`srFullBeforeGT`/`srTitleBeforeGT`/
+  `srInfoBeforeGT`, module-level; `viewGtBtn`/`viewGtBtnRow`, MODULE: pipeline) — after a
+  successful Simulate movie, `groundTruthLocs` is built from `groundTruthEvents` (one
+  `{x,y,z,photons}` entry per simulated BLINK, not per structure site — the fair comparison
+  against a real reconstruction's own per-blink localizations). Each entry ALSO carries a fixed
+  `lpx:lpy:1/px` (native camera px equivalent of 1 nm, `px` = `simulation_pxnm`/`stack.px`) — a
+  real, reported bug otherwise: with no `lpx`/`lpy` of their own, `renderSuperResPixels()`'s
+  'precision'/'dither' render modes fall back to the whole-dataset `rblur` (Render blur σ_render,
+  the same knob a REAL fit's own localization precision typically needs), rendering GT markers as
+  blobs several times too large — these are the true simulated positions, not a fit with real
+  uncertainty, so a 1 nm precision (a crisp point at any realistic magnification) is the correct
+  fixed value. `viewGtBtn`'s own click handler passes the SAME `1/stack.px` as the `blurPx`
+  fallback argument to `renderSuperRes()` too (rather than `paramValue('rblur')`), covering
+  'fixed' render mode as well, which never consults `lpx`/`lpy` at all. **`viewGtBtnRow`'s HTML
+  lives directly under `nupDebugBtnRow` inside `simTypeBox`** (not in the top button group any more,
+  and not added to `NUP_ROW_IDS` — it stays independently shown/hidden for ANY structure type,
+  just grouped visually next to the other simulation-debug tool) — genBtn's handler toggles
+  `viewGtBtnRow.style.display`, not the button's own (the button carries no inline style of its
+  own now that it's wrapped in a `label.row`).
+
+  Clicking **View GT localizations** renders `groundTruthLocs` into `srFull` via the SAME
+  `renderSuperRes()` call `rerender()` makes — **including its depth-colour (z) handling**, not
+  just a flat density render (a real, reported bug: the first version hardcoded `zColor=false`
+  regardless of real per-emitter z, e.g. from a 3D NUP simulation). Mirrors `rerender()`'s own
+  logic exactly: auto-checks **Colour by depth (z)** + picks the `turbo` LUT the first time a
+  given `groundTruthLocs` array turns out colourable (`_zColorAutoChecked` flagged directly on
+  the array, same "flag on the data object" trick `lastResult._zColorAutoChecked` uses), computes
+  zlo/zhi via `zRange()` (cached as `groundTruthLocs._zr`, same per-object-cache idea as
+  `lastResult.zr`), shows/hides `zcolorRow`/`zrangeRow`, and stamps `srFull._zColor`/`_zlo`/`_zhi`
+  on the returned canvas so `drawView()`'s own `srFull._zColor` check draws the depth-colour bar
+  for a GT render exactly as it would for a real one. Stashes/restores whatever `srFull` (AND its
+  `$('srTitle')`/`$('srInfo')` text, `srTitleBeforeGT`/`srInfoBeforeGT`) held before — swaps
+  `srFull` directly rather than going through `lastResult`, since `lastResult` is `null`
+  immediately after Simulate movie, before any Localize run; hiding GT with no `lastResult` and no
+  stashed `srFull` re-runs `showStackProjection()` rather than leaving a blank canvas mislabelled
+  "Ground truth", and always hides `zcolorRow`/`zrangeRow` again in that fallback path (GT's own
+  depth-colour state has no home once there's no real result or prior render to fall back to).
+
+  **`$('zmin')`/`$('zmax')` are SHARED text fields** with the real reconstruction's own zmin/zmax
+  auto-fill (`rerender()`, only fills them when EMPTY, by design — see its own comment — so a
+  user's manual override persists across settings-change re-renders of the SAME result).
+  `genBtn`'s click handler now explicitly clears both (`$('zmin').value=''; $('zmax').value='';`)
+  — a real, reported bug otherwise: nothing cleared them on a fresh Simulate movie, so clicking
+  **View GT localizations** right after could silently inherit zmin/zmax LEFT OVER from a
+  completely unrelated previous dataset (an earlier real Localize result, or an earlier Simulate
+  movie run) — GT's own `if($('zmin').value==='')` auto-fill guard (same pattern `rerender()`
+  uses) then saw them as already-set and never recomputed, clipping the depth-colour range to
+  values that had nothing to do with the new simulation. `run()` (Localize) already cleared them
+  at its own start for the same reason (real dataset vs. real dataset); `genBtn` needed the exact
+  same reset for GT vs. GT (or GT vs. real, either direction).
+
 - **validation** — scores recovered localizations against the simulator's own ground truth
   (`groundTruthEvents`), which nothing read before. `scoreTruthCore()` is the pure core shared by
   the **Score vs truth** button and `analyze()`'s `scoreVsTruth` flag. Matching is per frame,
@@ -240,7 +348,6 @@ relevant one before editing rather than scrolling:
   clamped-calibration failures), and measured on a typical run the worst 1% of pairs contributed
   62% of the sum of squares while the RMSE swung 67→420 nm across seeds and the median barely
   moved. Gross axial failures are counted separately rather than left to inflate a mean.
-
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),
   or **uniform box filter** (difference of two box averages, thresholded by a plain intensity
@@ -1325,10 +1432,14 @@ in the repo.
   never hand-edit a `.hint` div directly, it'll be overwritten on the next sync. `--check` exits 1
   without writing if `webSMLM.html` would change, for a pre-commit/CI-style drift check. The
   `<span class="pill">module: X</span>` label at the top of each `.hint` div is NOT part of the
-  synced content (kept as fixed markup in `webSMLM.html`). All 12 `.hint` divs
-  (`hint-memory`/`hint-liveStreaming`/`hint-simulation`/`hint-pcfo`/`hint-calibration`/
-  `hint-detectfit`/`hint-export`/`hint-render`/`hint-drift`/`hint-locprecision`/`hint-sSMLM`/
-  `hint-spt`) use this mechanism. Each
+  synced content (kept as fixed markup in `webSMLM.html`). All 17 `.hint` divs
+  (`hint-memory`/`hint-liveStreaming`/`hint-simulation-user`/`hint-simulation-type`/
+  `hint-simulation-fluorophore`/`hint-simulation-camera`/`hint-simulation-psf`/`hint-simulation`/
+  `hint-pcfo`/`hint-calibration`/`hint-detectfit`/`hint-export`/`hint-render`/`hint-drift`/
+  `hint-locprecision`/`hint-sSMLM`/`hint-spt`) use this mechanism — the Simulation settings panel
+  is the one place with more than one `.hint` per `<details class="sim">` section, split across
+  its own sub-groups (see **simulation** module notes above) plus a final coarse
+  `hint-simulation` overview. Each
   marker is placed as the INTRO to its DOCUMENTATION.md section, right after the PARAMS table — the
   surrounding prose picks up only where the popup leaves off, not restating it.
 - **Quick guide** (the in-app modal, `helpBtn`) is deliberately thin: just the intro blurb, the

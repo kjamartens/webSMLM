@@ -1029,9 +1029,11 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 
 | id | Label | Type | Min | Max | Step | Default |
 |---|---|---|---|---|---|---|
-| `frames` | Simulated frame count | number (int) | 50 | 800 | 50 | 300 |
+| `frames` | Simulated frame count | number (int) | 50 | 5000 | 50 | 300 |
+| `simulation_fov` | FOV (pixels) | number (int) | 32 | 1024 | 8 | 128 |
 | `simulation_pxnm` | Simulation pixel size (nm) | number | 10 | 500 | 1 | 100 |
 | `dens` | Emitter density (emitters/µm²/frame) | number | 0 | 5 | 0.01 | 0.05 |
+| `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `phot` | Simulated photons/emitter/frame | number (int) | 0 | 50000 | 50 | 900 |
 | `simlifetime` | Simulated ON lifetime (frames, mean) | number | 0.1 | 20 | 0.1 | 1 |
 | `simulation_gain` | Simulation camera gain (photons/ADU) | number | 0.001 | 1000 | 0.01 | 0.34 |
@@ -1043,30 +1045,58 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
 | `simulation_3d` | 3D simulation? | bool | — | — | — | off |
 | `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
-| `simulation_structure` | Test structure | enum (`filaments`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `filaments` |
-| `simulation_structureSize` | Structure size (nm) — the shell's radius | number | 10 | 5000 | 10 | 500 |
+| `simulation_structureType` | Structure type | enum (`filaments_ring`, `nup`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `filaments_ring` |
+| `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
+| `simulation_nup_radius` | NPC ring radius (nm) | number | 20 | 150 | 0.5 | 53.5 |
+| `simulation_nup_cornerSpread` | Corner sub-point spread (nm) | number | 0 | 30 | 0.5 | 12 |
+| `simulation_nup_ringSeparation` | Axial ring separation (nm) | number | 0 | 150 | 1 | 50 |
+| `simulation_nup_linkerLengthMin` | Linker length, min (nm) | number | 0 | 30 | 0.5 | 2 |
+| `simulation_nup_linkerLengthMax` | Linker length, max (nm) | number | 0 | 30 | 0.5 | 5 |
+| `simulation_nup_membraneType` | Membrane orientation | enum (`topdown`/`sideways`) | — | — | — | `topdown` |
+| `simulation_nup_count` | Number of NPCs | number (int) | 1 | 500 | 1 | 20 |
+| `simulation_nup_minSpacing` | Min. NPC-NPC spacing (nm) | number | 0 | 2000 | 10 | 200 |
+| `simulation_nup_curvature` | Membrane curvature amplitude (nm) | number | 0 | 2000 | 10 | 150 |
+The sidebar's Simulation settings panel splits these into 5 groups — a flat
+**User parameters** group plus 4 collapsible sub-groups (**Simulation type**,
+**Fluorophore parameters**, **Camera parameters**, **PSF parameters**) — each
+with its own "more info…" popup, plus one final, coarse overview popup for
+the section as a whole. **Structure type** (inside **Simulation type**) picks
+which synthetic ground-truth structure "Simulate movie" builds — the original
+**Filaments + ring** layout (default, unchanged), or **Nuclear pore complex
+(NPC)**, which reveals its own cluster of NUP-specific rows/popup within the
+same sub-group (see below). After a successful "Simulate movie", a **View GT
+localizations** button (next to "Simulate movie" itself) renders the true
+simulated emitter positions — one point per simulated blink — into the
+reconstruction panel the same way a real reconstruction is drawn, for
+comparing what "Localize" actually recovers against the known ground truth.
 
-**In-app "more info…" popup** (`hint-simulation` in `webSMLM.html`; synced
-by `tools/sync_hints.mjs` — edit here, then run the script, never edit the
-`.hint` div directly):
+**In-app "more info…" popups** (synced by `tools/sync_hints.mjs` — edit here,
+then run the script, never edit a `.hint` div directly):
 
-<!-- HINT:simulation -->
-<p><b>Emitter density</b> is a physical areal density — the average number of ON emitters per µm² in any
-given frame — independent of how densely the ground-truth structure is sampled. Emitters arrive as a
-Poisson process at randomly chosen structure sites; each turns on exactly once: a fractional start time
-(drawn from up to 5×lifetime before frame 0, so the exponential's tail can already be mid-event at frame 0)
-and an exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
-scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits half the
-photons.</p>
-<p><b>Background</b> (photons/px, Poisson like the signal) is added at every pixel independently, every
-frame. <b>Camera gain/offset/offset std/read noise</b>
-forward-model a real sensor: Gaussian read noise (σ in electrons) is added to the photon count before the
-gain conversion, then a per-pixel offset map (Gaussian around the mean offset, fixed for the whole stack)
-is added — independent of the fit-side camera gain/offset used for localization. For a clean
-self-consistency test with the <b>Gain/offset estimation</b> section's own readout-noise field, combine
-read noise and offset std in quadrature (√(read_noise²+offset_std²), offset std converted to photons via
-this panel's gain) — a static per-pixel offset pattern looks identical to read noise in a single frame's
-Fourier content, so leaving it out biases the fitted offset the same way.</p>
+**User parameters** (`hint-simulation-user`):
+
+<!-- HINT:simulation-user -->
+<p><b>Frames</b> is the length of the simulated movie; <b>FOV (pixels)</b> is the simulated camera's
+square field of view; <b>Pixel size (nm)</b> is this simulated stack's own camera pixel size —
+independent of any pixel size later used for localization/rendering.
+<b>Emitter density</b> is a physical areal density — the average number of ON emitters per µm² in any
+given frame — independent of how densely the ground-truth structure is sampled. <b>Labeling
+efficiency (%)</b> randomly drops that fraction of physical structure sites from ever carrying a
+label at all, before any emitter dynamics run — an unlabeled site never lights up, at any frame,
+modelling real labeling chemistry (antibodies, SNAP/Halo, FP fusions) never reaching 100% of its
+target. Emitters arrive as a Poisson process at randomly chosen (labeled) structure sites (see
+<b>Simulation type</b> below for the structure's own 2D/3D shape). <b>Background</b> (photons/px,
+Poisson like the signal) is added at every pixel independently, every frame.</p>
+<!-- /HINT:simulation-user -->
+
+**Simulation type** (`hint-simulation-type`):
+
+<!-- HINT:simulation-type -->
+<p><b>Structure type</b> picks which synthetic ground-truth structure emitters attach to —
+<b>Filaments + ring</b> (default, unchanged) or <b>Nuclear pore complex (NPC)</b> (see that option's
+own "more info…" below). <b>3D simulation?</b> makes the generated filament structure oscillate in
+z, scaled by <b>Structure Z range (± nm)</b> — unchecked (default), the structure is flat and every
+emitter simulates at z=0.</p>
 <p><b>Drift (px, total)</b> — total sample drift over all frames, in a random direction (linear from
 frame 0). 0 = none. Used to test drift correction — the true drift is stored for scoring.</p>
 <p><b>Random seed (0 = random)</b> — 0 (default) keeps the original unseeded behaviour: a fresh
@@ -1075,6 +1105,62 @@ pick, ON/OFF timing, drift direction, and all simulated camera noise) reproducib
 instead, so two runs with the same seed and only <b>PSF placement interpolation</b> changed differ
 ONLY in the PSF placement itself — useful for A/B-comparing interpolation modes on identical
 underlying data.</p>
+<!-- /HINT:simulation-type -->
+
+**Nuclear pore complex (NPC) structure** (`hint-simulation-nup`, shown only when **Structure
+type** is set to **Nuclear pore complex (NPC)**):
+
+<!-- HINT:simulation-nup -->
+<p>Models the endogenously SNAP-tagged Nup96 nuclear pore complex (NPC) reference standard from
+Thevathasan <i>et al.</i>, "Nuclear pores as versatile reference standards for quantitative
+superresolution microscopy", <i>Nat. Methods</i> 16, 1045–1053 (2019),
+<a href="https://doi.org/10.1038/s41592-019-0574-9" target="_blank" rel="noopener">doi:10.1038/s41592-019-0574-9</a>
+— an 8-fold symmetric ring of 32 Nup96 (8 corners of 4 Nup96 each, arranged in a half-circle arc
+of diameter <b>Corner sub-point spread</b>, bulging outward from the ring — see the paper's own
+Fig. 1e), <b>NPC ring radius</b> ≈ 53.5 nm, two such rings <b>Axial ring separation</b> ≈ 50 nm apart
+along the pore axis (nucleoplasmic/cytoplasmic). Geometry is kept fully adjustable rather than
+hardcoded, following the parametrized-NPC-simulation approach of Wanninger <i>et al.</i>
+("CIR4MICS"), <i>Bioinformatics</i> 39(10), btad587 (2023),
+<a href="https://doi.org/10.1093/bioinformatics/btad587" target="_blank" rel="noopener">doi:10.1093/bioinformatics/btad587</a>.
+Each of the 64 attachment points is displaced by <b>Linker length, min/max (nm)</b> in a random 3D
+direction, modelling the real fluorophore (SNAP/Halo+dye, or antibody) sitting a finite distance
+from its Nup96 attachment site rather than exactly on it. <b>Membrane orientation</b> chooses
+whether NPCs are viewed <b>Top-down</b> (pore axis along the optical/Z axis, rings face-on — the
+common SMLM case) or <b>Sideways</b> (pore axis in-plane along image-Y, rings edge-on, matching
+Thevathasan <i>et al.</i>'s own side-view NPC images). <b>Number of NPCs</b>/<b>Min. NPC-NPC
+spacing</b> control how many pores are scattered across the simulated field of view and how far
+apart; <b>Membrane curvature amplitude</b> adds a gentle bowl-shaped curvature (centred so the
+field's mean offset stays ~0) to the membrane patch the NPCs sit on. <b>Debug: view single NUP</b>
+is a temporary aid showing one NPC's 64 points (top view and side view) for checking the geometry
+directly.</p>
+<!-- /HINT:simulation-nup -->
+
+**Fluorophore parameters** (`hint-simulation-fluorophore`):
+
+<!-- HINT:simulation-fluorophore -->
+<p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
+frame 0, so the exponential's tail can already be mid-event at frame 0) and an
+exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
+scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits
+half the photons.</p>
+<!-- /HINT:simulation-fluorophore -->
+
+**Camera parameters** (`hint-simulation-camera`):
+
+<!-- HINT:simulation-camera -->
+<p><b>Gain/offset/offset std/read noise</b> forward-model a real sensor: Gaussian read noise (σ in
+electrons) is added to the photon count before the gain conversion, then a per-pixel offset map
+(Gaussian around the mean offset, fixed for the whole stack) is added — independent of the fit-side
+camera gain/offset used for localization. For a clean self-consistency test with the <b>Gain/offset
+estimation</b> section's own readout-noise field, combine read noise and offset std in quadrature
+(√(read_noise²+offset_std²), offset std converted to photons via this panel's gain) — a static
+per-pixel offset pattern looks identical to read noise in a single frame's Fourier content, so
+leaving it out biases the fitted offset the same way.</p>
+<!-- /HINT:simulation-camera -->
+
+**PSF parameters** (`hint-simulation-psf`):
+
+<!-- HINT:simulation-psf -->
 <p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
 Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
 wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
@@ -1105,6 +1191,18 @@ as its own internal resolution increases rather than matching the direct method 
 (cached, oversampled) kernel and shows it as a z-scrollable slice in the raw panel — this is a
 preview/validation step only; "Simulate movie" itself still always renders the plain Gaussian PSF
 for now (see <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
+<!-- /HINT:simulation-psf -->
+
+**Section overview** (`hint-simulation`, the final, coarse popup at the bottom of the whole panel):
+
+<!-- HINT:simulation -->
+<p>"Simulate movie" builds a fully synthetic ground-truth stack — random emitter placement along a
+simulated structure, physically modelled blinking, shot/read/offset camera noise, and (optionally) a
+real vectorial PSF — for validating and teaching the rest of the pipeline against known-correct
+answers. Settings above are grouped into <b>User parameters</b> (the everyday knobs), <b>Simulation
+type</b> (2D/3D structure, drift, seed), <b>Fluorophore parameters</b> (photon output and blinking
+kinetics), <b>Camera parameters</b> (sensor noise model), and <b>PSF parameters</b> (Gaussian vs.
+physically modelled optics) — see each group's own "more info…" for detail.</p>
 <!-- /HINT:simulation -->
 
 `dens` is a **physical areal density** (ON emitters/µm²/frame), not tied to
@@ -2626,6 +2724,10 @@ What this tool borrows from, and where to read more.
 **Drift correction (AIM)**
 - "Toward drift-free high-throughput nanoscopy through adaptive intersection maximization," H. Ma, M. Chen, P. Nguyen, Y. Liu, *Sci. Adv.* **10**(21), eadm7765 (2024). [doi:10.1126/sciadv.adm7765](https://doi.org/10.1126/sciadv.adm7765)
 - Adapted from **Picasso**'s `picasso/aim.py` (parabolic sub-pixel peak fit replaces the FFT phase refinement; linear interpolation replaces the spline) — see Picasso reference below.
+
+**Nuclear pore complex (NPC) simulation**
+- "Nuclear pores as versatile reference standards for quantitative superresolution microscopy," J. V. Thevathasan et al., *Nat. Methods* **16**, 1045–1053 (2019). [doi:10.1038/s41592-019-0574-9](https://doi.org/10.1038/s41592-019-0574-9)
+- "CIR4MICS: simulating structurally variable nuclear pore complexes for microscopy," R. Wanninger et al., *Bioinformatics* **39**(10), btad587 (2023). [doi:10.1093/bioinformatics/btad587](https://doi.org/10.1093/bioinformatics/btad587)
 
 **Picasso** (reference implementation for the ported MLE and AIM drift code above, [github.com/jungmannlab/picasso](https://github.com/jungmannlab/picasso))
 - "Super-resolution microscopy with DNA-PAINT," J. Schnitzbauer, M. T. Strauss, T. Schlichthaerle, F. Schueder, R. Jungmann, *Nat. Protoc.* **12**, 1198–1228 (2017). [doi:10.1038/nprot.2017.024](https://doi.org/10.1038/nprot.2017.024)

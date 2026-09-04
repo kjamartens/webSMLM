@@ -267,8 +267,17 @@ relevant one before editing rather than scrolling:
   `srInfoBeforeGT`, module-level; `viewGtBtn`/`viewGtBtnRow`, MODULE: pipeline) — after a
   successful Simulate movie, `groundTruthLocs` is built from `groundTruthEvents` (one
   `{x,y,z,photons}` entry per simulated BLINK, not per structure site — the fair comparison
-  against a real reconstruction's own per-blink localizations). **`viewGtBtnRow`'s HTML lives
-  directly under `nupDebugBtnRow` inside `simTypeBox`** (not in the top button group any more,
+  against a real reconstruction's own per-blink localizations). Each entry ALSO carries a fixed
+  `lpx:lpy:1/px` (native camera px equivalent of 1 nm, `px` = `simulation_pxnm`/`stack.px`) — a
+  real, reported bug otherwise: with no `lpx`/`lpy` of their own, `renderSuperResPixels()`'s
+  'precision'/'dither' render modes fall back to the whole-dataset `rblur` (Render blur σ_render,
+  the same knob a REAL fit's own localization precision typically needs), rendering GT markers as
+  blobs several times too large — these are the true simulated positions, not a fit with real
+  uncertainty, so a 1 nm precision (a crisp point at any realistic magnification) is the correct
+  fixed value. `viewGtBtn`'s own click handler passes the SAME `1/stack.px` as the `blurPx`
+  fallback argument to `renderSuperRes()` too (rather than `paramValue('rblur')`), covering
+  'fixed' render mode as well, which never consults `lpx`/`lpy` at all. **`viewGtBtnRow`'s HTML
+  lives directly under `nupDebugBtnRow` inside `simTypeBox`** (not in the top button group any more,
   and not added to `NUP_ROW_IDS` — it stays independently shown/hidden for ANY structure type,
   just grouped visually next to the other simulation-debug tool) — genBtn's handler toggles
   `viewGtBtnRow.style.display`, not the button's own (the button carries no inline style of its

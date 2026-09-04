@@ -4327,8 +4327,14 @@ async function generateSynthetic(){
   groundTruth=gt;
   // GT localizations for "View GT localizations" — one entry per simulated blink (matches
   // groundTruthEvents' own per-blink shape), not one per structure site, so it's the fair thing
-  // to compare visually against a real reconstruction's own per-blink localizations.
-  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal}));
+  // to compare visually against a real reconstruction's own per-blink localizations. lpx/lpy
+  // (native camera px, same units renderSuperResPixels()'s 'precision'/'dither' modes read off
+  // any REAL fit) are pinned to a fixed 1 nm — these are the true simulated positions, not a fit
+  // with real uncertainty, so rendering them at whatever localization precision the CURRENT UI
+  // happens to be set to (rblur) would blur them into blobs far larger than a "ground truth"
+  // marker should be; 1 nm renders as a crisp point at any realistic magnification instead.
+  const gtLp=1/px;   // 1 nm expressed in native camera px, same unit lpx/lpy are always stored in
+  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal, lpx:gtLp, lpy:gtLp}));
   // store the true per-frame drift (nm) so drift correction can be scored
   simTrueDrift = driftPx>0 ? {n, px, dx:fi=>driftAt(fi)*ddx, dy:fi=>driftAt(fi)*ddy, total:driftPx} : null;
   if(driftPx>0) log(`Simulated ${driftPx} px total drift along (${ddx.toFixed(2)}, ${ddy.toFixed(2)}).`);
@@ -13641,7 +13647,12 @@ $('viewGtBtn').addEventListener('click', async ()=>{
         zhi = $('zmax').value!=='' ? +$('zmax').value : auto.hi;
         if(!(zhi>zlo)){ zlo=auto.lo; zhi=auto.hi; }
       }
-      srFull=await renderSuperRes(groundTruthLocs, stack.w, stack.h, paramValue('mag'), paramValue('rblur'),
+      // blurPx here is only ever the FALLBACK width for a loc with no lpx/lpy ('precision'/
+      // 'dither' modes) or the single whole-buffer blur sigma ('fixed' mode) — every
+      // groundTruthLocs entry already carries its own 1 nm lpx/lpy (see generateSynthetic()),
+      // so this only matters for 'fixed' mode; pass the SAME 1 nm-equivalent rather than the
+      // user's current Render blur σ (rblur), for a crisp GT marker in every render mode.
+      srFull=await renderSuperRes(groundTruthLocs, stack.w, stack.h, paramValue('mag'), 1/stack.px,
                         paramValue('lut'), +paramValue('lutpct'), zColor, zlo, zhi, groundTruthLocs, 'z', log, paramValue('renderMode'));
       srFull._zColor=zColor; srFull._zlo=zlo; srFull._zhi=zhi;
       srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); fitView(); clampView(); drawView();

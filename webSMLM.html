@@ -2008,9 +2008,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <button id="genBtn">Simulate movie</button>
       </div>
       <div class="btnrow">
-        <button id="viewGtBtn" style="display:none" title="Render the true simulated emitter positions (one point per simulated blink) into the reconstruction panel, the same way a real reconstruction is drawn — for comparing what Localize actually recovers against the known ground truth.">View GT localizations</button>
-      </div>
-      <div class="btnrow">
         <button id="loadSetBtn">Load settings</button>
         <button id="saveSetBtn">Save settings</button>
       </div>
@@ -2163,6 +2160,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="nupCurvatureRow" style="display:none">Membrane curvature amplitude (nm) <input type="number" id="simulation_nup_curvature" min="0" max="2000" step="10" value="150" class="num"></label>
           <label class="row" id="nupDebugBtnRow" style="display:none" title="Temporary debug aid: shows one synthetic NPC's 64 attachment/emitter points (top view and side view), using the current NUP parameters above. Not tied to Simulate movie.">
             <button type="button" id="nupDebugBtn">Debug: view single NUP</button>
+          </label>
+          <label class="row" id="viewGtBtnRow" style="display:none" title="Render the true simulated emitter positions (one point per simulated blink) into the reconstruction panel, the same way a real reconstruction is drawn — for comparing what Localize actually recovers against the known ground truth.">
+            <button type="button" id="viewGtBtn">View GT localizations</button>
           </label>
           <label class="row" id="nupInfoBtnRow" style="display:none"><button type="button" class="infobtn">more info…</button></label>
           <div class="hint" hidden id="hint-simulation-nup"><span class="pill">module: simulation</span>
@@ -13540,7 +13540,7 @@ $('genBtn').addEventListener('click',async()=>{
   $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
   try{
     stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; gtShowing=false; srFullBeforeGT=null;
-    { const b=$('viewGtBtn'); if(b){ b.style.display = groundTruthLocs && groundTruthLocs.length ? '' : 'none'; b.textContent='View GT localizations'; } }
+    { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display = groundTruthLocs && groundTruthLocs.length ? 'flex' : 'none'; if(b) b.textContent='View GT localizations'; }
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13573,7 +13573,7 @@ $('genCalBtn').addEventListener('click',async()=>{
   try{
     const {stack:s, focusIndex, zStepNm}=await generateCalibrationStack();
     stack=s; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated_calib'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; gtShowing=false; srFullBeforeGT=null;
-    { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
+    { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display='none'; if(b) b.textContent='View GT localizations'; }
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13604,10 +13604,11 @@ $('genCalBtn').addEventListener('click',async()=>{
 
 // "View GT localizations" — renders the true simulated emitter positions (groundTruthLocs, one
 // point per simulated blink) into the SAME srFull the real reconstruction uses, via the SAME
-// renderSuperRes() call rerender() makes — so it looks and behaves exactly like a real
-// reconstruction (pan/zoom/scale bar) without being one. Swaps srFull directly (stashing/
-// restoring whatever was there before) rather than going through lastResult, since lastResult is
-// null right after Simulate movie, before any Localize run.
+// renderSuperRes() call rerender() makes, including its depth-colour (z) handling — so it looks
+// and behaves exactly like a real reconstruction (pan/zoom/scale bar, depth-colour bar, zmin/
+// zmax) without being one. Swaps srFull directly (stashing/restoring whatever was there before)
+// rather than going through lastResult, since lastResult is null right after Simulate movie,
+// before any Localize run.
 $('viewGtBtn').addEventListener('click', async ()=>{
   if(!groundTruthLocs || !groundTruthLocs.length || !stack){ log('No simulated ground truth available — click Simulate movie first.'); return; }
   const btn=$('viewGtBtn'); btn.disabled=true;
@@ -13616,11 +13617,37 @@ $('viewGtBtn').addEventListener('click', async ()=>{
     if(gtShowing){
       srFullBeforeGT=srFull;
       srTitleBeforeGT=$('srTitle').textContent; srInfoBeforeGT=$('srInfo').textContent;
+      // Same depth-colour setup rerender() does for a real reconstruction (see its own
+      // comment): auto-check "Colour by depth (z)" + pick a LUT the first time THIS
+      // groundTruthLocs array turns out to be colourable, compute zlo/zhi (cached on the array,
+      // same "per-field cache" idea as lastResult.zr), and show the zcolor/zrange rows.
+      const hasZ=groundTruthLocs.some(L=>isFinite(L.z));
+      if(hasZ && !groundTruthLocs._zColorAutoChecked){
+        groundTruthLocs._zColorAutoChecked=true;
+        $('zcolor').checked=true; $('lut').value='turbo';
+      }
+      $('zcolorLabel').textContent='Colour by depth (z)';
+      $('zminLabel').textContent='z min (nm)'; $('zmaxLabel').textContent='z max (nm)';
+      $('zcolorRow').style.display = hasZ ? 'flex' : 'none';
+      const zColor = hasZ && paramValue('zcolor');
+      $('zrangeRow').style.display = zColor ? 'block' : 'none';
+      let zlo=0, zhi=1;
+      if(zColor){
+        if(!groundTruthLocs._zr) groundTruthLocs._zr=zRange(groundTruthLocs,'z');
+        const auto=groundTruthLocs._zr||{lo:0,hi:1};
+        if($('zmin').value==='') $('zmin').value=Math.floor(auto.lo);
+        if($('zmax').value==='') $('zmax').value=Math.ceil(auto.hi);
+        zlo = $('zmin').value!=='' ? +$('zmin').value : auto.lo;
+        zhi = $('zmax').value!=='' ? +$('zmax').value : auto.hi;
+        if(!(zhi>zlo)){ zlo=auto.lo; zhi=auto.hi; }
+      }
       srFull=await renderSuperRes(groundTruthLocs, stack.w, stack.h, paramValue('mag'), paramValue('rblur'),
-                        paramValue('lut'), +paramValue('lutpct'), false, 0, 1, null, 'z', log, paramValue('renderMode'));
+                        paramValue('lut'), +paramValue('lutpct'), zColor, zlo, zhi, groundTruthLocs, 'z', log, paramValue('renderMode'));
+      srFull._zColor=zColor; srFull._zlo=zlo; srFull._zhi=zhi;
       srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); fitView(); clampView(); drawView();
       $('srTitle').textContent='Ground truth';
-      $('srInfo').textContent=`— ${groundTruthLocs.length.toLocaleString()} simulated emitter blink(s) · true positions, not a fit`;
+      $('srInfo').textContent=`— ${groundTruthLocs.length.toLocaleString()} simulated emitter blink(s) · true positions, not a fit`+
+        (zColor?` · z ${zlo.toFixed(0)}…${zhi.toFixed(0)} nm`:'');
       btn.textContent='Hide GT localizations';
     } else {
       srFull=srFullBeforeGT; srFullBeforeGT=null;
@@ -13630,12 +13657,15 @@ $('viewGtBtn').addEventListener('click', async ()=>{
         // restore whatever non-null srFull preceded the GT view (e.g. a bead composite, or the
         // pre-Run data projection already built by the time GT was clicked) — title/info were
         // stashed alongside it above, so restore those verbatim rather than leaving the
-        // GT-specific labels stuck on screen.
+        // GT-specific labels stuck on screen. No colourable data outside a real result, so hide
+        // the zcolor/zrange rows rather than leaving GT's own state showing.
+        $('zcolorRow').style.display='none'; $('zrangeRow').style.display='none';
         setSrRecon(false); fitView(); clampView(); drawView();
         $('srTitle').textContent=srTitleBeforeGT; $('srInfo').textContent=srInfoBeforeGT;
       } else {
         // nothing preceded the GT view — restore the pre-Run data projection instead of leaving
         // a blank canvas mislabelled "Ground truth".
+        $('zcolorRow').style.display='none'; $('zrangeRow').style.display='none';
         setSrRecon(false); drawView();
         await showStackProjection();
       }
@@ -13692,7 +13722,7 @@ async function loadMovieFiles(fs){
   if(!fs.length) return;
   const multi=fs.length>1;
   $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
-  { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
+  { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display='none'; if(b) b.textContent='View GT localizations'; }
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
   // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -14186,7 +14216,7 @@ async function loadCsvFile(f){
     $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('frcBtn').disabled=false;
     $('sSmlmPreviewBtn').disabled=false; $('sSmlmPairBtn').disabled=false;
     $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false;   // a freshly-loaded result invalidates any prior pairing state
-    groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }   // a CSV-loaded result has no simulated ground truth
+    groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display='none'; if(b) b.textContent='View GT localizations'; }   // a CSV-loaded result has no simulated ground truth
     $('sptTrackBtn').disabled=false; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;   // Track is safe to re-run even on a CSV that already has track_id/D_coeff columns; the histograms themselves need a fresh Track click (lastSpt isn't reconstructed from a loaded CSV)
     let nFrames=0; for(const L of locs) if(L.frame+1>nFrames) nFrames=L.frame+1;
     $('rawInfo').textContent='— no raw frame data (loaded from CSV)';
@@ -14554,7 +14584,7 @@ function rawClickToNative(e){
 function resetAfterCropChange(){
   lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false);
   setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; simTrueDrift=null; lastDrift=null; lastNena=null;
-  { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
+  { const r=$('viewGtBtnRow'), b=$('viewGtBtn'); if(r) r.style.display='none'; if(b) b.textContent='View GT localizations'; }
   $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   // lastResult=null above orphans any sSMLM pairing state too (unpairSSmlm()
   // would otherwise try to write lastResult.locs on a null lastResult) — same

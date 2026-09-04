@@ -263,14 +263,34 @@ relevant one before editing rather than scrolling:
   `setupPlot(cv,true)`, independent of any actual Simulate-movie run (its own fresh
   `Math.random()`, not the seeded stream) — meant to be lifted out cleanly once no longer needed.
 
-  **GT localizations viewer** (`groundTruthLocs`/`gtShowing`/`srFullBeforeGT`, module-level;
-  `viewGtBtn`, MODULE: pipeline) — after a successful Simulate movie, `groundTruthLocs` is built
-  from `groundTruthEvents` (one `{x,y,z,photons}` entry per simulated BLINK, not per structure
-  site — the fair comparison against a real reconstruction's own per-blink localizations).
-  Clicking **View GT localizations** renders it into `srFull` via the SAME `renderSuperRes()` call
-  `rerender()` makes, stashing/restoring whatever `srFull` held before (`srFullBeforeGT`) — swaps
+  **GT localizations viewer** (`groundTruthLocs`/`gtShowing`/`srFullBeforeGT`/`srTitleBeforeGT`/
+  `srInfoBeforeGT`, module-level; `viewGtBtn`/`viewGtBtnRow`, MODULE: pipeline) — after a
+  successful Simulate movie, `groundTruthLocs` is built from `groundTruthEvents` (one
+  `{x,y,z,photons}` entry per simulated BLINK, not per structure site — the fair comparison
+  against a real reconstruction's own per-blink localizations). **`viewGtBtnRow`'s HTML lives
+  directly under `nupDebugBtnRow` inside `simTypeBox`** (not in the top button group any more,
+  and not added to `NUP_ROW_IDS` — it stays independently shown/hidden for ANY structure type,
+  just grouped visually next to the other simulation-debug tool) — genBtn's handler toggles
+  `viewGtBtnRow.style.display`, not the button's own (the button carries no inline style of its
+  own now that it's wrapped in a `label.row`).
+
+  Clicking **View GT localizations** renders `groundTruthLocs` into `srFull` via the SAME
+  `renderSuperRes()` call `rerender()` makes — **including its depth-colour (z) handling**, not
+  just a flat density render (a real, reported bug: the first version hardcoded `zColor=false`
+  regardless of real per-emitter z, e.g. from a 3D NUP simulation). Mirrors `rerender()`'s own
+  logic exactly: auto-checks **Colour by depth (z)** + picks the `turbo` LUT the first time a
+  given `groundTruthLocs` array turns out colourable (`_zColorAutoChecked` flagged directly on
+  the array, same "flag on the data object" trick `lastResult._zColorAutoChecked` uses), computes
+  zlo/zhi via `zRange()` (cached as `groundTruthLocs._zr`, same per-object-cache idea as
+  `lastResult.zr`), shows/hides `zcolorRow`/`zrangeRow`, and stamps `srFull._zColor`/`_zlo`/`_zhi`
+  on the returned canvas so `drawView()`'s own `srFull._zColor` check draws the depth-colour bar
+  for a GT render exactly as it would for a real one. Stashes/restores whatever `srFull` (AND its
+  `$('srTitle')`/`$('srInfo')` text, `srTitleBeforeGT`/`srInfoBeforeGT`) held before — swaps
   `srFull` directly rather than going through `lastResult`, since `lastResult` is `null`
-  immediately after Simulate movie, before any Localize run.
+  immediately after Simulate movie, before any Localize run; hiding GT with no `lastResult` and no
+  stashed `srFull` re-runs `showStackProjection()` rather than leaving a blank canvas mislabelled
+  "Ground truth", and always hides `zcolorRow`/`zrangeRow` again in that fallback path (GT's own
+  depth-colour state has no home once there's no real result or prior render to fall back to).
 
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),

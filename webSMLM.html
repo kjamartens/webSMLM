@@ -1946,7 +1946,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2419,6 +2419,11 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <button id="nenaBtn" disabled title="Empirical per-localization precision (nearest-neighbour)">NeNA</button>
           <button id="frcBtn" disabled title="Image resolution via Fourier Ring Correlation (1/7 threshold)">FRC</button>
         </div>
+        <div class="btnrow">
+          <button id="truthBtn" disabled title="Compare the localizations against the simulator's own ground truth: detection rate, lateral bias/RMSE, and axial bias/RMSE versus true depth. Simulated data only.">Score vs truth</button>
+        </div>
+        <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
+        <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-locprecision"><span class="pill">module: locprecision</span>
 
@@ -2525,7 +2530,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
   <main class="main">
     <div class="canvases" id="canvases">
       <div class="card">
-        <h4><span style="display:flex;align-items:center;gap:6px"><span id="rawTitle">Raw frame</span><button id="rawFtmBtn" class="logbtn" style="display:none" title="Toggle between the original frame and its FTM-corrected version, computed live for the scrubbed frame">Show FTM corrected</button><button id="driftPlotModeBtn" class="logbtn" style="display:none" title="Toggle the drift plot between drift-vs-frame curves and an x/y trajectory coloured by frame (time)">Show x/y path</button><button id="sptHistModeBtn" class="logbtn" style="display:none" title="Cycle between the diffusion-coefficient histogram, the track-length histogram, and the MSD-vs-lag plot">Track length</button><button id="sSmlmHistModeBtn" class="logbtn" style="display:none" title="Toggle between the sSMLM candidate distance histogram and the angle histogram">Angles</button><button id="segShowModeBtn" class="logbtn" style="display:none" title="Toggle between the segmentation image and its cell-area histogram">Area histogram</button><button id="rawCropBtn" class="linetool" disabled title="Crop the analysed region — click two opposite corners in this window. Replaces the loaded stack with just this region (Localize, scrubbing, FTM, everything only sees the crop) until you deselect this tool to restore the original — unlike the reconstruction panel's crop, which only filters an already-finished result. Deselecting asks to confirm if it would discard existing analysis results."><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 0 V9 H12" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9 12 V3 H0" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button></span> <small id="rawInfo">— detected spots overlaid in green</small></h4>
+        <h4><span style="display:flex;align-items:center;gap:6px"><span id="rawTitle">Raw frame</span><button id="rawFtmBtn" class="logbtn" style="display:none" title="Toggle between the original frame and its FTM-corrected version, computed live for the scrubbed frame">Show FTM corrected</button><button id="driftPlotModeBtn" class="logbtn" style="display:none" title="Toggle the drift plot between drift-vs-frame curves and an x/y trajectory coloured by frame (time)">Show x/y path</button><button id="sptHistModeBtn" class="logbtn" style="display:none" title="Cycle between the diffusion-coefficient histogram, the track-length histogram, and the MSD-vs-lag plot">Track length</button><button id="sSmlmHistModeBtn" class="logbtn" style="display:none" title="Toggle between the sSMLM candidate distance histogram and the angle histogram">Angles</button><button id="segShowModeBtn" class="logbtn" style="display:none" title="Toggle between the segmentation image and its cell-area histogram">Area histogram</button><button id="truthPlotModeBtn" class="logbtn" style="display:none" title="Cycle the ground-truth score between z error vs depth, fitted-vs-true z, and the lateral error histogram">Show fitted vs true</button><button id="rawCropBtn" class="linetool" disabled title="Crop the analysed region — click two opposite corners in this window. Replaces the loaded stack with just this region (Localize, scrubbing, FTM, everything only sees the crop) until you deselect this tool to restore the original — unlike the reconstruction panel's crop, which only filters an already-finished result. Deselecting asks to confirm if it would discard existing analysis results."><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 0 V9 H12" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9 12 V3 H0" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button></span> <small id="rawInfo">— detected spots overlaid in green</small></h4>
         <div class="panel-body">
           <canvas id="raw"></canvas>
           <div id="scrubRow" style="display:none;margin-top:8px;align-items:center;gap:10px">
@@ -2952,6 +2957,19 @@ const PARAMS = {
   // structure-specific ones so the sidebar doesn't grow a row per object; the tooltip says what
   // it means for the selected one, and the row hides for structures that don't use it.
   simulation_structureSize: { type:'number', id:'simulation_structureSize', label:'Structure size (nm)', min:10, max:5000, step:10, default:500, int:false },
+
+  // ---- ground-truth scoring (MODULE: validation) ----
+  // validation_matchRadius = how close, LATERALLY, a localization must be to a ground-truth
+  // emitter in the same frame to count as that emitter's detection. Matching is deliberately
+  // lateral-only (the SMLM-challenge convention): matching on z as well would pull the pairing
+  // towards whichever candidate has the flattering z and bias the axial error towards zero — the
+  // very quantity being measured. 250 nm is a couple of PSF widths: loose enough not to reject
+  // genuine but imprecise localizations, tight enough not to pair unrelated emitters at the
+  // densities this simulator produces.
+  validation_matchRadius: { type:'number', id:'validation_matchRadius', label:'Match radius (nm)', min:20, max:2000, step:10, default:250, int:false },
+  // validation_zBins = how many bins the true-z axis is split into for the bias/RMS curve. Too
+  // few hides where accuracy falls off, too many leaves each bin too sparse to mean anything.
+  validation_zBins: { type:'number', id:'validation_zBins', label:'Score z bins', min:4, max:100, step:1, default:20, int:true },
 
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — a Zernike-aberrated PSF
   // model for "Simulate movie", alongside the fixed-sigma=1.3 isotropic Gaussian fallback. These
@@ -5726,6 +5744,285 @@ async function loadTiff(fileBuf, fileSize, onLog=log){
 }
 
 /* ===========================================================================
+   MODULE: validation — score recovered localizations against the simulator's
+   own ground truth (MODULE: simulation's groundTruthEvents). Simulation-only:
+   there is nothing to score against for real data, so the button stays greyed
+   out exactly as NeNA/FRC do before a Run.
+
+   Answers the question the simulator could not answer before: not "does this
+   look right" but "how far off is it, and where in z does it go wrong".
+   =========================================================================== */
+let lastTruthScore=null;         // stashed like lastNena, so the plot can be re-drawn/exported
+
+// Expands groundTruthEvents (one entry per emitter ACTIVATION, with fractional start/end times)
+// into per-frame emitter positions, using the very same frame-overlap rule generateSynthetic()
+// itself used when it decided which frames to splat that emitter into. Deriving it rather than
+// storing frameEvents keeps the simulator's memory profile unchanged, and — more importantly —
+// guarantees the two sets agree by construction instead of by two copies of one rule staying in
+// sync. Returns a Map frame -> [{x,y,z}, …], x/y in camera px, z in nm.
+function groundTruthByFrame(gtEvents, nFrames, first, last){
+  const byFrame=new Map();
+  for(const e of gtEvents){
+    const f0=Math.max(0,Math.floor(e.tStart)), f1=Math.min(nFrames-1,Math.floor(e.tEnd));
+    for(let fi=Math.max(f0,first); fi<=Math.min(f1,last); fi++){
+      let a=byFrame.get(fi); if(!a){ a=[]; byFrame.set(fi,a); }
+      a.push({x:e.x, y:e.y, z:e.z});
+    }
+  }
+  return byFrame;
+}
+
+// Match one frame's localizations to one frame's ground-truth emitters, one-to-one.
+//
+// gridNN() (MODULE: locprecision) already does the expensive part — exact nearest neighbour
+// between two independent point sets, grid-accelerated — but it is UNIDIRECTIONAL and unbounded:
+// several localizations can claim the same emitter, and every localization gets a partner however
+// far away it is. Both matter here, so this adds the two missing constraints on top: sort the
+// candidate pairs by distance and accept greedily, skipping any whose partner is already taken or
+// which exceeds the match radius. Greedy-by-distance is not guaranteed globally optimal the way a
+// full assignment solve would be, but at SMLM densities the two agree except in pathological
+// ties, and this stays O(n log n) with no new machinery.
+function matchFrame(locs, gts, radiusPx){
+  const pairs=gridNN(locs, gts).filter(p=>p.d<=radiusPx).sort((a,b)=>a.d-b.d);
+  const usedL=new Set(), usedG=new Set(), out=[];
+  for(const p of pairs){
+    if(usedL.has(p.a) || usedG.has(p.b)) continue;
+    usedL.add(p.a); usedG.add(p.b); out.push(p);
+  }
+  return {pairs:out, usedL, usedG};
+}
+
+// Score `locs` against the simulator's ground truth. Pure and DOM-free (the *Core() convention),
+// so the button handler and the headless API can share it.
+//
+// Two conventions worth stating, because they decide what the numbers MEAN:
+//
+//  - Positions are compared BEFORE drift correction. The simulator splats each emitter at its
+//    structure position plus that frame's drift, so the truth for frame f is the drifted position;
+//    comparing that against the raw localization (L.x0, kept by correctDrift(), else L.x) measures
+//    the FITTER, whatever drift correction did or didn't do afterwards. Drift correction already
+//    has its own ground-truth score in correctDrift().
+//  - z errors are only accumulated where both sides have a finite z. A 2D fit method, or a 2D
+//    simulation, therefore yields the same detection and lateral numbers through the same code
+//    path, just without the axial ones — no separate 2D branch.
+async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLog,onProgress}={}){
+  const radiusPx=(cfg.validation_matchRadius||250)/px;
+  const nBins=Math.max(4, cfg.validation_zBins||20);
+  if(!gtEvents||!gtEvents.length) return {err:'no simulated ground truth available — run Simulate movie first'};
+  if(!locs.length) return {err:'no localizations to score'};
+  if(locs[0].nMerged!==undefined)
+    return {err:'the active filter merges localizations across frames (temporal clustering), and scoring matches per frame — reset the clustering filter first'};
+
+  // Which frames a Run actually covered; scoring outside it would count every emitter there as a
+  // miss and silently wreck the recall figure.
+  let first=0, last=nFrames-1;
+  for(const L of locs){ const f=L.frame|0; if(f<first) first=f; if(f>last) last=f; }
+  first=Math.max(0,first); last=Math.min(nFrames-1,last);
+
+  const byFrameGT=groundTruthByFrame(gtEvents, nFrames, first, last);
+  const byFrameLoc=new Map();
+  for(const L of locs){ const f=L.frame|0; let a=byFrameLoc.get(f); if(!a){ a=[]; byFrameLoc.set(f,a); } a.push(L); }
+
+  const dx=[], dy=[], dz=[], zTrue=[];             // matched-pair errors (px, px, nm) + true z (nm)
+  let tp=0, fp=0, fn=0, zClampedMatched=0, nZ=0;
+  const frames=[...new Set([...byFrameGT.keys(), ...byFrameLoc.keys()])].sort((a,b)=>a-b);
+  let yld=performance.now();
+  for(let i=0;i<frames.length;i++){
+    const f=frames[i];
+    const L=byFrameLoc.get(f)||[], G=byFrameGT.get(f)||[];
+    if(!L.length){ fn+=G.length; continue; }
+    if(!G.length){ fp+=L.length; continue; }
+    // Truth for THIS frame = structure position + the drift the simulator applied to it. Note
+    // trueDrift's accessors are in nm (see simTrueDrift), so convert back to camera pixels here.
+    const drx=trueDrift? trueDrift.dx(f)/px : 0, dry=trueDrift? trueDrift.dy(f)/px : 0;
+    const Gf=drx||dry ? G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z})) : G;
+    // Raw (pre-drift-correction) coordinates when a correction has been applied — see the header.
+    const Lf=L.map(l=>({x:l.x0!==undefined?l.x0:l.x, y:l.y0!==undefined?l.y0:l.y,
+                        z:l.z0!==undefined?l.z0:l.z, zClamped:l.zClamped}));
+    const {pairs,usedL,usedG}=matchFrame(Lf, Gf, radiusPx);
+    tp+=pairs.length; fp+=Lf.length-usedL.size; fn+=Gf.length-usedG.size;
+    for(const p of pairs){
+      dx.push(p.a.x-p.b.x); dy.push(p.a.y-p.b.y);
+      if(isFinite(p.a.z) && isFinite(p.b.z)){ dz.push(p.a.z-p.b.z); zTrue.push(p.b.z); nZ++;
+        if(p.a.zClamped) zClampedMatched++; }
+    }
+    if(onProgress && performance.now()-yld>50){ onProgress(i/frames.length); await tick(); yld=performance.now(); }
+  }
+  if(!tp) return {err:`no localization fell within ${(cfg.validation_matchRadius||250).toFixed(0)} nm of a ground-truth emitter — check the pixel size, or widen the match radius`};
+
+  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+  const rms=a=>Math.sqrt(a.reduce((s,v)=>s+v*v,0)/a.length);
+  const biasX=mean(dx)*px, biasY=mean(dy)*px;
+  const rmseLat=Math.sqrt(dx.reduce((s,v,i)=>s+v*v+dy[i]*dy[i],0)/dx.length)*px;
+  const has3d=nZ>0;
+  const biasZ=has3d?mean(dz):NaN, rmseZ=has3d?rms(dz):NaN;
+
+  // Binned on TRUE z — the axis that matters. Binning on fitted z would fold the very error being
+  // measured into the x-axis and flatten the curve towards zero.
+  let bins=null;
+  if(has3d){
+    let zmin=Infinity, zmax=-Infinity;
+    for(const z of zTrue){ if(z<zmin)zmin=z; if(z>zmax)zmax=z; }
+    if(zmax-zmin<1e-6){ zmin-=1; zmax+=1; }
+    const w=(zmax-zmin)/nBins;
+    bins=Array.from({length:nBins},(_,i)=>({z0:zmin+i*w, z1:zmin+(i+1)*w, zc:zmin+(i+0.5)*w,
+                                            n:0, sum:0, sumSq:0, latSq:0}));
+    for(let i=0;i<dz.length;i++){
+      const b=bins[Math.min(nBins-1, Math.max(0, Math.floor((zTrue[i]-zmin)/w)))];
+      b.n++; b.sum+=dz[i]; b.sumSq+=dz[i]*dz[i];
+      b.latSq+=(dx[i]*dx[i]+dy[i]*dy[i])*px*px;
+    }
+    for(const b of bins){ b.bias=b.n?b.sum/b.n:NaN; b.rms=b.n?Math.sqrt(b.sumSq/b.n):NaN;
+                          b.latRms=b.n?Math.sqrt(b.latSq/b.n):NaN; }
+  }
+  if(onLog){
+    onLog(`matched ${tp.toLocaleString()} of ${(tp+fn).toLocaleString()} ground-truth emitter-frames `+
+          `(${fp.toLocaleString()} unmatched localization${fp===1?'':'s'}) · recall ${(tp/(tp+fn)*100).toFixed(1)}% · `+
+          `precision ${(tp/(tp+fp)*100).toFixed(1)}% · Jaccard ${(tp/(tp+fp+fn)).toFixed(3)}`);
+    onLog(`lateral: bias (${biasX.toFixed(1)}, ${biasY.toFixed(1)}) nm · RMSE ${rmseLat.toFixed(1)} nm`);
+    if(has3d) onLog(`axial: bias ${biasZ.toFixed(1)} nm · RMSE ${rmseZ.toFixed(1)} nm over ${nZ.toLocaleString()} pairs`+
+                    (zClampedMatched?` · ${zClampedMatched.toLocaleString()} matched loc(s) had z clamped to the calibration edge`:''));
+    else onLog(`axial: no z on either side — a 2D fit method or a 2D simulation, so only detection and lateral accuracy apply.`);
+  }
+  return { tp, fp, fn, jaccard:tp/(tp+fp+fn), recall:tp/(tp+fn), precision:tp/(tp+fp),
+           biasX, biasY, rmseLat, biasZ, rmseZ, nZ, zClampedMatched, has3d, bins,
+           dx, dy, dz, zTrue, px, matchRadiusNm:cfg.validation_matchRadius||250 };
+}
+
+// Which of the three views the score plot shows. 'lateral' is the only one available without z,
+// and the button that cycles them hides in that case — the same idiom updateMethodUI() uses to
+// hide the depth-colour row for a 2D fit method.
+let truthPlotMode='zbias';
+
+// Score plot on the LEFT (raw) panel. Structure follows drawNenaPlot() exactly: setupPlot ->
+// claim the panel -> margins -> X()/Y() -> ticks/grid -> data -> axis stroked LAST -> labels ->
+// rawInfo -> registerPlotHover -> _replotRaw -> syncSaveImg.
+function drawTruthScorePlot(res){
+  const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
+  rawFull=null; setRawPlot(true); rawPlotName='truth';
+  const mode = res.has3d ? truthPlotMode : 'lateral';
+  $('rawTitle').textContent = mode==='scatter' ? 'Score: fitted vs true z'
+                            : mode==='lateral' ? 'Score: lateral error'
+                            : 'Score: z error vs depth';
+  hideOtherRawToggleBtns('truthPlotModeBtn');
+  { const b=$('truthPlotModeBtn');
+    if(b){ b.style.display = res.has3d ? '' : 'none';
+           b.textContent = mode==='zbias' ? 'Show fitted vs true' : mode==='scatter' ? 'Show lateral' : 'Show z error'; } }
+  const C=plotColors();
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const mL=62,mR=16,mT=30,mB=44, pw=W-mL-mR, ph=H-mT-mB;
+  const GREEN='#0a7d32', MAG='#c81cc8', BLUE='#3572b0';
+  const axis=(X,Y,xlab,ylab,xt,yt,xdec,ydec)=>{
+    ctx.strokeStyle=C.grid; ctx.fillStyle=C.text; ctx.lineWidth=1; ctx.font='12px '+PLOT_FONT;
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    for(const v of yt){ const y=Y(v); ctx.beginPath(); ctx.moveTo(mL,y); ctx.lineTo(mL+pw,y); ctx.stroke();
+      ctx.strokeStyle=C.text; ctx.beginPath(); ctx.moveTo(mL-5,y); ctx.lineTo(mL,y); ctx.stroke(); ctx.strokeStyle=C.grid;
+      ctx.fillText(v.toFixed(ydec), mL-9, y); }
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    for(const v of xt){ const x=X(v);
+      ctx.strokeStyle=C.text; ctx.beginPath(); ctx.moveTo(x,mT+ph); ctx.lineTo(x,mT+ph+5); ctx.stroke();
+      ctx.fillText(v.toFixed(xdec), x, mT+ph+9); }
+    ctx.strokeStyle=C.text; ctx.beginPath(); ctx.moveTo(mL,mT); ctx.lineTo(mL,mT+ph); ctx.lineTo(mL+pw,mT+ph); ctx.stroke();
+    ctx.fillStyle=C.axis; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(xlab, mL+pw/2, mT+ph+26);
+    ctx.save(); ctx.translate(14,mT+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='middle'; ctx.fillText(ylab,0,0); ctx.restore();
+  };
+  let hover;
+  if(mode==='lateral'){
+    // Histogram of the per-pair lateral error. Always available, and the whole plot when there is
+    // no z at all — so a 2D run still gets a real picture, not a blank panel.
+    const d=[]; for(let i=0;i<res.dx.length;i++) d.push(Math.hypot(res.dx[i],res.dy[i])*res.px);
+    const xmax=Math.max(1e-6, res.matchRadiusNm), nb=40, bw=xmax/nb, hist=new Float64Array(nb);
+    for(const v of d) hist[Math.min(nb-1,Math.floor(v/bw))]++;
+    let ymax=0; for(const v of hist) if(v>ymax) ymax=v; ymax*=1.08;
+    const X=v=>mL+pw*v/xmax, Y=v=>mT+ph*(1-v/Math.max(1e-9,ymax));
+    axis(X,Y,'lateral error (nm)','pairs',niceTicks(0,xmax,6),niceTicks(0,ymax,5),0,0);
+    ctx.fillStyle=C.bar;
+    for(let i=0;i<nb;i++){ const x0=X(i*bw), x1=X((i+1)*bw), y=Y(hist[i]);
+      ctx.fillRect(x0,y,Math.max(1,x1-x0-1),(mT+ph)-y); }
+    ctx.strokeStyle=GREEN; ctx.lineWidth=1.6; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(X(res.rmseLat),mT); ctx.lineTo(X(res.rmseLat),mT+ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=GREEN; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText(`RMSE ${res.rmseLat.toFixed(1)} nm`, Math.min(X(res.rmseLat)+6, mL+pw-110), mT-4);
+    hover={mL,mT,pw,ph,xA:0,xB:xmax,yTop:ymax,yBot:0,fmt:(vx,vy)=>`${vx.toFixed(1)} nm · ${vy.toFixed(0)} pairs`};
+  } else if(mode==='scatter'){
+    // Fitted z against true z, with the identity line. This is the view that makes a non-invertible
+    // z obvious: past the PSF's single-valued range the cloud stops following y=x and folds back.
+    let zmin=Infinity,zmax=-Infinity;
+    for(let i=0;i<res.zTrue.length;i++){ const t=res.zTrue[i], f=t+res.dz[i];
+      zmin=Math.min(zmin,t,f); zmax=Math.max(zmax,t,f); }
+    const pad=(zmax-zmin)*0.05||1; zmin-=pad; zmax+=pad;
+    const X=v=>mL+pw*(v-zmin)/(zmax-zmin), Y=v=>mT+ph*(1-(v-zmin)/(zmax-zmin));
+    const t=niceTicks(zmin,zmax,6);
+    axis(X,Y,'true z (nm)','fitted z (nm)',t,t,0,0);
+    ctx.strokeStyle=C.text; ctx.lineWidth=1.4; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(X(zmin),Y(zmin)); ctx.lineTo(X(zmax),Y(zmax)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=BLUE;
+    const step=Math.max(1, Math.ceil(res.zTrue.length/6000));   // cap the dot count; the cloud's shape is the point
+    for(let i=0;i<res.zTrue.length;i+=step){
+      ctx.beginPath(); ctx.arc(X(res.zTrue[i]), Y(res.zTrue[i]+res.dz[i]), 1.4, 0, 7); ctx.fill(); }
+    ctx.fillStyle=C.text; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText('— y = x (perfect)', mL+8, mT-4);
+    hover={mL,mT,pw,ph,xA:zmin,xB:zmax,yTop:zmax,yBot:zmin,fmt:(vx,vy)=>`true ${vx.toFixed(0)} nm · fitted ${vy.toFixed(0)} nm`};
+  } else {
+    // Axial bias per true-z bin with a +/-RMS band, plus lateral RMS on the same nm axis so the
+    // two are directly comparable — the usual finding being that axial error dwarfs lateral.
+    const bins=res.bins.filter(b=>b.n>0);
+    let ymin=0,ymax=0;
+    for(const b of bins){ ymin=Math.min(ymin,b.bias-b.rms); ymax=Math.max(ymax,b.bias+b.rms,b.latRms); }
+    const padY=(ymax-ymin)*0.08||1; ymin-=padY; ymax+=padY;
+    const z0=bins[0].zc, z1=bins[bins.length-1].zc;
+    const X=v=>mL+pw*(v-z0)/Math.max(1e-9,z1-z0), Y=v=>mT+ph*(1-(v-ymin)/Math.max(1e-9,ymax-ymin));
+    axis(X,Y,'true z (nm)','z error (nm)',niceTicks(z0,z1,6),niceTicks(ymin,ymax,6),0,0);
+    ctx.fillStyle=C.grid; ctx.globalAlpha=0.45;                       // +/-RMS band
+    ctx.beginPath();
+    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.bias+b.rms); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    for(let i=bins.length-1;i>=0;i--) ctx.lineTo(X(bins[i].zc), Y(bins[i].bias-bins[i].rms));
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=C.text; ctx.lineWidth=1; ctx.setLineDash([4,4]);  // zero line
+    ctx.beginPath(); ctx.moveTo(mL,Y(0)); ctx.lineTo(mL+pw,Y(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle=MAG; ctx.lineWidth=1.6; ctx.beginPath();          // lateral RMS
+    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.latRms); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+    ctx.strokeStyle=GREEN; ctx.lineWidth=2; ctx.beginPath();          // axial bias
+    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.bias); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+    ctx.fillStyle=GREEN; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText('z bias', mL+8, mT-4);
+    ctx.fillStyle=C.text; ctx.fillText('±RMS', mL+52, mT-4);
+    ctx.fillStyle=MAG;    ctx.fillText('lateral RMS', mL+96, mT-4);
+    hover={mL,mT,pw,ph,xA:z0,xB:z1,yTop:ymax,yBot:ymin,fmt:(vx,vy)=>`true z ${vx.toFixed(0)} nm · ${vy.toFixed(1)} nm`};
+  }
+  $('rawInfo').textContent=`— vs ground truth · ${res.tp.toLocaleString()} matched · Jaccard ${res.jaccard.toFixed(3)} · `+
+    `lateral RMSE ${res.rmseLat.toFixed(1)} nm`+(res.has3d?` · axial RMSE ${res.rmseZ.toFixed(1)} nm`:'')+` · scrub a frame to return`;
+  registerPlotHover('raw',hover);
+  _replotRaw=()=>drawTruthScorePlot(res);
+  syncSaveImg();
+}
+
+// "Score vs truth" button handler — shaped exactly like computeNeNA().
+async function computeTruthScore(){
+  if(!lastResult||!lastResult.locs.length){ log('Localize first.'); return; }
+  if(!groundTruthEvents){ log('Score vs truth needs a simulated movie — its ground truth is what the localizations are compared against.'); return; }
+  $('truthBtn').disabled=true;
+  try{
+    logCmd({scoreVsTruth:true, pxnm:paramValue('pxnm'),
+            validation_matchRadius:paramValue('validation_matchRadius'), validation_zBins:paramValue('validation_zBins')});
+    log('\nScoring against simulated ground truth…');
+    if(renderLocs) log(`(using the filtered subset: ${renderLocs.length.toLocaleString()} of ${lastResult.locs.length.toLocaleString()} localizations)`);
+    const t0=performance.now();
+    const r=await scoreTruthCore(renderLocs||lastResult.locs, groundTruthEvents, stack?stack.n:0,
+                                 lastResult.px, simTrueDrift, buildConfigFromParams(),
+                                 {onLog:log, onProgress:p=>setProg(100*p)});
+    setProg(null);
+    if(r.err){ log(r.err+'.'); return; }
+    lastTruthScore=r;
+    log(`Scored in ${Math.round(performance.now()-t0)} ms. Matching is lateral only (within ${r.matchRadiusNm.toFixed(0)} nm), `+
+        `so the axial error is measured, never used to pair.`);
+    drawTruthScorePlot(r);
+  }catch(err){ log(`⚠ Score vs truth failed: ${err.name}: ${err.message}`); }
+  finally{ $('truthBtn').disabled=false; setProg(null); }
+}
+
+/* ===========================================================================
    MODULE: detect  (DoG band-pass + local maxima)
    =========================================================================== */
 /* Separable Gaussian into a caller-supplied dst (tmp is reused scratch).
@@ -7730,7 +8027,7 @@ function drawRawOverlays(ctx,DW,DH){
     ctx.fillStyle='#3fb950'; ctx.beginPath(); ctx.arc((rawCropPt0.x-sx)*z,(rawCropPt0.y-sy)*z,3.5,0,7); ctx.fill();
   }
 }
-// Hides every raw-panel mode-toggle button (driftPlotModeBtn/sptHistModeBtn/
+// Hides every raw-panel mode-toggle button (driftPlotModeBtn/sptHistModeBtn/truthPlotModeBtn/
 // sSmlmHistModeBtn/segShowModeBtn) except `exceptId` — the four are mutually
 // exclusive (only one plot/image can occupy the panel at a time), so every
 // dispatcher that shows one of them calls this first. Needed because a
@@ -7738,7 +8035,7 @@ function drawRawOverlays(ctx,DW,DH){
 // drawSegmentedImage() "reclaim" points that already hide the others) used
 // to leave the PREVIOUS toggle stranded on screen alongside the new one.
 function hideOtherRawToggleBtns(exceptId){
-  for(const id of ['driftPlotModeBtn','sptHistModeBtn','sSmlmHistModeBtn','segShowModeBtn']){
+  for(const id of ['driftPlotModeBtn','sptHistModeBtn','sSmlmHistModeBtn','segShowModeBtn','truthPlotModeBtn']){
     if(id===exceptId) continue;
     const b=$(id); if(b) b.style.display='none';
   }
@@ -8649,7 +8946,7 @@ async function exportPlotEither(which){
   // them, so those — plus the inherently-interactive line profile, and the
   // MSD-vs-lag plot (no headless equivalent yet, docs/REFACTOR_PLAN.md) —
   // have no recordable command here.
-  if(isSR || ['drift','nena','frc','pcfo'].includes(rawPlotName)){
+  if(isSR || ['drift','nena','frc','pcfo','truth'].includes(rawPlotName)){
     logCmd({exportPlots:true});
   }else if(rawPlotName==='histogram' && histData){
     const NON_COLUMN_HIST_LABELS=new Set(['log10(D)','SPT track length','Cell area','sSMLM pair distance','sSMLM pair angle']);
@@ -12812,7 +13109,7 @@ async function run(){
   // lock the data sources too: swapping the stack mid-run would pull frames
   // out from under the loop.
   $('runBtn').disabled=true; $('loadBtn').disabled=true; $('genBtn').disabled=true;
-  $('stopBtn').disabled=false; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; calib=null; srIsPlot=false; setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; renderLocs=null; _tableFilters=[]; $('zmin').value=''; $('zmax').value='';
+  $('stopBtn').disabled=false; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; calib=null; srIsPlot=false; setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; renderLocs=null; _tableFilters=[]; $('zmin').value=''; $('zmax').value='';
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   try{
     const method=paramValue('method');
@@ -12870,6 +13167,9 @@ async function run(){
 
     $('saveBtn').disabled = r.locs.length===0; $('tableBtn').disabled = r.locs.length===0; $('driftBtn').disabled = r.locs.length===0;
     $('nenaBtn').disabled = $('sptLocErrorFromNenaBtn').disabled = $('frcBtn').disabled = r.locs.length===0;
+    // Score vs truth additionally needs something to score AGAINST, so it stays greyed out on
+    // real data exactly as NeNA/FRC stay greyed out before a Run.
+    $('truthBtn').disabled = r.locs.length===0 || !groundTruthEvents;
     $('sSmlmPreviewBtn').disabled = $('sSmlmPairBtn').disabled = r.locs.length===0;
     $('sptTrackBtn').disabled = r.locs.length===0;
     if(groundTruth) log(`Ground-truth emitters in structure: ${groundTruth.length}.`);
@@ -12973,7 +13273,7 @@ function startLiveStreamingSession(){
   lastResult=null; srFull=null; srIsPlot=false; setRawPlot(false); renderLocs=null; _tableFilters=[];
   $('zmin').value=''; $('zmax').value=''; lastDrift=null;
   $('saveBtn').disabled=true; $('tableBtn').disabled=true;
-  $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true;
+  $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true;
   // A fresh Start always begins a brand-new session — any PREVIOUS session's
   // raw-frame history/scrub position is discarded along with it, same as any
   // other "new load resets everything" convention in this app.
@@ -13055,7 +13355,7 @@ async function liveStreamPushChunkFile(file){
   // until it's clicked again — a real limitation, not a bug, since a
   // still-growing dataset has no final drift curve yet.
   if(liveStreamState.allLocs.length){
-    $('driftBtn').disabled=false; $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('frcBtn').disabled=false;
+    $('driftBtn').disabled=false; $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('truthBtn').disabled=!groundTruthEvents; $('frcBtn').disabled=false;
   }
   // Idle/pause detector: a genuine drop in incoming chunks (acquisition
   // stalled, or between phases) gets ONE render, without ending the session —
@@ -13276,7 +13576,7 @@ function endLiveStreamingSession(){
   // reconstruction could lag lastResult.locs after Stop.
   if(lastResult && lastResult.locs.length){
     $('saveBtn').disabled=false; $('tableBtn').disabled=false;
-    $('driftBtn').disabled=false; $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('frcBtn').disabled=false;
+    $('driftBtn').disabled=false; $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('truthBtn').disabled=!groundTruthEvents; $('frcBtn').disabled=false;
     rerender(true,false);
   }
 }
@@ -13299,7 +13599,7 @@ function clearLiveStreamingLocalizations(){
   lastResult=null; srFull=null; renderLocs=null; _tableFilters=[]; lastDrift=null;
   $('zmin').value=''; $('zmax').value='';
   $('saveBtn').disabled=true; $('tableBtn').disabled=true;
-  $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true;
+  $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true;
   $('liveStreamScrubRow').style.display='none'; $('liveStreamScrubNote').style.display='none';
   $('liveStreamStatus').textContent = liveStreamState.active ? 'Streaming — armed, waiting for chunks…' : 'Not streaming.';
   rawFull=null; $('rawInfo').textContent='';
@@ -13479,7 +13779,7 @@ $('genBtn').addEventListener('click',async()=>{
   log('Simulating movie…');
   $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
   try{
-    stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
+    stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13511,7 +13811,7 @@ $('genCalBtn').addEventListener('click',async()=>{
   $('genCalBtn').disabled=true; $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
   try{
     const {stack:s, focusIndex, zStepNm}=await generateCalibrationStack();
-    stack=s; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated_calib'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
+    stack=s; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated_calib'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13547,7 +13847,7 @@ $('genCalBtn').addEventListener('click',async()=>{
 async function loadMovieFiles(fs){
   if(!fs.length) return;
   const multi=fs.length>1;
-  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthEvents=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
+  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthEvents=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
   // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13754,6 +14054,11 @@ $('driftPlotModeBtn').addEventListener('click',()=>{ driftPlotMode = driftPlotMo
 // 0.8.0 (in development): localization-precision estimators. Scaffolded UI only.
 $('nenaBtn').addEventListener('click',computeNeNA);
 $('frcBtn').addEventListener('click',computeFRC);
+$('truthBtn').addEventListener('click',computeTruthScore);
+$('truthPlotModeBtn').addEventListener('click',()=>{
+  truthPlotMode = truthPlotMode==='zbias' ? 'scatter' : truthPlotMode==='scatter' ? 'lateral' : 'zbias';
+  if(lastTruthScore && rawIsPlot && rawPlotName==='truth') drawTruthScorePlot(lastTruthScore);
+});
 $('pcfoBtn').addEventListener('click',estimateGainOffset);
 // Runs Estimate first if there's no PCFO result yet, same "run the
 // dependency then use it" pattern sptLocErrorFromNenaBtn uses for NeNA —
@@ -14041,7 +14346,7 @@ async function loadCsvFile(f){
     setFrameAspect(w, h);
     rerender();
     $('saveBtn').disabled=false; $('tableBtn').disabled = false; $('driftBtn').disabled=false;
-    $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('frcBtn').disabled=false;
+    $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('truthBtn').disabled=!groundTruthEvents; $('frcBtn').disabled=false;
     $('sSmlmPreviewBtn').disabled=false; $('sSmlmPairBtn').disabled=false;
     $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false;   // a freshly-loaded result invalidates any prior pairing state
     $('sptTrackBtn').disabled=false; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;   // Track is safe to re-run even on a CSV that already has track_id/D_coeff columns; the histograms themselves need a fresh Track click (lastSpt isn't reconstructed from a loaded CSV)
@@ -14384,6 +14689,7 @@ function recomputeIfShown(){
   if(!rawIsPlot) return;
   if(rawPlotName==='frc') computeFRC();
   else if(rawPlotName==='nena') computeNeNA();
+  else if(rawPlotName==='truth') computeTruthScore();
 }
 // Raw-panel crop tool: click-two-corners like the reconstruction crop above,
 // but commits by swapping `stack` for a makeCroppedStack() wrapper (MODULE:
@@ -14411,7 +14717,7 @@ function rawClickToNative(e){
 function resetAfterCropChange(){
   lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false);
   setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthEvents=null; simTrueDrift=null; lastDrift=null; lastNena=null;
-  $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
+  $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('truthBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   // lastResult=null above orphans any sSMLM pairing state too (unpairSSmlm()
   // would otherwise try to write lastResult.locs on a null lastResult) — same
   // reset every fresh Run/Load/Simulate already does, needed here for the
@@ -14685,26 +14991,21 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-04b — 3D simulation z accuracy. Emitters are now
-splatted from a LINEAR BLEND of the two PSF kernel planes straddling their own z, instead of the
-nearest single plane — the old lookup quantized every emitter's depth to the kernel z-step (±5 nm
-at the 10 nm default), which would sit underneath any axial-accuracy measurement and be mistaken
-for fitter error. Photon count is unaffected: the two weights sum to 1 and the splat is exactly
-linear in photons, so two weighted splats equal one blended kernel, with no allocation. Verified
-photon-exact at every z including the halfway case, and byte-identical output across two seeded
-runs through the worker pool.
-The PSF build now reports how far either side of focus that PSF encodes z SINGLE-VALUED, measured
-by fitting each kernel plane with the same elliptical Gaussian fitter 3D calibration uses. Past
-that point sigma_y/sigma_x turns back, two z values share one width pair, and no width-based 3D
-fit can resolve them — z folds back. Simulate movie warns when the chosen structure reaches
-beyond it. At NA 1.4 / 660 nm the limit is about ±450 nm (astig. weak), ±475 nm (moderate, the
-default) and ±550 nm (strong) — all well inside the ±1000 nm default Structure Z range — and 0
-for unaberrated and for spherical aberration, both being axisymmetric.
-Measured and NOT changed: the splat window was expected to be far wider than the PSF needs, but
-this PSF's Airy tails are heavy — 3.2% of an in-focus emitter's photons land beyond a 10-camera
--pixel radius and 0.8% beyond 20 — so shrinking the window to the kernel's mass would discard a
-few percent of every emitter's photons. The existing geometric window is right; "PSF kernel width
-(nm)" remains the honest place to trade support against speed.
+log(`webSMLM v0.12.0-dev · build 2026-09-04c — New **Score vs truth** button (Localization
+precision, next to NeNA/FRC): compares the localizations against the simulator's own ground
+truth, which webSMLM has always recorded and never used. Reports detection rate (recall,
+precision, Jaccard), lateral bias and RMSE, and — for a 3D run — axial bias and RMSE, plus a
+plot on the left panel with three views: z error against TRUE depth with a ±RMS band, fitted-z
+against true-z with the y=x line (where a non-invertible z shows up as the cloud folding back),
+and a lateral-error histogram. Greyed out on real data, since there is nothing to score against.
+Matching is per frame and LATERAL ONLY, within a settable Match radius (250 nm default), one
+localization to one emitter: matching on z as well would pair towards whichever candidate has
+the flattering z and bias the axial error towards zero — the very number being measured.
+Positions are compared before drift correction (the raw x0/y0 a correction preserves) against
+the drifted truth, so the score measures the FITTER regardless of what drift correction did;
+drift correction already has its own ground-truth score.
+A 2D run reports the same detection and lateral numbers through the same code path, just without
+the axial ones — no separate 2D mode.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

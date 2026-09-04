@@ -194,18 +194,42 @@ relevant one before editing rather than scrolling:
 
 - **simulation** — the built-in synthetic stack generator ("Simulate movie"): demo/validation/
   teaching data, not a core analysis path. Split out from in/out since it doesn't load anything.
-  `simulation_psfModel` (`'gaussian'` default, or `'zernike'`) picks the emitter PSF: `'gaussian'`
+  `simulation_psfModel` (`'zernike'` default, or `'gaussian'`) picks the emitter PSF: `'gaussian'`
   is the original fixed-`sigma=1.3` isotropic render; `'zernike'` splats each emitter from the same
   oversampled, physically-modelled Gibson-Lanni+Zernike kernel the PSF preview builds (see
-  `docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §10) — **2D only** (one fixed
-  `simulation_psfDepth` for the whole movie; that same section spells out the per-emitter-z/3D
-  follow-up). `simulation_psfInterp` (`'nearest'|'linear'|'cubic'`(default)`|'fft'`) selects how
+  `docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §10). With `simulation_3d` on, each emitter is
+  splatted from a **linear blend of the two kernel z-planes straddling its own z** (nearest-plane
+  lookup would quantize every emitter's depth to the kernel z-step and be mistaken for fitter
+  error later); with it off, one fixed `simulation_psfDepth` applies to the whole movie.
+  `simulation_structure` picks the object emitters attach to — the original filaments+ring, or one
+  of five that sample z independently of x/y (the filaments' single sine drives both their y and
+  their z, so a z error can't be told apart from a y error). **`simulation_3d` means exactly one
+  thing**: `buildStructure()` always builds in 3D and flattens every z to 0 when it is off, so the
+  lateral geometry is identical either way and every control, log line and plot applies unchanged
+  in both states — don't reintroduce a separate 2D structure path.
+  `buildPsfKernelStack()` reports `zUsableNm`, how far either side of focus the PSF encodes z
+  *single-valued* (measured per plane with `gaussianFitElliptical()`, the same fitter 3D
+  calibration uses). Past it σy/σx turns back, two z values share one width pair, and
+  `zFromWidths()` silently picks one — its `clamped` flag only guards the calibrated range's
+  EDGES, not that ambiguous interior. `simulation_psfInterp` (`'nearest'|'linear'|'cubic'`(default)`|'fft'`) selects how
   `splatZernikeEmitter()` interpolates the oversampled kernel at each emitter's exact sub-pixel
   position before SUMMING (not averaging — each kernel entry is a probability mass, so summing is
   what conserves photon count) the sub-cell samples down to the camera pixel grid — the "oversample
   once, downsample everywhere" placement both `docs/VECTORIAL_PSF_SIMULATION.md` and the Zernike
   implementation doc's own §5 call for. Downstream of filling `img` (Poisson shot noise, read
   noise, gain/offset) is identical for both PSF paths.
+
+- **validation** — scores recovered localizations against the simulator's own ground truth
+  (`groundTruthEvents`), which nothing read before. `scoreTruthCore()` is the pure core shared by
+  the **Score vs truth** button and `analyze()`'s `scoreVsTruth` flag. Matching is per frame,
+  **lateral only**, one-to-one within `validation_matchRadius`: matching on z would pair towards
+  whichever candidate has the flattering z and bias the axial error towards zero — the very number
+  being measured — and keeping it lateral is also what lets 2D and 3D share one code path (axial
+  metrics simply don't accumulate when either side lacks a finite z). Ground truth per frame is
+  *derived* from `groundTruthEvents` with the same frame-overlap rule `generateSynthetic()` used to
+  splat it, so the two sets agree by construction. Positions are compared **before** drift
+  correction (`L.x0`/`L.y0`, which `correctDrift()` preserves) against the *drifted* truth, so the
+  score measures the fitter regardless of what drift correction did.
 
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),

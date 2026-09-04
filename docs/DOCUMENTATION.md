@@ -345,7 +345,42 @@ the fit-side `gain`/`camoffset` so ground truth and the fit's assumed
 camera can be matched or intentionally mismatched — see
 [§3](#3-parameters-params-registry)/Simulation. Stores the true per-frame
 drift (`simTrueDrift`) for scoring drift correction and the true emitter
-events (`groundTruthEvents`) for future recovery comparisons.
+events (`groundTruthEvents`), which **Score vs truth**
+([§2](#validation)) compares the localizations against.
+
+**Test structure** (`simulation_structure`) picks the object emitters attach
+to. The original *Filaments + ring* stays the default, but note what it
+cannot measure: one `sin(k·x+φ)` drives both a filament's y offset and its
+z, so the two are perfectly correlated and a z error is indistinguishable
+from a y error — and the sinusoid piles emitters up at the extremes of the
+Z range, exactly where an astigmatic PSF stops encoding z uniquely. The
+other five sample z independently:
+
+| Structure | Geometry | What it measures |
+|---|---|---|
+| Tilted plane | z ramps linearly with x across the frame | bias, axial compression and the fold-back point, in one picture |
+| Uniform 3D volume | x, y and z all uniform | unbiased bias/RMS-versus-depth statistics |
+| Spherical shell | hollow sphere, radius `simulation_structureSize` | axial compression — a sphere reconstructing flat is direct evidence |
+| z-staircase | 5 planes at known depths, each in its own y band | axial separability |
+| 3D nanoruler | point pairs a known distance apart, 45° in xz | absolute 3D distance accuracy |
+
+**3D simulation?** (`simulation_3d`) means exactly one thing: whether z
+varies. The structure is always built in 3D and its z simply flattened to 0
+when the box is unticked, so the lateral geometry is identical either way
+and every control, log line and plot applies unchanged in both states. With
+it ticked *and* the Zernike PSF selected, each emitter is splatted from a
+**linear blend of the two kernel z-planes straddling its own z** — nearest
+-plane lookup would quantize every emitter's depth to the kernel z-step
+(±5 nm at the 10 nm default) and be mistaken for fitter error later.
+
+The PSF build reports how far either side of focus that PSF encodes z
+**single-valued**, measured per plane with the same elliptical-Gaussian
+fitter 3D calibration uses. Beyond it σ_y/σ_x turns back, two z values share
+one width pair, and no width-based 3D fit can tell them apart — so Simulate
+movie warns when the chosen structure reaches past it. At NA 1.4 / 660 nm
+that limit is roughly ±450 nm (astigmatism weak), ±475 nm (moderate) and
+±550 nm (strong), and zero for an unaberrated or purely spherical-aberrated
+PSF, both being axisymmetric.
 
 ### Localisation settings (`detect`) {#detect}
 
@@ -491,6 +526,34 @@ AIM (adaptive intersection maximization), point-based, no
 FFT, 2D+z. Segments localizations in time (`driftSeg`), grid-searches the
 shift that maximizes coincident localizations against the accumulated
 reference (`driftRoi`), then a parabolic sub-pixel peak refine.
+
+### Ground-truth scoring (`validation`) {#validation}
+
+Compares the localizations against the simulator's own ground truth — the
+question a synthetic dataset exists to answer, and one webSMLM recorded the
+data for but never asked. **Score vs truth** (Localization precision panel)
+is enabled only for data generated in the same session; there is no ground
+truth for a loaded file.
+
+Reports detection quality (recall, precision, Jaccard), lateral bias and
+RMSE, and — for a 3D run — axial bias and RMSE, with a left-panel plot in
+three views: axial bias against **true** depth with a ±RMS band and the
+lateral RMS alongside, fitted-z against true-z with the *y = x* line, and a
+lateral-error histogram. The fitted-versus-true view is where a
+non-invertible z shows itself: the cloud stops following the diagonal and
+folds back.
+
+Matching is per frame, **lateral only**, one localization to one emitter,
+within **Match radius**. Matching on z as well would pair towards whichever
+candidate has the flattering z and bias the axial error towards zero — the
+very quantity being measured. It also means a 2D fit method, or a 2D
+simulation, produces the same detection and lateral figures through the same
+code, simply without the axial ones.
+
+Positions are compared **before** drift correction, against ground truth
+that carries the simulated drift, so the score describes the *fitter*
+whatever drift correction did or did not do afterwards; drift correction has
+its own ground-truth score in [§2](#drift).
 
 ### Localization precision (NeNA & FRC) (`locprecision`) {#locprecision}
 
@@ -933,6 +996,10 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 | `simbg` | Simulation background (photons/px) | number | 0 | 500 | 1 | 0 |
 | `driftpx` | Simulated total drift (px) | number | 0 | 30 | 0.5 | 0 |
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
+| `simulation_3d` | 3D simulation? | bool | — | — | — | off |
+| `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
+| `simulation_structure` | Test structure | enum (`filaments`, `tiltedPlane`, `uniform3D`, `shell`, `staircase`, `nanoruler3D`) | — | — | — | `filaments` |
+| `simulation_structureSize` | Structure size (nm) | number | 10 | 5000 | 10 | 500 |
 
 **In-app "more info…" popup** (`hint-simulation` in `webSMLM.html`; synced
 by `tools/sync_hints.mjs` — edit here, then run the script, never edit the
@@ -1028,6 +1095,23 @@ stored in `groundTruthEvents` for comparison against recovered
 localizations. `driftpx` (as before) accumulates linearly over all frames in
 a random direction; the true per-frame drift is stored (`simTrueDrift`) for
 scoring drift correction. See the **simulation** module.
+
+### Ground-truth scoring (`validation`) {#validation-params}
+
+*Module:* **validation** — see [§2](#validation).
+
+| id | Label | Type | Min | Max | Step | Default |
+|---|---|---|---|---|---|---|
+| `validation_matchRadius` | Match radius (nm) | number | 20 | 2000 | 10 | 250 |
+| `validation_zBins` | Score z bins | number (int) | 4 | 100 | 1 | 20 |
+
+**Match radius** is how close, laterally, a localization must be to a
+ground-truth emitter in the same frame to count as its detection. 250 nm is
+a couple of PSF widths: loose enough not to reject genuine but imprecise
+localizations, tight enough not to pair unrelated emitters at the densities
+the simulator produces. **Score z bins** splits the true-z axis for the
+bias/RMS curve — too few hides where accuracy falls off, too many leaves
+each bin too sparse to mean anything.
 
 ### Localisation settings (`detect`) {#detect-params}
 
@@ -1971,6 +2055,14 @@ const result = await window.webSMLM.analyze({
   result field is omitted).
 - `config.correctDrift` / `config.computeNeNA` / `config.computeFRC` —
   booleans, not `PARAMS` entries, gating optional pipeline stages.
+- `config.scoreVsTruth` — boolean, not a `PARAMS` entry. Scores the
+  localizations against the simulator's own ground truth
+  (`scoreTruthCore()`, see **validation** in [§2](#validation)) and returns
+  the result as `truthScore`; with `exportPlots` it also renders
+  `plots.truthScore`. Only meaningful for data generated in the same
+  session — a loaded file has no ground truth — so it is skipped silently
+  rather than erroring. `validation_matchRadius`/`validation_zBins` are
+  ordinary `PARAMS` fields and configure it.
 - `config.sSmlmPair` (v0.11.1) — boolean, not a `PARAMS` entry. Runs
   `pairCore()` (spectral SMLM pairing, see **sSMLM** in `CLAUDE.md`) right
   after Localize, before drift/NeNA/FRC — the headless equivalent of

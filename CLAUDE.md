@@ -198,12 +198,18 @@ relevant one before editing rather than scrolling:
   is the original fixed-`sigma=1.3` isotropic render; `'zernike'` splats each emitter from the same
   oversampled, physically-modelled Gibson-Lanni+Zernike kernel the PSF preview builds (see
   `docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md` §10). With `simulation_3d` on, each emitter is
-  splatted from a **linear blend of the two kernel z-planes straddling its own z** (nearest-plane
-  lookup would quantize every emitter's depth to the kernel z-step and be mistaken for fitter
-  error later); with it off, one fixed `simulation_psfDepth` applies to the whole movie.
+  splatted from the **nearest kernel z-plane** (quantizing its depth to ± half the z step, 2.9 nm
+  RMS at the default — two orders below the fit's own axial error); with it off, one fixed
+  `simulation_psfDepth` applies to the whole movie. A two-plane linear blend was built and then
+  removed on measurement: blending two PSF *intensities* is not interpolating the PSF's *width*,
+  which is what an astigmatic fit reads z from, so it cost 1.74× the simulation time for no
+  measurable gain at a fine z step and was measurably worse at a coarse one. **Don't reintroduce
+  it without a width-aware interpolation** (a spline through the z-stack would do it properly).
   `simulation_structure` picks the object emitters attach to — the original filaments+ring, or one
-  of five that sample z independently of x/y (the filaments' single sine drives both their y and
-  their z, so a z error can't be told apart from a y error). **`simulation_3d` means exactly one
+  of three that sample z independently of x/y (the filaments' single sine drives both their y and
+  their z, so a z error can't be told apart from a y error — and their 1-D crowding inflates the
+  measured lateral spread by ~50% at equal density, `uniform3D` being the one to quote figures
+  from). **`simulation_3d` means exactly one
   thing**: `buildStructure()` always builds in 3D and flattens every z to 0 when it is off, so the
   lateral geometry is identical either way and every control, log line and plot applies unchanged
   in both states — don't reintroduce a separate 2D structure path.
@@ -229,7 +235,11 @@ relevant one before editing rather than scrolling:
   *derived* from `groundTruthEvents` with the same frame-overlap rule `generateSynthetic()` used to
   splat it, so the two sets agree by construction. Positions are compared **before** drift
   correction (`L.x0`/`L.y0`, which `correctDrift()` preserves) against the *drifted* truth, so the
-  score measures the fitter regardless of what drift correction did.
+  score measures the fitter regardless of what drift correction did. **Median and percentiles are
+  the headline numbers, not RMSE**: the axial error distribution has heavy tails (fold-back and
+  clamped-calibration failures), and measured on a typical run the worst 1% of pairs contributed
+  62% of the sum of squares while the RMSE swung 67→420 nm across seeds and the median barely
+  moved. Gross axial failures are counted separately rather than left to inflate a mean.
 
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),

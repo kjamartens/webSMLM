@@ -1950,7 +1950,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04e</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-04f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2086,11 +2086,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
             <option value="tiltedPlane">Tilted plane</option>
             <option value="uniform3D">Uniform 3D volume</option>
             <option value="shell">Spherical shell</option>
-            <option value="staircase">z-staircase</option>
-            <option value="nanoruler3D">3D nanoruler</option>
           </select>
         </label>
-        <label class="row" id="structureSizeRow" style="display:none" title="Meaning depends on the selected structure: spherical shell radius, z-staircase plane spacing, or 3D nanoruler point separation.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
+        <label class="row" id="structureSizeRow" style="display:none" title="Radius of the spherical shell structure, in nm.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
         <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
         <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
         <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike" selected>Zernike-aberrated</option></select></label>
@@ -2945,7 +2943,7 @@ const PARAMS = {
   // simulation_zRange = the +/- half-range (nm) the structure's Z extent is scaled to. What that
   // means is per structure (see buildStructure()): filaments oscillate sinusoidally over it and
   // are additionally offset from one another, so they reach ~1.5x it; tiltedPlane ramps linearly
-  // across x; uniform3D draws uniformly from it; staircase places its planes across it. The
+  // across x; uniform3D draws uniformly from it. The
   // shell ignores it entirely and uses simulation_structureSize as its radius instead.
   simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:1000, int:false },
   // simulation_structure = which synthetic object buildStructure() builds. 'filaments' stays the
@@ -2955,11 +2953,11 @@ const PARAMS = {
   // sinusoid also piles emitters up at its extremes — exactly where an astigmatic PSF stops
   // encoding z uniquely. Applies in 2D as much as in 3D (see simulation_3d).
   simulation_structure: { type:'enum', id:'simulation_structure', label:'Test structure',
-    options:['filaments','tiltedPlane','uniform3D','shell','staircase','nanoruler3D'], default:'filaments' },
-  // simulation_structureSize = the one dimension whose meaning is per structure: shell radius,
-  // staircase plane spacing, nanoruler separation. Deliberately ONE field rather than three
-  // structure-specific ones so the sidebar doesn't grow a row per object; the tooltip says what
-  // it means for the selected one, and the row hides for structures that don't use it.
+    options:['filaments','tiltedPlane','uniform3D','shell'], default:'filaments' },
+  // simulation_structureSize = the shell's radius, the one structure with a dimension of its own
+  // (the others are sized by simulation_zRange). Kept as a general "structure size" rather than a
+  // shell-specific field so a future structure with its own scale needs no new parameter; the row
+  // hides for structures that don't use it.
   simulation_structureSize: { type:'number', id:'simulation_structureSize', label:'Structure size (nm)', min:10, max:5000, step:10, default:500, int:false },
 
   // ---- ground-truth scoring (MODULE: validation) ----
@@ -3849,32 +3847,6 @@ function buildStructure(w,h,zRange=0,kind='filaments',sizeNm=500,px=100,rng=Math
       }
       break;
     }
-    // Discrete z planes at known depths, each confined to its own horizontal band so the planes
-    // are separated laterally too — you can see which band lands at which depth instead of having
-    // to trust the colour scale. Measures axial separability directly.
-    case 'staircase': {
-      pts=[];
-      const nSteps=5, bandH=spanY/nSteps;
-      for(let i=0;i<STRUCTURE_SITES;i++){
-        const s=Math.min(nSteps-1, (rng()*nSteps)|0);
-        pts.push([M+rng()*spanX, M+s*bandH+rng()*bandH, -zRange+(2*zRange)*s/(nSteps-1)]);
-      }
-      break;
-    }
-    // Point PAIRS a known 3D distance apart, oriented at 45° in the xz plane so the separation is
-    // split between a lateral and an axial component. Unlike every other structure here this one
-    // has a ground-truth DISTANCE, so it measures absolute 3D accuracy rather than per-point bias.
-    case 'nanoruler3D': {
-      pts=[];
-      const half=sizeNm/2, k=Math.SQRT1_2;                 // 45° in xz: dx=dz=size/2·(1/√2)
-      const dxPx=nmToPx(half*k), dzNm=half*k;
-      for(let i=0;i<STRUCTURE_SITES/2;i++){
-        const x=M+dxPx+rng()*Math.max(1,spanX-2*dxPx), y=M+rng()*spanY, z=(rng()*2-1)*zRange;
-        pts.push([x-dxPx, y, z-dzNm]);
-        pts.push([x+dxPx, y, z+dzNm]);
-      }
-      break;
-    }
     default:
       pts=buildFilaments(w,h,zRange);
   }
@@ -3882,29 +3854,26 @@ function buildStructure(w,h,zRange=0,kind='filaments',sizeNm=500,px=100,rng=Math
   return pts;
 }
 
-// One-line "how this structure distributes z", for generateSynthetic()'s own 3D log line. Kept
-// next to buildStructure() so the two can't drift apart — the log used to hardcode the filament
-// description, which read as plainly wrong for every other object.
-// The half-extent in z (nm) a structure actually reaches — NOT simply zRange, since filaments add
-// a per-strand offset on top of their sine (so they reach ~1.5x it), the shell is sized by its own
-// radius, and a nanoruler's pair offset extends past its centre range. Used to check the structure
-// against what the PSF can encode; keep in step with buildStructure().
+// The half-extent in z (nm) a structure actually reaches — NOT simply zRange: filaments add a
+// per-strand offset on top of their sine (so they reach ~1.5x it) and the shell is sized by its
+// own radius instead. Used to check the structure against what the PSF can encode; keep in step
+// with buildStructure().
 function structureZExtent(kind,zRange,sizeNm){
   switch(kind){
     case 'shell':       return sizeNm;
-    case 'nanoruler3D': return zRange + sizeNm/2*Math.SQRT1_2;
     case 'filaments':   return 1.5*zRange;
-    default:            return zRange;              // tiltedPlane / uniform3D / staircase
+    default:            return zRange;              // tiltedPlane / uniform3D
   }
 }
 
+// One-line "how this structure distributes z", for generateSynthetic()'s own 3D log line. Kept
+// next to buildStructure() so the two can't drift apart — the log used to hardcode the filament
+// description, which read as plainly wrong for every other object.
 function structureZDescription(kind,zRange,sizeNm){
   switch(kind){
     case 'tiltedPlane':  return `tilted plane, z ramping linearly with x from −${zRange} to +${zRange} nm`;
     case 'uniform3D':    return `uniform 3D volume, z drawn uniformly over ±${zRange} nm`;
     case 'shell':        return `spherical shell of radius ${sizeNm} nm, so z spans ±${sizeNm} nm`;
-    case 'staircase':    return `z-staircase, 5 planes spread over ±${zRange} nm, one per horizontal band`;
-    case 'nanoruler3D':  return `3D nanorulers, pairs ${sizeNm} nm apart at 45° in xz, centres over ±${zRange} nm`;
     default:             return `filaments oscillate/offset in z over a ±${zRange} nm structure Z range`;
   }
 }
@@ -3921,55 +3890,27 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
   const img=new Float32Array(w*h).fill(bg);
   let zClamped=0, zTotal=0;
   if(zKernelStack){
-    // Emitter z -> kernel plane, LINEARLY INTERPOLATED between the two planes straddling it.
-    // Nearest-plane lookup (what this used to do) quantizes every emitter's depth to the kernel's
-    // own z-step — +/-5 nm at the default 10 nm step — which would otherwise sit underneath any
-    // axial-accuracy measurement made against this simulator's ground truth and be mistaken for
-    // fitter error.
+    // Emitter z -> nearest kernel plane.
     //
-    // Blending the two SLICES first would mean allocating a full kernel-sized array per emitter.
-    // Instead we splat twice at weights (1-f) and f: splatZernikeEmitter() only ever does
-    // `img[...] += photons * <kernel sample>`, so it is exactly linear in `photons`, and summing
-    // two weighted splats is mathematically identical to splatting one blended kernel — for the
-    // cost of a second pass and no allocation at all. Photon count is conserved either way, since
-    // the weights sum to 1 and each slice is independently normalized to sum 1.
-    //
-    // KNOW THE LIMIT, measured against ground truth rather than assumed: blending two PSF
-    // INTENSITIES is not the same as interpolating the PSF's WIDTH. A mixture of two Gaussians of
-    // different width is wider than the Gaussian halfway between them, so at coarse z-steps the
-    // blended PSF is systematically too broad and its fitted sigma_x/sigma_y maps to the wrong z.
-    // Measured (uniform 3D volume, astig. moderate, same seed): at a 25 nm step blending and
-    // nearest-plane are indistinguishable (axial RMSE 82.4 vs 80.4 nm, uncertainty ~2.7 nm), but
-    // at a 100 nm step blending is genuinely worse (84.7 vs 81.8 nm) — the interpolation error it
-    // introduces then exceeds the +/-50 nm quantization it removes. So this is the right default
-    // for a properly sampled kernel and the wrong one for a coarse one; buildPsfKernelStack()
-    // warns above PSF_ZSTEP_BLEND_WARN_NM. Keep the z-step fine and it is strictly an improvement:
-    // the quantization it removes is systematic, and it is what would otherwise put a floor under
-    // any axial-accuracy measurement made against this simulator.
-    const {focusIndex, zStepNm, nz, norm, nx, ny, oversample, camRad, interpMode}=zKernelStack;
-    const kernelObj={kernel:null, nx, ny, oversample};
+    // A two-plane linear blend was implemented and then removed, on measurement rather than
+    // taste: blending two PSF INTENSITIES is not the same as interpolating the PSF's WIDTH (a
+    // mixture of two differently-wide PSFs is broader than the one halfway between them), and
+    // width is exactly what an astigmatic 3D fit reads z from. Scored against ground truth on the
+    // same seed, blending cost 1.74x the simulation time for no measurable accuracy gain at the
+    // default 10 nm z step -- median axial error 21.8 vs 24.2 nm, inside the ~+/-2 nm sampling
+    // noise at n~400, and only ~0.2 nm of that is even attributable to the quantization it
+    // removes -- while at a coarse 100 nm step it was measurably WORSE (84.7 vs 81.8 nm axial
+    // RMSE). Nearest-plane leaves one monotone rule with no exceptions: a finer z step is more
+    // accurate, at a cost linear in plane count that is paid once per kernel build and cached,
+    // not per emitter per frame. The quantization it leaves behind is +/-zStep/2, i.e. 2.9 nm RMS
+    // at the default -- two orders below the ~70 nm axial error of the fit itself.
     for(const [ex,ey,ez,ov] of evList){
-      const mx=ex+drx, my=ey+dry, phot=photPerFrame*ov;
+      const mx=ex+drx, my=ey+dry;
       zTotal++;
-      const t=focusIndex + ez/zStepNm;
-      let z0=Math.floor(t), f=t-z0;
-      // Outside the built z-range there is no second plane to blend towards, so clamp to the
-      // edge plane and drop the interpolation (f=0) rather than extrapolating a PSF we never
-      // computed. Counted, as before, so generateSynthetic() can warn about it.
-      if(z0<0){ z0=0; f=0; zClamped++; }
-      else if(z0>=nz-1){ z0=nz-1; f=0; zClamped++; }
-      if(f<1e-3){                                   // lands on (or within rounding of) plane z0
-        kernelObj.kernel=norm[z0];
-        splatZernikeEmitter(img, w, h, mx, my, phot, kernelObj, camRad, interpMode);
-      } else if(f>1-1e-3){                          // ...or on plane z0+1
-        kernelObj.kernel=norm[z0+1];
-        splatZernikeEmitter(img, w, h, mx, my, phot, kernelObj, camRad, interpMode);
-      } else {
-        kernelObj.kernel=norm[z0];
-        splatZernikeEmitter(img, w, h, mx, my, phot*(1-f), kernelObj, camRad, interpMode);
-        kernelObj.kernel=norm[z0+1];
-        splatZernikeEmitter(img, w, h, mx, my, phot*f, kernelObj, camRad, interpMode);
-      }
+      let zi=zKernelStack.focusIndex + Math.round(ez/zKernelStack.zStepNm);
+      if(zi<0){ zi=0; zClamped++; } else if(zi>=zKernelStack.nz){ zi=zKernelStack.nz-1; zClamped++; }
+      const kernelObj={kernel:zKernelStack.norm[zi], nx:zKernelStack.nx, ny:zKernelStack.ny, oversample:zKernelStack.oversample};
+      splatZernikeEmitter(img, w, h, mx, my, photPerFrame*ov, kernelObj, zKernelStack.camRad, zKernelStack.interpMode);
     }
   } else if(zKernel){
     for(const [ex,ey,ez,ov] of evList){
@@ -4511,9 +4452,6 @@ function computePsfIntensityPlane(nx, ny, resLateralM, pupil){
    tested) in the zero-Zernike case, and to agree on the depth-focal-shift-
    corrected best-focus plane exactly.
    --------------------------------------------------------------------------- */
-// Above this PSF z step, splatSimFrame()'s two-plane blend stops paying for itself — measured,
-// see that function's own comment and buildPsfKernelStack()'s warning.
-const PSF_ZSTEP_BLEND_WARN_NM=50;
 const PSF_FFT_M=64;
 // Chirp-Z transform (Bluestein's algorithm): computes, for M uniformly-spaced complex input
 // samples at k_m=k0+m*dk (m=0..M-1), the P uniformly-spaced OUTPUT samples at x_p=x0+p*dx
@@ -4739,15 +4677,6 @@ async function buildPsfKernelStack(cfg){
       (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
   if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
   const zStepNm=cfg.zStep*1e9;
-  // Above this, splatSimFrame()'s two-plane blend starts costing more accuracy (linear blending of
-  // two intensities is not width interpolation) than the quantization it removes — see its own
-  // comment for the measurement.
-  if(zStepNm>PSF_ZSTEP_BLEND_WARN_NM)
-    log(`⚠ PSF z step ${zStepNm.toFixed(0)} nm is coarse: 3D emitters are splatted from a linear blend of `+
-        `adjacent z-planes, and blending two PSF intensities is not the same as interpolating the PSF's width, `+
-        `so above ~${PSF_ZSTEP_BLEND_WARN_NM} nm the blend adds more error than the quantization it removes. `+
-        `Measured at 100 nm: axial RMSE 84.7 nm blended vs 81.8 nm nearest-plane. Use a finer z step for `+
-        `accuracy work.`);
   const zUsableNm=psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, cfg.oversample);
   if(zUsableNm>0)
     log(`PSF z encoding is single-valued to ±${zUsableNm.toFixed(0)} nm — beyond that σy/σx turns back, so two z values give the same width pair and no width-based 3D fit can tell them apart.`);
@@ -5881,10 +5810,25 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
 
   const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
   const rms=a=>Math.sqrt(a.reduce((s,v)=>s+v*v,0)/a.length);
+  // Robust companions to RMSE, and the ones to read first. An axial error distribution here has
+  // heavy tails: a handful of localizations land on the wrong side of the PSF's fold-back, or on
+  // a clamped calibration edge, and are wrong by hundreds of nm. Measured on a typical run, the
+  // worst 1% of pairs (4 of 385) contributed 62% of the sum of squares, and across seeds the RMSE
+  // swung 67 -> 420 nm while the median barely moved. RMSE is still reported — it is the field's
+  // convention and the tail is real — but on its own it describes the failures, not the method.
+  const pct=(a,p)=>{ const q=a.map(Math.abs).sort((x,y)=>x-y); return q[Math.min(q.length-1, Math.floor(p*(q.length-1)))]; };
   const biasX=mean(dx)*px, biasY=mean(dy)*px;
   const rmseLat=Math.sqrt(dx.reduce((s,v,i)=>s+v*v+dy[i]*dy[i],0)/dx.length)*px;
   const has3d=nZ>0;
   const biasZ=has3d?mean(dz):NaN, rmseZ=has3d?rms(dz):NaN;
+  const latErr=dx.map((v,i)=>Math.hypot(v,dy[i])*px);
+  const medLat=pct(latErr,0.5), p90Lat=pct(latErr,0.9);
+  const medZ=has3d?pct(dz,0.5):NaN, p90Z=has3d?pct(dz,0.9):NaN, p95Z=has3d?pct(dz,0.95):NaN;
+  // "Gross" axial failures: wrong by more than the PSF's own single-valued half-range would allow,
+  // i.e. almost certainly a fold-back or a clamp rather than ordinary fit noise. Counted
+  // separately so the tail is visible as a COUNT instead of silently inflating the RMSE.
+  const grossZnm=Math.max(150, (cfg.validation_matchRadius||250));
+  const nGrossZ=has3d?dz.filter(v=>Math.abs(v)>grossZnm).length:0;
 
   // Binned on TRUE z — the axis that matters. Binning on fitted z would fold the very error being
   // measured into the x-axis and flatten the curve towards zero.
@@ -5895,26 +5839,45 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     if(zmax-zmin<1e-6){ zmin-=1; zmax+=1; }
     const w=(zmax-zmin)/nBins;
     bins=Array.from({length:nBins},(_,i)=>({z0:zmin+i*w, z1:zmin+(i+1)*w, zc:zmin+(i+0.5)*w,
-                                            n:0, sum:0, sumSq:0, latSq:0}));
+                                            n:0, dz:[], lat:[]}));
     for(let i=0;i<dz.length;i++){
       const b=bins[Math.min(nBins-1, Math.max(0, Math.floor((zTrue[i]-zmin)/w)))];
-      b.n++; b.sum+=dz[i]; b.sumSq+=dz[i]*dz[i];
-      b.latSq+=(dx[i]*dx[i]+dy[i]*dy[i])*px*px;
+      b.n++; b.dz.push(dz[i]); b.lat.push(Math.hypot(dx[i],dy[i])*px);
     }
-    for(const b of bins){ b.bias=b.n?b.sum/b.n:NaN; b.rms=b.n?Math.sqrt(b.sumSq/b.n):NaN;
-                          b.latRms=b.n?Math.sqrt(b.latSq/b.n):NaN; }
+    // Per bin, robust statistics for the same reason the headline ones are robust (see pct()
+    // above): one fold-back failure in a bin of 50 would otherwise throw that bin's band off the
+    // chart and hide the real trend either side of it. `spread` is the median ABSOLUTE deviation
+    // from the bin's own median — a like-for-like stand-in for the standard deviation.
+    for(const b of bins){
+      if(!b.n){ b.bias=b.spread=b.lat50=NaN; continue; }
+      const sorted=[...b.dz].sort((x,y)=>x-y);
+      b.bias=sorted[Math.floor(sorted.length/2)];
+      const dev=b.dz.map(v=>Math.abs(v-b.bias)).sort((x,y)=>x-y);
+      b.spread=dev[Math.floor(dev.length/2)];
+      const l=[...b.lat].sort((x,y)=>x-y);
+      b.lat50=l[Math.floor(l.length/2)];
+    }
   }
   if(onLog){
     onLog(`matched ${tp.toLocaleString()} of ${(tp+fn).toLocaleString()} ground-truth emitter-frames `+
           `(${fp.toLocaleString()} unmatched localization${fp===1?'':'s'}) · recall ${(tp/(tp+fn)*100).toFixed(1)}% · `+
           `precision ${(tp/(tp+fp)*100).toFixed(1)}% · Jaccard ${(tp/(tp+fp+fn)).toFixed(3)}`);
-    onLog(`lateral: bias (${biasX.toFixed(1)}, ${biasY.toFixed(1)}) nm · RMSE ${rmseLat.toFixed(1)} nm`);
-    if(has3d) onLog(`axial: bias ${biasZ.toFixed(1)} nm · RMSE ${rmseZ.toFixed(1)} nm over ${nZ.toLocaleString()} pairs`+
-                    (zClampedMatched?` · ${zClampedMatched.toLocaleString()} matched loc(s) had z clamped to the calibration edge`:''));
+    onLog(`lateral: median ${medLat.toFixed(1)} nm · 90th pct ${p90Lat.toFixed(1)} nm · RMSE ${rmseLat.toFixed(1)} nm · `+
+          `bias (${biasX.toFixed(1)}, ${biasY.toFixed(1)}) nm`);
+    if(has3d){
+      onLog(`axial: median ${medZ.toFixed(1)} nm · 90th pct ${p90Z.toFixed(1)} nm · 95th ${p95Z.toFixed(1)} nm · `+
+            `RMSE ${rmseZ.toFixed(1)} nm · bias ${biasZ.toFixed(1)} nm over ${nZ.toLocaleString()} pairs`);
+      if(nGrossZ) onLog(` ${nGrossZ.toLocaleString()} of those (${(100*nGrossZ/nZ).toFixed(1)}%) are off by more than `+
+                        `${grossZnm.toFixed(0)} nm — fold-back or a clamped calibration edge, not fit noise. They dominate the RMSE; `+
+                        `read the median for typical accuracy.`+
+                        (zClampedMatched?` ${zClampedMatched.toLocaleString()} matched loc(s) were z-clamped.`:''));
+      else if(zClampedMatched) onLog(` ${zClampedMatched.toLocaleString()} matched loc(s) had z clamped to the calibration edge.`);
+    }
     else onLog(`axial: no z on either side — a 2D fit method or a 2D simulation, so only detection and lateral accuracy apply.`);
   }
   return { tp, fp, fn, jaccard:tp/(tp+fp+fn), recall:tp/(tp+fn), precision:tp/(tp+fp),
-           biasX, biasY, rmseLat, biasZ, rmseZ, nZ, zClampedMatched, has3d, bins,
+           biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
+           nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
            dx, dy, dz, zTrue, px, matchRadiusNm:cfg.validation_matchRadius||250 };
 }
 
@@ -5970,9 +5933,9 @@ function drawTruthScorePlot(res){
     for(let i=0;i<nb;i++){ const x0=X(i*bw), x1=X((i+1)*bw), y=Y(hist[i]);
       ctx.fillRect(x0,y,Math.max(1,x1-x0-1),(mT+ph)-y); }
     ctx.strokeStyle=GREEN; ctx.lineWidth=1.6; ctx.setLineDash([5,3]);
-    ctx.beginPath(); ctx.moveTo(X(res.rmseLat),mT); ctx.lineTo(X(res.rmseLat),mT+ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(X(res.medLat),mT); ctx.lineTo(X(res.medLat),mT+ph); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle=GREEN; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillText(`RMSE ${res.rmseLat.toFixed(1)} nm`, Math.min(X(res.rmseLat)+6, mL+pw-110), mT-4);
+    ctx.fillText(`median ${res.medLat.toFixed(1)} nm · RMSE ${res.rmseLat.toFixed(1)} nm`, Math.min(X(res.medLat)+6, mL+pw-190), mT-4);
     hover={mL,mT,pw,ph,xA:0,xB:xmax,yTop:ymax,yBot:0,fmt:(vx,vy)=>`${vx.toFixed(1)} nm · ${vy.toFixed(0)} pairs`};
   } else if(mode==='scatter'){
     // Fitted z against true z, with the identity line. This is the view that makes a non-invertible
@@ -5998,30 +5961,30 @@ function drawTruthScorePlot(res){
     // two are directly comparable — the usual finding being that axial error dwarfs lateral.
     const bins=res.bins.filter(b=>b.n>0);
     let ymin=0,ymax=0;
-    for(const b of bins){ ymin=Math.min(ymin,b.bias-b.rms); ymax=Math.max(ymax,b.bias+b.rms,b.latRms); }
+    for(const b of bins){ ymin=Math.min(ymin,b.bias-b.spread); ymax=Math.max(ymax,b.bias+b.spread,b.lat50); }
     const padY=(ymax-ymin)*0.08||1; ymin-=padY; ymax+=padY;
     const z0=bins[0].zc, z1=bins[bins.length-1].zc;
     const X=v=>mL+pw*(v-z0)/Math.max(1e-9,z1-z0), Y=v=>mT+ph*(1-(v-ymin)/Math.max(1e-9,ymax-ymin));
     axis(X,Y,'true z (nm)','z error (nm)',niceTicks(z0,z1,6),niceTicks(ymin,ymax,6),0,0);
     ctx.fillStyle=C.grid; ctx.globalAlpha=0.45;                       // +/-RMS band
     ctx.beginPath();
-    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.bias+b.rms); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
-    for(let i=bins.length-1;i>=0;i--) ctx.lineTo(X(bins[i].zc), Y(bins[i].bias-bins[i].rms));
+    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.bias+b.spread); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    for(let i=bins.length-1;i>=0;i--) ctx.lineTo(X(bins[i].zc), Y(bins[i].bias-bins[i].spread));
     ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
     ctx.strokeStyle=C.text; ctx.lineWidth=1; ctx.setLineDash([4,4]);  // zero line
     ctx.beginPath(); ctx.moveTo(mL,Y(0)); ctx.lineTo(mL+pw,Y(0)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.strokeStyle=MAG; ctx.lineWidth=1.6; ctx.beginPath();          // lateral RMS
-    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.latRms); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
-    ctx.strokeStyle=GREEN; ctx.lineWidth=2; ctx.beginPath();          // axial bias
+    ctx.strokeStyle=MAG; ctx.lineWidth=1.6; ctx.beginPath();          // median lateral error
+    bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.lat50); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+    ctx.strokeStyle=GREEN; ctx.lineWidth=2; ctx.beginPath();          // median axial error
     bins.forEach((b,i)=>{ const x=X(b.zc), y=Y(b.bias); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
     ctx.fillStyle=GREEN; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillText('z bias', mL+8, mT-4);
-    ctx.fillStyle=C.text; ctx.fillText('±RMS', mL+52, mT-4);
-    ctx.fillStyle=MAG;    ctx.fillText('lateral RMS', mL+96, mT-4);
+    ctx.fillText('median z error', mL+8, mT-4);
+    ctx.fillStyle=C.text; ctx.fillText('±MAD', mL+92, mT-4);
+    ctx.fillStyle=MAG;    ctx.fillText('median lateral', mL+134, mT-4);
     hover={mL,mT,pw,ph,xA:z0,xB:z1,yTop:ymax,yBot:ymin,fmt:(vx,vy)=>`true z ${vx.toFixed(0)} nm · ${vy.toFixed(1)} nm`};
   }
   $('rawInfo').textContent=`— vs ground truth · ${res.tp.toLocaleString()} matched · Jaccard ${res.jaccard.toFixed(3)} · `+
-    `lateral RMSE ${res.rmseLat.toFixed(1)} nm`+(res.has3d?` · axial RMSE ${res.rmseZ.toFixed(1)} nm`:'')+` · scrub a frame to return`;
+    `lateral median ${res.medLat.toFixed(1)} nm`+(res.has3d?` · axial median ${res.medZ.toFixed(1)} nm`:'')+` · scrub a frame to return`;
   registerPlotHover('raw',hover);
   _replotRaw=()=>drawTruthScorePlot(res);
   syncSaveImg();
@@ -14163,11 +14126,11 @@ $('simulation_3d').addEventListener('change',updateSimulation3dUI);
 updateSimulation3dUI();
 
 // Structure size only means something for the three structures that have a size independent of
-// the Z range (shell radius / staircase spacing / nanoruler separation). Deliberately keyed off
+// the Z range (the shell's radius). Deliberately keyed off
 // the STRUCTURE only and never off simulation_3d: picking an object is a geometry choice, so
 // both its rows stay visible in 2D as well — the 3D checkbox only decides whether the z that
 // geometry carries is used or flattened (see buildStructure()).
-const STRUCTURE_SIZED=['shell','staircase','nanoruler3D'];
+const STRUCTURE_SIZED=['shell'];
 function updateSimulationStructureUI(){
   $('structureSizeRow').style.display =
     STRUCTURE_SIZED.includes(paramValue('simulation_structure')) ? 'flex' : 'none';
@@ -15020,22 +14983,25 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-04e — Findings from actually scoring the simulator
-against its own ground truth, now that it can be.
-1) The default **Filaments + ring** test object overstates lateral error by ~50%, and not because
-of depth: at the SAME depth band its lateral RMSE is 22.7 nm against 14.6 nm for a uniform 3D
-volume at identical emitter density. The cause is self-crowding — emitters sit along 1D curves,
-so 15.3% of them are within 500 nm of another simultaneously-active emitter versus ~7% for the
-scattered structures, and overlapping PSFs are fitted with a single-emitter model. Accuracy
-figures measured on the default object are pessimistic; use Uniform 3D volume or Tilted plane.
-2) The two-plane z blend has a sampling limit, measured rather than assumed: blending two PSF
-INTENSITIES is not interpolating the PSF's WIDTH, and a mixture of two differently-wide PSFs is
-broader than the one halfway between them. At a 25 nm z step blending and nearest-plane are
-indistinguishable (axial RMSE 82.4 vs 80.4 nm, uncertainty ~2.7 nm); at 100 nm blending is
-genuinely worse (84.7 vs 81.8 nm). It is the right default for a properly sampled kernel and the
-wrong one for a coarse one, so the PSF build now warns above a 50 nm z step.
-3) 2D and 3D agree as intended: same object and seed, Jaccard 0.784 vs 0.774 and lateral RMSE
-13.4 vs 15.6 nm, the gap being defocus, since flattening z puts every emitter in focus.
+log(`webSMLM v0.12.0-dev · build 2026-09-04f — Simpler, and better for it. **Score vs truth**
+now leads with the MEDIAN and percentiles instead of RMSE, and counts gross axial failures
+separately: the axial error distribution has heavy tails, and on a typical run the worst 1% of
+pairs (4 of 385) contributed 62% of the sum of squares while the RMSE swung 67–420 nm across
+seeds and the median barely moved. The score plot follows suit — median z error with a ±MAD band
+and median lateral error, so plot and log tell the same story.
+Two things REMOVED after measuring them. The two-plane z blend is gone: blending two PSF
+intensities is not interpolating the PSF's width, which is what an astigmatic fit reads z from,
+so it cost 1.74x the simulation time for no measurable gain at the default z step (21.8 vs
+24.2 nm median, inside the ±2 nm sampling noise) and was measurably worse at a coarse one.
+Nearest-plane leaves one rule with no exceptions: a finer z step is more accurate, at a cost paid
+once per kernel build and cached. The z-staircase and 3D nanoruler structures are gone too —
+neither measured anything the remaining three don't, the nanoruler's own pair distance not being
+scored by anything.
+Documented: the calibration/sample depth-mismatch scenario, which needs no new settings and
+reproduces the failure that silently corrupts real 3D data — calibrate at the coverslip, image
+2 um deep, and the axial scale comes back 0.65 with a 243 nm median z error while detection looks
+nearly untouched. Also documented: the default Filaments object inflates measured lateral spread
+~50% through self-crowding, so quote figures from Uniform 3D volume.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

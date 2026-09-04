@@ -359,19 +359,33 @@ other five sample z independently:
 | Structure | Geometry | What it measures |
 |---|---|---|
 | Tilted plane | z ramps linearly with x across the frame | bias, axial compression and the fold-back point, in one picture |
-| Uniform 3D volume | x, y and z all uniform | unbiased bias/RMS-versus-depth statistics |
-| Spherical shell | hollow sphere, radius `simulation_structureSize` | axial compression — a sphere reconstructing flat is direct evidence |
-| z-staircase | 5 planes at known depths, each in its own y band | axial separability |
-| 3D nanoruler | point pairs a known distance apart, 45° in xz | absolute 3D distance accuracy |
+| Uniform 3D volume | x, y and z all uniform | unbiased accuracy-versus-depth statistics |
+| Spherical shell | hollow sphere, radius `simulation_structureSize` | axial scale errors, visually — a sphere reconstructing flat (see the depth-mismatch scenario in [§2](#validation)) |
+
+**The default object flatters nothing, but it does inflate the spread.**
+Scored against ground truth at identical emitter density, *Filaments + ring*
+gives a median lateral error of 22.7 nm where *Uniform 3D volume* gives 14.6 nm
+— and that gap survives comparing only emitters at the same depth, so it is not
+defocus. The cause is self-crowding: emitters lie along 1-D curves, so 15.3% of
+them sit within 500 nm of another simultaneously-active emitter against ~7% for
+the scattered structures, and overlapping PSFs are fitted with a single-emitter
+model. Lateral *bias* stays under 1 nm for every structure, so the fitter is
+unbiased either way. For accuracy figures, prefer **Uniform 3D volume**; for
+diagnosis, **Tilted plane**.
 
 **3D simulation?** (`simulation_3d`) means exactly one thing: whether z
 varies. The structure is always built in 3D and its z simply flattened to 0
 when the box is unticked, so the lateral geometry is identical either way
 and every control, log line and plot applies unchanged in both states. With
-it ticked *and* the Zernike PSF selected, each emitter is splatted from a
-**linear blend of the two kernel z-planes straddling its own z** — nearest
--plane lookup would quantize every emitter's depth to the kernel z-step
-(±5 nm at the 10 nm default) and be mistaken for fitter error later.
+it ticked *and* the Zernike PSF selected, each emitter is splatted from the
+**nearest kernel z-plane**, so its depth is quantized to ± half the z step —
+2.9 nm RMS at the 10 nm default, two orders below the fit's own axial error.
+A two-plane linear blend was implemented and removed on measurement: blending
+two PSF *intensities* is not interpolating the PSF's *width*, which is what an
+astigmatic fit reads z from, so it cost 1.74× the simulation time for no
+measurable gain at a fine z step and was measurably worse at a coarse one. The
+rule left behind has no exceptions: a finer z step is more accurate, at a cost
+paid once per kernel build and cached rather than per emitter per frame.
 
 The PSF build reports how far either side of focus that PSF encodes z
 **single-valued**, measured per plane with the same elliptical-Gaussian
@@ -554,6 +568,37 @@ Positions are compared **before** drift correction, against ground truth
 that carries the simulated drift, so the score describes the *fitter*
 whatever drift correction did or did not do afterwards; drift correction has
 its own ground-truth score in [§2](#drift).
+
+**Read the median, not the RMSE.** The axial error distribution has heavy
+tails: a few localizations land past the PSF's fold-back or on a clamped
+calibration edge and are wrong by hundreds of nm. On a typical run the worst
+1% of pairs — 4 out of 385 — contributed 62% of the sum of squares, and across
+seeds the RMSE swung between 67 and 420 nm while the median barely moved.
+Both are reported, along with a count of gross axial failures, but the RMSE on
+its own describes the failures rather than the method.
+
+#### The scenario worth running: calibration/sample depth mismatch
+
+The single most useful thing this scoring reveals needs no new settings, only
+a deliberate mismatch — and it reproduces the failure that silently corrupts
+real 3D data. Calibrate on beads at the coverslip (**Emitter depth into
+sample** = 0, then *Simulate calib. stack* → *Calibrate*), then raise the depth
+to, say, 2000 nm and simulate a movie there. Imaging into a lower-index sample
+through higher-index immersion shifts and aberrates the PSF, and the
+calibration no longer describes it:
+
+| | calibration = sample | sample 2 µm deeper |
+|---|---|---|
+| axial scale (fitted z vs true z) | 0.99 | **0.65** |
+| median axial error | 22 nm | **243 nm** |
+| Jaccard | 0.76 | 0.72 |
+
+The z scale is 35% wrong while detection looks nearly unaffected — nothing in
+an ordinary analysis would flag it. Note the measured 0.65 is well below the
+paraxial `ns/ni` = 0.88: the Gibson-Lanni model's focal shift is not simply
+that ratio, and the added aberration degrades the width→z mapping on top of
+the scale error. Run the same scenario with **Spherical shell** to see it
+rather than read it: the sphere reconstructs as a flattened ellipsoid.
 
 ### Localization precision (NeNA & FRC) (`locprecision`) {#locprecision}
 
@@ -998,8 +1043,8 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
 | `simulation_3d` | 3D simulation? | bool | — | — | — | off |
 | `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
-| `simulation_structure` | Test structure | enum (`filaments`, `tiltedPlane`, `uniform3D`, `shell`, `staircase`, `nanoruler3D`) | — | — | — | `filaments` |
-| `simulation_structureSize` | Structure size (nm) | number | 10 | 5000 | 10 | 500 |
+| `simulation_structure` | Test structure | enum (`filaments`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `filaments` |
+| `simulation_structureSize` | Structure size (nm) — the shell's radius | number | 10 | 5000 | 10 | 500 |
 
 **In-app "more info…" popup** (`hint-simulation` in `webSMLM.html`; synced
 by `tools/sync_hints.mjs` — edit here, then run the script, never edit the

@@ -921,7 +921,7 @@ default changes (resizing the window afterward doesn't re-trigger it); a loaded 
 
 | id | Label | Type | Min | Max | Step | Default |
 |---|---|---|---|---|---|---|
-| `frames` | Simulated frame count | number (int) | 50 | 800 | 50 | 300 |
+| `frames` | Simulated frame count | number (int) | 50 | 5000 | 50 | 300 |
 | `simulation_fov` | FOV (pixels) | number (int) | 32 | 1024 | 8 | 128 |
 | `simulation_pxnm` | Simulation pixel size (nm) | number | 10 | 500 | 1 | 100 |
 | `dens` | Emitter density (emitters/µm²/frame) | number | 0 | 5 | 0.01 | 0.05 |

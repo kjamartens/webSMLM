@@ -21,7 +21,7 @@
   edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2555   PARAMS registry, single source of truth for params;
+    params          2711   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,32 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3346   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3550   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3645   synthetic stack generator ("Simulate movie");
+    simulation      3849   synthetic stack generator ("Simulate movie");
+                           buildStructure() is now a dispatcher over
+                           simulation_structureType — 'filaments_ring'
+                           (default, buildFilamentsRingStructure(), unchanged)
+                           or 'nup' (buildNupStructure(), a Thevathasan et al.
+                           2019 / Wanninger et al. 2023-CIR4MICS nuclear pore
+                           complex model: 8-fold ring x 4-Nup96 corners x 2
+                           axial rings = 64 attachment points per NPC, each
+                           randomly linker-displaced, scattered on a curved
+                           membrane patch in 'topdown' or 'sideways'
+                           orientation — see simTypeBox's own NUP rows/hint);
+                           groundTruthLocs (one entry per simulated blink) +
+                           the "View GT localizations" button (viewGtBtn,
+                           MODULE: pipeline) render the true emitter positions
+                           into srFull for comparison against a real Localize
+                           result; drawNupDebugView() (nupDebugBtn) is a
+                           temporary debug aid showing one NPC's 64 points;
+                           simBox sidebar UI now split into a flat User
+                           parameters group plus 4 collapsible details.subsim
+                           sub-groups (Simulation type/Fluorophore/Camera/PSF
+                           parameters), each with its own "more info…" hint
+                           (hint-simulation-user/-type/-fluorophore/-camera/
+                           -psf) plus a final coarse hint-simulation overview;
                            Zernike-aberrated PSF kernel: build + raw-panel
                            z-scrollable preview, AND (§10 of
                            docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) wired
@@ -83,8 +105,8 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    detect          5461   per-frame band-pass + local-maxima detection
-    fit             5738   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          5753   per-frame band-pass + local-maxima detection
+    fit             6030   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -94,7 +116,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          6247   accumulate to offscreen buffer; view/colour/blur;
+    render          6539   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -116,7 +138,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         7532   frame-parallel detect/fit worker pool; dedicated
+    workers         7824   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -142,14 +164,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          8101   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  8393   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          8393   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  8685   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           8810   AIM drift correction (2D+z); drift-vs-frame or
+    drift           9102   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -159,16 +181,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision    9316   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    9608   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           10025  spectrally resolved SMLM pair-finding; merged
+    sSMLM           10317  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             10495  single particle tracking, trackpy-inspired;
+    spt             10787  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -199,7 +221,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        11997  top-level orchestration, *Core()/wrapper split;
+    pipeline        12289  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -207,8 +229,10 @@
                            offset; refitCanvases() always re-fits on resize,
                            not gated on atFit; run()/runSptTrack() each
                            logCmd() a curated config subset (not the whole
-                           PARAMS registry) on success — see MODULE: params
-    liveStreaming   12618  Micro-Manager/pycromanager camera bridge
+                           PARAMS registry) on success — see MODULE: params;
+                           viewGtBtn/nupDebugBtn click handlers (MODULE:
+                           simulation's own GT-locs/NUP-debug feature)
+    liveStreaming   12910  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -252,9 +276,9 @@
                            intentionally different (a fresh stack load must
                            always reclaim the panel, even from a stopped
                            session's leftover scrub-back history)
-    table           14533  localizations table, filtering, histograms;
+    table           14908  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    15108  window.webSMLM.analyze()/analyzeBatch();
+    headless API    15483  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -1725,6 +1749,22 @@ X.B(E,Y);return E}return J}())
      belonging to it (box-sizing:border-box keeps rows/buttons from overflowing) */
   details.sim>*:not(summary){padding-left:14px}
   details.sim>label.row{padding-right:4px}
+  /* second-level (nested) dropdown, e.g. inside "Simulation settings" — same
+     open/close mechanics as details.sim but visually lighter (smaller arrow,
+     no box outline) so it reads as a subgroup, not a sibling top-level
+     section. A plain details.sim nested here would only pad ITSELF, not the
+     rows inside it (direct-child selectors above) — see the label.row
+     nesting-depth gotcha in CLAUDE.md — so this gets its own matching rules. */
+  details.subsim{margin:6px 0 0}
+  details.subsim>summary{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 0;
+    font-size:12px;font-weight:600;color:var(--muted);list-style:none}
+  details.subsim>summary::-webkit-details-marker{display:none}
+  details.subsim>summary::before{content:'▸';font-size:15px;line-height:.8;color:var(--fg);
+    transition:transform .15s}
+  details.subsim[open]>summary::before{transform:rotate(90deg)}
+  details.subsim>summary:hover::before{color:var(--accent)}
+  details.subsim>*:not(summary){padding-left:14px}
+  details.subsim>label.row{padding-right:4px}
   /* "more info…" trigger: a plain button styled to read as a secondary
      text toggle (right-aligned, muted, small), not a primary action — opens
      #infoModal with this button's paired (hidden) .hint content instead of
@@ -1946,7 +1986,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-03i</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.0-dev · build 2026-09-03j</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1966,6 +2006,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
       <div class="btnrow">
         <button id="loadBtn" title="Select a movie (a single multi-frame TIFF, or Ctrl/Cmd+click several single-frame TIFFs to concatenate — native Nikon .nd2, single file, uncompressed/16-bit single-channel, is also accepted) OR a CSV previously exported with Save data. Detected by file extension — don't select a movie and a CSV together.">Load movie/data</button>
         <button id="genBtn">Simulate movie</button>
+      </div>
+      <div class="btnrow">
+        <button id="viewGtBtn" style="display:none" title="Render the true simulated emitter positions (one point per simulated blink) into the reconstruction panel, the same way a real reconstruction is drawn — for comparing what Localize actually recovers against the known ground truth.">View GT localizations</button>
       </div>
       <div class="btnrow">
         <button id="loadSetBtn">Load settings</button>
@@ -2065,80 +2108,41 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
       <details class="sim" id="simBox">
         <summary>Simulation settings</summary>
         <label class="row">Frames <input type="number" id="frames" min="50" max="800" step="50" value="300" class="num"></label>
+        <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row">Pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
-        <label class="row">Photons/emitter/frame <input type="number" id="phot" min="0" max="50000" step="50" value="900" class="num"></label>
-        <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
-        <label class="row">Gain (photons/ADU) <input type="number" id="simulation_gain" min="0.001" max="1000" step="0.01" value="0.34" class="num"></label>
-        <label class="row">Camera offset (ADU) <input type="number" id="simulation_offset" min="0" max="65535" step="1" value="100" class="num"></label>
-        <label class="row">Offset std (ADU, per-pixel) <input type="number" id="simulation_offset_std" min="0" max="200" step="0.5" value="3" class="num"></label>
-        <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
+        <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
-        <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
-        <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
-        <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
-        <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
-        <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike" selected>Zernike-aberrated</option></select></label>
-        <label class="row" id="psfNARow" style="display:none">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
-        <label class="row" id="psfWavelengthRow" style="display:none">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
-        <label class="row" id="psfNsRow" style="display:none">Sample refractive index (ns) <input type="number" id="simulation_psfNs" min="1.0" max="1.7" step="0.001" value="1.33" class="num"></label>
-        <label class="row" id="psfNiRow" style="display:none">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
-        <label class="row" id="psfTi0Row" style="display:none">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
-        <label class="row" id="psfDepthRow" style="display:none">Emitter depth into sample (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
-        <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="2000" class="num"></label>
-        <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="10" class="num"></label>
-        <label class="row" id="psfOversampleRow" style="display:none">PSF lateral oversampling (×) <input type="number" id="simulation_psfOversample" min="4" max="8" step="1" value="4" class="num"></label>
-        <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="6000" class="num"></label>
-        <label class="row" id="psfZernikePresetRow" style="display:none">Zernike aberration preset
-          <select id="simulation_psfZernikePreset" class="sel">
-            <option value="none">None (unaberrated)</option>
-            <option value="astigWeak">Astigmatism (weak)</option>
-            <option value="astigModerate" selected>Astigmatism (moderate)</option>
-            <option value="astigStrong">Astigmatism (strong)</option>
-            <option value="comaWeak">Coma (weak)</option>
-            <option value="comaStrong">Coma (strong)</option>
-            <option value="sphericalWeak">Spherical (weak)</option>
-            <option value="sphericalStrong">Spherical (strong)</option>
-            <option value="trefoilModerate">Trefoil (moderate)</option>
-            <option value="mixedRealistic">Mixed (realistic objective)</option>
-          </select>
-        </label>
-        <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 comma-separated values, one per OSA Zernike index 0-14, in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
-        <label class="row" id="psfEvalMethodRow" style="display:none" title="'Direct quadrature' is the original, more field-tested evaluator. 'FFT/chirp-Z' is a mathematically exact reformulation measured 76x-970x faster (kernel-size dependent) in this project's own testing, kept opt-in since it's newer code on a differently-discretized grid.">PSF evaluation method
-          <select id="simulation_psfEvalMethod" class="sel">
-            <option value="direct">Direct quadrature</option>
-            <option value="fft" selected>FFT / chirp-Z (faster)</option>
-          </select>
-        </label>
-        <label class="row" id="psfInterpRow" style="display:none" title="How an emitter's exact sub-pixel position is sampled from the oversampled kernel before box-downsampling it to the camera pixel grid. Nearest is cheapest/coarsest; linear (bilinear) is a fast middle ground; cubic (bicubic) is the default, matching SMLM-tooling practice; FFT phase-shift is a mathematically-exact Fourier-shift-theorem placement kept opt-in for comparison — much slower, and prone to periodic-boundary ringing on a non-periodic kernel tile.">PSF placement interpolation
-          <select id="simulation_psfInterp" class="sel">
-            <option value="nearest">Nearest</option>
-            <option value="linear">Linear (bilinear)</option>
-            <option value="cubic" selected>Cubic (bicubic)</option>
-            <option value="fft">FFT phase-shift (slow, for comparison)</option>
-          </select>
-        </label>
-        <label class="row" id="psfPreviewBtnRow" style="display:none"><button type="button" id="psfPreviewBtn">Preview PSF</button></label>
-        <label class="row" id="genCalBtnRow" style="display:none" title="Builds a bead z-stack from the SAME PSF kernel as Preview PSF above (PSF z range/step), focus exactly on the centre frame, and writes z-step/z=0 ref frame straight into the 3D calibration section below — Localize/3D calibration → Calibrate then needs no other setting changed."><button type="button" id="genCalBtn">Simulate calib. stack</button></label>
         <button type="button" class="infobtn">more info…</button>
-        <div class="hint" hidden id="hint-simulation"><span class="pill">module: simulation</span>
+        <div class="hint" hidden id="hint-simulation-user"><span class="pill">module: simulation</span>
 
-          <p><b>Emitter density</b> is a physical areal density — the average number of ON emitters per µm² in any
-          given frame — independent of how densely the ground-truth structure is sampled. Emitters arrive as a
-          Poisson process at randomly chosen structure sites; each turns on exactly once: a fractional start time
-          (drawn from up to 5×lifetime before frame 0, so the exponential's tail can already be mid-event at frame 0)
-          and an exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
-          scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits half the
-          photons.</p>
-          <p><b>Background</b> (photons/px, Poisson like the signal) is added at every pixel independently, every
-          frame. <b>Camera gain/offset/offset std/read noise</b>
-          forward-model a real sensor: Gaussian read noise (σ in electrons) is added to the photon count before the
-          gain conversion, then a per-pixel offset map (Gaussian around the mean offset, fixed for the whole stack)
-          is added — independent of the fit-side camera gain/offset used for localization. For a clean
-          self-consistency test with the <b>Gain/offset estimation</b> section's own readout-noise field, combine
-          read noise and offset std in quadrature (√(read_noise²+offset_std²), offset std converted to photons via
-          this panel's gain) — a static per-pixel offset pattern looks identical to read noise in a single frame's
-          Fourier content, so leaving it out biases the fitted offset the same way.</p>
+          <p><b>Frames</b> is the length of the simulated movie; <b>FOV (pixels)</b> is the simulated camera's
+          square field of view; <b>Pixel size (nm)</b> is this simulated stack's own camera pixel size —
+          independent of any pixel size later used for localization/rendering.
+          <b>Emitter density</b> is a physical areal density — the average number of ON emitters per µm² in any
+          given frame — independent of how densely the ground-truth structure is sampled. <b>Labeling
+          efficiency (%)</b> randomly drops that fraction of physical structure sites from ever carrying a
+          label at all, before any emitter dynamics run — an unlabeled site never lights up, at any frame,
+          modelling real labeling chemistry (antibodies, SNAP/Halo, FP fusions) never reaching 100% of its
+          target. Emitters arrive as a Poisson process at randomly chosen (labeled) structure sites (see
+          <b>Simulation type</b> below for the structure's own 2D/3D shape). <b>Background</b> (photons/px,
+          Poisson like the signal) is added at every pixel independently, every frame.</p>
+        </div>
+        <details class="subsim" id="simTypeBox">
+          <summary>Simulation type</summary>
+          <label class="row">Structure type <select id="simulation_structureType" class="sel"><option value="filaments_ring" selected>Filaments + ring</option><option value="nup">Nuclear pore complex (NPC)</option></select></label>
+          <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
+          <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
+          <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
+          <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-simulation-type"><span class="pill">module: simulation</span>
+
+          <p><b>Structure type</b> picks which synthetic ground-truth structure emitters attach to —
+          <b>Filaments + ring</b> (default, unchanged) or <b>Nuclear pore complex (NPC)</b> (see that option's
+          own "more info…" below). <b>3D simulation?</b> makes the generated filament structure oscillate in
+          z, scaled by <b>Structure Z range (± nm)</b> — unchecked (default), the structure is flat and every
+          emitter simulates at z=0.</p>
           <p><b>Drift (px, total)</b> — total sample drift over all frames, in a random direction (linear from
           frame 0). 0 = none. Used to test drift correction — the true drift is stored for scoring.</p>
           <p><b>Random seed (0 = random)</b> — 0 (default) keeps the original unseeded behaviour: a fresh
@@ -2147,6 +2151,126 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           instead, so two runs with the same seed and only <b>PSF placement interpolation</b> changed differ
           ONLY in the PSF placement itself — useful for A/B-comparing interpolation modes on identical
           underlying data.</p>
+        </div>
+          <label class="row" id="nupRadiusRow" style="display:none">NPC ring radius (nm) <input type="number" id="simulation_nup_radius" min="20" max="150" step="0.5" value="53.5" class="num"></label>
+          <label class="row" id="nupCornerSpreadRow" style="display:none">Corner sub-point spread (nm) <input type="number" id="simulation_nup_cornerSpread" min="0" max="30" step="0.5" value="12" class="num"></label>
+          <label class="row" id="nupRingSeparationRow" style="display:none">Axial ring separation (nm) <input type="number" id="simulation_nup_ringSeparation" min="0" max="150" step="1" value="50" class="num"></label>
+          <label class="row" id="nupLinkerMinRow" style="display:none">Linker length, min (nm) <input type="number" id="simulation_nup_linkerLengthMin" min="0" max="30" step="0.5" value="2" class="num"></label>
+          <label class="row" id="nupLinkerMaxRow" style="display:none">Linker length, max (nm) <input type="number" id="simulation_nup_linkerLengthMax" min="0" max="30" step="0.5" value="5" class="num"></label>
+          <label class="row" id="nupMembraneTypeRow" style="display:none">Membrane orientation <select id="simulation_nup_membraneType" class="sel"><option value="topdown" selected>Top-down (rings face-on)</option><option value="sideways">Sideways (rings edge-on)</option></select></label>
+          <label class="row" id="nupCountRow" style="display:none">Number of NPCs <input type="number" id="simulation_nup_count" min="1" max="500" step="1" value="20" class="num"></label>
+          <label class="row" id="nupMinSpacingRow" style="display:none">Min. NPC-NPC spacing (nm) <input type="number" id="simulation_nup_minSpacing" min="0" max="2000" step="10" value="200" class="num"></label>
+          <label class="row" id="nupCurvatureRow" style="display:none">Membrane curvature amplitude (nm) <input type="number" id="simulation_nup_curvature" min="0" max="2000" step="10" value="150" class="num"></label>
+          <label class="row" id="nupDebugBtnRow" style="display:none" title="Temporary debug aid: shows one synthetic NPC's 64 attachment/emitter points (top view and side view), using the current NUP parameters above. Not tied to Simulate movie.">
+            <button type="button" id="nupDebugBtn">Debug: view single NUP</button>
+          </label>
+          <label class="row" id="nupInfoBtnRow" style="display:none"><button type="button" class="infobtn">more info…</button></label>
+          <div class="hint" hidden id="hint-simulation-nup"><span class="pill">module: simulation</span>
+
+          <p>Models the endogenously SNAP-tagged Nup96 nuclear pore complex (NPC) reference standard from
+          Thevathasan <i>et al.</i>, "Nuclear pores as versatile reference standards for quantitative
+          superresolution microscopy", <i>Nat. Methods</i> 16, 1045–1053 (2019),
+          <a href="https://doi.org/10.1038/s41592-019-0574-9" target="_blank" rel="noopener">doi:10.1038/s41592-019-0574-9</a>
+          — an 8-fold symmetric ring of 32 Nup96 (8 corners of 4 Nup96 each, arranged in a half-circle arc
+          of diameter <b>Corner sub-point spread</b>, bulging outward from the ring — see the paper's own
+          Fig. 1e), <b>NPC ring radius</b> ≈ 53.5 nm, two such rings <b>Axial ring separation</b> ≈ 50 nm apart
+          along the pore axis (nucleoplasmic/cytoplasmic). Geometry is kept fully adjustable rather than
+          hardcoded, following the parametrized-NPC-simulation approach of Wanninger <i>et al.</i>
+          ("CIR4MICS"), <i>Bioinformatics</i> 39(10), btad587 (2023),
+          <a href="https://doi.org/10.1093/bioinformatics/btad587" target="_blank" rel="noopener">doi:10.1093/bioinformatics/btad587</a>.
+          Each of the 64 attachment points is displaced by <b>Linker length, min/max (nm)</b> in a random 3D
+          direction, modelling the real fluorophore (SNAP/Halo+dye, or antibody) sitting a finite distance
+          from its Nup96 attachment site rather than exactly on it. <b>Membrane orientation</b> chooses
+          whether NPCs are viewed <b>Top-down</b> (pore axis along the optical/Z axis, rings face-on — the
+          common SMLM case) or <b>Sideways</b> (pore axis in-plane along image-Y, rings edge-on, matching
+          Thevathasan <i>et al.</i>'s own side-view NPC images). <b>Number of NPCs</b>/<b>Min. NPC-NPC
+          spacing</b> control how many pores are scattered across the simulated field of view and how far
+          apart; <b>Membrane curvature amplitude</b> adds a gentle bowl-shaped curvature (centred so the
+          field's mean offset stays ~0) to the membrane patch the NPCs sit on. <b>Debug: view single NUP</b>
+          is a temporary aid showing one NPC's 64 points (top view and side view) for checking the geometry
+          directly.</p>
+        </div>
+        </details>
+        <details class="subsim" id="fluorophoreBox">
+          <summary>Fluorophore parameters</summary>
+          <label class="row">Photons/emitter/frame <input type="number" id="phot" min="0" max="50000" step="50" value="900" class="num"></label>
+          <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
+
+          <p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
+          frame 0, so the exponential's tail can already be mid-event at frame 0) and an
+          exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
+          scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits
+          half the photons.</p>
+        </div>
+        </details>
+        <details class="subsim" id="cameraBox">
+          <summary>Camera parameters</summary>
+          <label class="row">Gain (photons/ADU) <input type="number" id="simulation_gain" min="0.001" max="1000" step="0.01" value="0.34" class="num"></label>
+          <label class="row">Camera offset (ADU) <input type="number" id="simulation_offset" min="0" max="65535" step="1" value="100" class="num"></label>
+          <label class="row">Offset std (ADU, per-pixel) <input type="number" id="simulation_offset_std" min="0" max="200" step="0.5" value="3" class="num"></label>
+          <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-simulation-camera"><span class="pill">module: simulation</span>
+
+          <p><b>Gain/offset/offset std/read noise</b> forward-model a real sensor: Gaussian read noise (σ in
+          electrons) is added to the photon count before the gain conversion, then a per-pixel offset map
+          (Gaussian around the mean offset, fixed for the whole stack) is added — independent of the fit-side
+          camera gain/offset used for localization. For a clean self-consistency test with the <b>Gain/offset
+          estimation</b> section's own readout-noise field, combine read noise and offset std in quadrature
+          (√(read_noise²+offset_std²), offset std converted to photons via this panel's gain) — a static
+          per-pixel offset pattern looks identical to read noise in a single frame's Fourier content, so
+          leaving it out biases the fitted offset the same way.</p>
+        </div>
+        </details>
+        <details class="subsim" id="psfBox">
+          <summary>PSF parameters</summary>
+          <label class="row">PSF model <select id="simulation_psfModel" class="sel"><option value="gaussian">Gaussian (fast)</option><option value="zernike" selected>Zernike-aberrated</option></select></label>
+          <label class="row" id="psfNARow" style="display:none">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
+          <label class="row" id="psfWavelengthRow" style="display:none">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
+          <label class="row" id="psfNsRow" style="display:none">Sample refractive index (ns) <input type="number" id="simulation_psfNs" min="1.0" max="1.7" step="0.001" value="1.33" class="num"></label>
+          <label class="row" id="psfNiRow" style="display:none">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
+          <label class="row" id="psfTi0Row" style="display:none">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
+          <label class="row" id="psfDepthRow" style="display:none">Emitter depth into sample (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
+          <label class="row" id="psfZRangeRow" style="display:none">PSF z range (± nm) <input type="number" id="simulation_psfZRange" min="50" max="2000" step="10" value="2000" class="num"></label>
+          <label class="row" id="psfZStepRow" style="display:none">PSF z step (nm) <input type="number" id="simulation_psfZStep" min="1" max="100" step="1" value="10" class="num"></label>
+          <label class="row" id="psfOversampleRow" style="display:none">PSF lateral oversampling (×) <input type="number" id="simulation_psfOversample" min="4" max="8" step="1" value="4" class="num"></label>
+          <label class="row" id="psfKernelWidthRow" style="display:none">PSF kernel width (nm) <input type="number" id="simulation_psfKernelWidth" min="500" max="6000" step="50" value="6000" class="num"></label>
+          <label class="row" id="psfZernikePresetRow" style="display:none">Zernike aberration preset
+            <select id="simulation_psfZernikePreset" class="sel">
+              <option value="none">None (unaberrated)</option>
+              <option value="astigWeak">Astigmatism (weak)</option>
+              <option value="astigModerate" selected>Astigmatism (moderate)</option>
+              <option value="astigStrong">Astigmatism (strong)</option>
+              <option value="comaWeak">Coma (weak)</option>
+              <option value="comaStrong">Coma (strong)</option>
+              <option value="sphericalWeak">Spherical (weak)</option>
+              <option value="sphericalStrong">Spherical (strong)</option>
+              <option value="trefoilModerate">Trefoil (moderate)</option>
+              <option value="mixedRealistic">Mixed (realistic objective)</option>
+            </select>
+          </label>
+          <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 comma-separated values, one per OSA Zernike index 0-14, in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
+          <label class="row" id="psfEvalMethodRow" style="display:none" title="'Direct quadrature' is the original, more field-tested evaluator. 'FFT/chirp-Z' is a mathematically exact reformulation measured 76x-970x faster (kernel-size dependent) in this project's own testing, kept opt-in since it's newer code on a differently-discretized grid.">PSF evaluation method
+            <select id="simulation_psfEvalMethod" class="sel">
+              <option value="direct">Direct quadrature</option>
+              <option value="fft" selected>FFT / chirp-Z (faster)</option>
+            </select>
+          </label>
+          <label class="row" id="psfInterpRow" style="display:none" title="How an emitter's exact sub-pixel position is sampled from the oversampled kernel before box-downsampling it to the camera pixel grid. Nearest is cheapest/coarsest; linear (bilinear) is a fast middle ground; cubic (bicubic) is the default, matching SMLM-tooling practice; FFT phase-shift is a mathematically-exact Fourier-shift-theorem placement kept opt-in for comparison — much slower, and prone to periodic-boundary ringing on a non-periodic kernel tile.">PSF placement interpolation
+            <select id="simulation_psfInterp" class="sel">
+              <option value="nearest">Nearest</option>
+              <option value="linear">Linear (bilinear)</option>
+              <option value="cubic" selected>Cubic (bicubic)</option>
+              <option value="fft">FFT phase-shift (slow, for comparison)</option>
+            </select>
+          </label>
+          <label class="row" id="psfPreviewBtnRow" style="display:none"><button type="button" id="psfPreviewBtn">Preview PSF</button></label>
+          <label class="row" id="genCalBtnRow" style="display:none" title="Builds a bead z-stack from the SAME PSF kernel as Preview PSF above (PSF z range/step), focus exactly on the centre frame, and writes z-step/z=0 ref frame straight into the 3D calibration section below — Localize/3D calibration → Calibrate then needs no other setting changed."><button type="button" id="genCalBtn">Simulate calib. stack</button></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-simulation-psf"><span class="pill">module: simulation</span>
+
           <p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
           Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
           wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
@@ -2177,6 +2301,18 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           (cached, oversampled) kernel and shows it as a z-scrollable slice in the raw panel — this is a
           preview/validation step only; "Simulate movie" itself still always renders the plain Gaussian PSF
           for now (see <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
+        </div>
+        </details>
+        <button type="button" class="infobtn">more info…</button>
+        <div class="hint" hidden id="hint-simulation"><span class="pill">module: simulation</span>
+
+          <p>"Simulate movie" builds a fully synthetic ground-truth stack — random emitter placement along a
+          simulated structure, physically modelled blinking, shot/read/offset camera noise, and (optionally) a
+          real vectorial PSF — for validating and teaching the rest of the pipeline against known-correct
+          answers. Settings above are grouped into <b>User parameters</b> (the everyday knobs), <b>Simulation
+          type</b> (2D/3D structure, drift, seed), <b>Fluorophore parameters</b> (photon output and blinking
+          kinetics), <b>Camera parameters</b> (sensor noise model), and <b>PSF parameters</b> (Gaussian vs.
+          physically modelled optics) — see each group's own "more info…" for detail.</p>
         </div>
       </details>
       <details class="sim" id="pcfoBox">
@@ -2867,6 +3003,17 @@ const PARAMS = {
   // ---- simulation ----
   // frames = number of frames the built-in synthetic-stack generator produces
   frames: { type:'number', id:'frames', label:'Simulated frame count', min:50, max:800, step:50, default:300, int:true },
+  // simulation_fov = simulated camera field of view, in pixels — square (w=h=this), replacing the
+  // previous hardcoded 128x128 in generateSynthetic()/generateCalibrationStack(). Kept modest by
+  // default (matches the old fixed value) since buildNupStructure()'s own rejection-sampling
+  // placement and renderSuperRes()'s memory-budget check both scale with FOV area.
+  simulation_fov: { type:'number', id:'simulation_fov', label:'FOV (pixels)', min:32, max:1024, step:8, default:128, int:true },
+  // simulation_labelEfficiency = the fraction (%) of physical structure sites that ever carry a
+  // functional label at all — real SMLM labels (antibodies, SNAP/Halo, FP fusions) never reach
+  // 100% of their target. Applied as a random keep/drop over buildStructure()'s own candidate
+  // list, once, before the Poisson emitter-arrival process ever gets to pick a site, so an
+  // unlabeled site can never light up at any frame (not just "less often").
+  simulation_labelEfficiency: { type:'number', id:'simulation_labelEfficiency', label:'Labeling efficiency (%)', min:0, max:100, step:1, default:70, int:true },
   // simulation_pxnm = physical camera pixel size (nm) of the simulated stack — separate from the
   // shared `pxnm` render/load param so simulation settings stay self-contained; the generated
   // stack's own px is synced from this value (see genBtn handler) so the rest of the app (scale
@@ -2925,6 +3072,49 @@ const PARAMS = {
   // simulation_zRange = the +/- half-range (nm) the filament Z-oscillation is scaled to; the ring
   // structure point are unaffected (z=0) since they have no sinusoidal pattern to mirror.
   simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:1000, int:false },
+  // simulation_structureType = which buildStructure() dispatches to: 'filaments_ring' (default,
+  // the original 3-sine-filament + 1-ring layout, unchanged) or 'nup' (nuclear pore complex, see
+  // the "---- NUP structure ----" section below).
+  simulation_structureType: { type:'enum', id:'simulation_structureType', label:'Structure type', options:['filaments_ring','nup'], default:'filaments_ring' },
+
+  // ---- NUP structure (nuclear pore complex, simulation_structureType==='nup') ----
+  // Models the endogenously SNAP-tagged Nup96 reference standard from Thevathasan et al.,
+  // "Nuclear pores as versatile reference standards for quantitative superresolution
+  // microscopy", Nat. Methods 16, 1045-1053 (2019), DOI:10.1038/s41592-019-0574-9 — an 8-fold
+  // symmetric ring of 32 Nup96 (8 corners of 4 Nup96 each), ~53 nm radius, two such rings ~50 nm
+  // apart along the pore axis (nucleoplasmic/cytoplasmic). Geometry kept fully parametrized
+  // (rather than hardcoded) following the parametrized-NPC-simulation approach of Wanninger et
+  // al. ("CIR4MICS"), Bioinformatics 39(10), btad587 (2023), DOI:10.1093/bioinformatics/btad587.
+  // simulation_nup_radius = ring radius (nm), Thevathasan et al. 2019's measured Nup96 value.
+  simulation_nup_radius: { type:'number', id:'simulation_nup_radius', label:'NPC ring radius (nm)', min:20, max:150, step:0.5, default:53.5, int:false },
+  // simulation_nup_cornerSpread = diameter (nm) of the half-circle arc the 4 Nup96 of one corner
+  // sit on ("8 corners of 4 Nup96 each") — matches Thevathasan et al. 2019 Fig. 1e's own ~12 nm
+  // corner-cluster scale (vs. ~42 nm corner-to-corner spacing, consistent with this module's
+  // simulation_nup_radius default).
+  simulation_nup_cornerSpread: { type:'number', id:'simulation_nup_cornerSpread', label:'Corner sub-point spread (nm)', min:0, max:30, step:0.5, default:12, int:false },
+  // simulation_nup_ringSeparation = total axial distance (nm) between the nucleoplasmic and
+  // cytoplasmic Nup96 rings — i.e. each ring sits at ±ringSeparation/2 along the pore axis.
+  simulation_nup_ringSeparation: { type:'number', id:'simulation_nup_ringSeparation', label:'Axial ring separation (nm)', min:0, max:150, step:1, default:50, int:false },
+  // simulation_nup_linkerLengthMin/Max = the real fluorophore (SNAP/Halo+dye, or antibody) sits
+  // some finite linker distance from its Nup96 attachment point, in a random 3D direction — each
+  // of the 64 attachment points is displaced by a radius drawn uniformly-in-volume between these
+  // two shells (see displaceByLinker()), not placed exactly at the attachment point itself.
+  simulation_nup_linkerLengthMin: { type:'number', id:'simulation_nup_linkerLengthMin', label:'Linker length, min (nm)', min:0, max:30, step:0.5, default:2, int:false },
+  simulation_nup_linkerLengthMax: { type:'number', id:'simulation_nup_linkerLengthMax', label:'Linker length, max (nm)', min:0, max:30, step:0.5, default:5, int:false },
+  // simulation_nup_membraneType = orientation of the simulated membrane patch the NPCs sit in:
+  // 'topdown' (pore axis along the optical/Z axis, rings viewed face-on — the common SMLM case)
+  // or 'sideways' (pore axis in-plane along image-Y, rings viewed edge-on, matching Thevathasan
+  // et al. 2019's own side-view NPC images).
+  simulation_nup_membraneType: { type:'enum', id:'simulation_nup_membraneType', label:'Membrane orientation', options:['topdown','sideways'], default:'topdown' },
+  // simulation_nup_count = number of NPCs scattered across the simulated FOV's membrane patch.
+  simulation_nup_count: { type:'number', id:'simulation_nup_count', label:'Number of NPCs', min:1, max:500, step:1, default:20, int:true },
+  // simulation_nup_minSpacing = minimum centre-to-centre distance (nm) enforced between NPCs
+  // during placement (rejection sampling), so rings don't overlap.
+  simulation_nup_minSpacing: { type:'number', id:'simulation_nup_minSpacing', label:'Min. NPC-NPC spacing (nm)', min:0, max:2000, step:10, default:200, int:false },
+  // simulation_nup_curvature = amplitude (nm) of the gentle membrane curvature NPCs are placed
+  // on — applied along whichever world axis is the membrane's normal for the chosen orientation
+  // (Z for 'topdown', image-Y for 'sideways'), centred so the FOV's mean offset stays ~0.
+  simulation_nup_curvature: { type:'number', id:'simulation_nup_curvature', label:'Membrane curvature amplitude (nm)', min:0, max:2000, step:10, default:150, int:false },
 
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — a Zernike-aberrated PSF
   // model for "Simulate movie", alongside the fixed-sigma=1.3 isotropic Gaussian fallback. These
@@ -3367,6 +3557,13 @@ let simTrueDrift=null;   // ground-truth per-frame drift from the simulator (for
 // activation ({x,y,tStart,tEnd,photonsTotal}, frame units) — kept for later comparison against
 // recovered localizations; not consumed anywhere yet.
 let groundTruthEvents=null;
+// GT localizations viewer state ("View GT localizations" button, genBtn's own row) —
+// groundTruthLocs is a {x,y,z,photons} array built from groundTruthEvents right after a
+// successful Simulate movie (one entry per simulated blink, the fair thing to compare against a
+// real reconstruction's own per-blink localizations); gtShowing/srFullBeforeGT let the toggle
+// swap srFull in/out without ever touching lastResult (which is null immediately after
+// Simulate, before any Localize run — see genBtn's own handler).
+let groundTruthLocs=null, gtShowing=false, srFullBeforeGT=null, srTitleBeforeGT='', srInfoBeforeGT='';
 const readBudget = ()=> paramValue('memgb')*1073741824;   // frame-cache memory budget
 
 /* ===========================================================================
@@ -3719,7 +3916,7 @@ function simFrameSeed(baseSeed, fi){
 // last a half-range ABOVE 0, middle one left centred on 0) so a 3D-simulated
 // movie shows genuinely different focus across the 3 structures, not just
 // each one individually bobbing through the same focal plane.
-function buildStructure(w,h,zRange=0){
+function buildFilamentsRingStructure(w,h,zRange=0){
   const pts=[], cx=w/2, cy=h/2;
   const zOffsets=[-zRange/2, 0, zRange/2];
   for(let f=0; f<3; f++){ const y0=h*(0.25+0.25*f), amp=8+4*f, k=0.09+0.02*f, ph=f*2, zOff=zOffsets[f];
@@ -3729,6 +3926,125 @@ function buildStructure(w,h,zRange=0){
     } }
   const R=Math.min(w,h)*0.28;
   for(let a=0; a<Math.PI*2; a+=0.012) pts.push([cx+R*Math.cos(a), cy+R*Math.sin(a)-6, 0]);
+  return pts;
+}
+// Dispatches to whichever structure generator PARAMS.simulation_structureType selects —
+// 'filaments_ring' (default, the original layout above, unchanged) or 'nup' (see the "NUP
+// structure" block below, MODULE: simulation). Same return shape either way: an array of
+// [x,y,z] candidate emitter-site triples (x,y in camera px, z in nm) — generateSynthetic()'s
+// own call site needs no further changes for a new structure type.
+function buildStructure(w,h,zRange=0,rng=Math.random){
+  switch(paramValue('simulation_structureType')){
+    case 'nup': return buildNupStructure(w,h,zRange,rng);
+    default: return buildFilamentsRingStructure(w,h,zRange);
+  }
+}
+
+/* ---- NUP structure (nuclear pore complex) ----
+   Thevathasan et al., "Nuclear pores as versatile reference standards for quantitative
+   superresolution microscopy", Nat. Methods 16, 1045-1053 (2019), DOI:10.1038/s41592-019-0574-9
+   — 8-fold symmetric Nup96 ring, ~53 nm radius, 8 corners of 4 Nup96 each, two rings ~50 nm
+   apart along the pore axis. Geometry parametrized per Wanninger et al. ("CIR4MICS"),
+   Bioinformatics 39(10), btad587 (2023), DOI:10.1093/bioinformatics/btad587, rather than
+   hardcoded, so radius/spacing/ring-count knobs stay adjustable via PARAMS. */
+
+// One NUP's 64 fluorophore-attachment points, in a LOCAL frame centred on the pore with the
+// pore axis along local `c` and the ring plane spanned by local `a,b` (all nm). 8 corners
+// (theta_k = k*45 deg) x 4 sub-points per corner x 2 rings (c = +/-ringSeparation/2).
+// The 4 Nup96 of one corner sit in a half-circle arc, bulging OUTWARD (away from the ring
+// centre), not a 2x2 square — see Thevathasan et al. 2019 Fig. 1e (reproduced in this module's
+// header comment): four points spanning ~180 deg around a small arc of diameter ~cornerSpread,
+// centred on the corner's own position on the ring.
+const NUP_CORNER_ARC_ANGLES=[-67.5,-22.5,22.5,67.5].map(d=>d*Math.PI/180);   // 4 points, evenly spread across a 180 deg arc
+function buildNupAttachmentPoints(){
+  const R=paramValue('simulation_nup_radius'), arcR=paramValue('simulation_nup_cornerSpread')/2;
+  const halfSep=paramValue('simulation_nup_ringSeparation')/2;
+  const pts=[];
+  for(const c of [-halfSep, halfSep]){
+    for(let k=0;k<8;k++){
+      const th=k*Math.PI/4, ct=Math.cos(th), st=Math.sin(th);   // (ct,st) = outward radial unit vector at this corner
+      for(const phi of NUP_CORNER_ARC_ANGLES){
+        // arc point in the corner's own local (radial=u, tangential=v) frame, then rotated into
+        // the ring's a,b frame: u=cos(phi)*arcR (0 at the arc's open ends, arcR at its outward
+        // apex), v=sin(phi)*arcR (spans the arc's tangential width)
+        const u=Math.cos(phi)*arcR, v=Math.sin(phi)*arcR;
+        const a=R*ct + (u*ct - v*st), b=R*st + (u*st + v*ct);
+        pts.push({a,b,c});
+      }
+    }
+  }
+  return pts;   // 8 corners * 4 points * 2 rings = 64
+}
+// Displaces one attachment point by a random 3D offset representing the real fluorophore's
+// finite linker distance (SNAP/Halo+dye, or antibody) from its Nup96 attachment site — a
+// uniform-in-volume radius between minNm/maxNm, uniform direction on the sphere.
+function displaceByLinker(p, minNm, maxNm, rng){
+  const u=rng()*2-1, phi=rng()*2*Math.PI, sn=Math.sqrt(1-u*u);
+  const r3=Math.pow(minNm,3) + (Math.pow(maxNm,3)-Math.pow(minNm,3))*rng();
+  const r=Math.cbrt(r3);
+  return {a:p.a+r*sn*Math.cos(phi), b:p.b+r*sn*Math.sin(phi), c:p.c+r*u};
+}
+// One NUP's 64 emitter positions (post-linker-displacement), in the same local (a,b,c) frame as
+// buildNupAttachmentPoints(). Returns {attachment, emitter} — the raw attachment points are kept
+// alongside the displaced emitter positions for the debug single-NUP viewer (drawNupDebugView()).
+function buildNupLocalPoints(rng){
+  const minL=paramValue('simulation_nup_linkerLengthMin'), maxL=paramValue('simulation_nup_linkerLengthMax');
+  const attachment=buildNupAttachmentPoints();
+  const emitter=attachment.map(p=>displaceByLinker(p, minL, maxL, rng));
+  return {attachment, emitter};
+}
+// Scatters simulation_nup_count NPCs over a small membrane patch spanning the simulated FOV,
+// each with a random azimuthal rotation, and maps every NPC's 64 local (a,b,c) emitter
+// positions into world [x,y,z] (x,y camera px, z nm) per the chosen membrane orientation. Same
+// return shape as buildFilamentsRingStructure(): a flat array of [x,y,z] triples.
+function buildNupStructure(w,h,zRange=0,rng=Math.random){
+  // rng comes from generateSynthetic() (mulberry32(simulation_seed) when seeded, else
+  // Math.random) — same reproducibility contract as the rest of that function's random draws;
+  // the debug single-NUP viewer (drawNupDebugView()) calls buildNupLocalPoints() directly with
+  // its own fresh Math.random(), deliberately unseeded (it's a geometry check, not tied to a
+  // Simulate-movie run).
+  const px=paramValue('simulation_pxnm');
+  const count=paramValue('simulation_nup_count'), minSpacing=paramValue('simulation_nup_minSpacing');
+  const membraneType=paramValue('simulation_nup_membraneType'), curveAmp=paramValue('simulation_nup_curvature');
+  const marginPx=Math.ceil((paramValue('simulation_nup_radius')+paramValue('simulation_nup_cornerSpread'))/px)+2;
+
+  // Membrane centres, rejection-sampled for minimum spacing (px). For 'sideways', the FOV's own
+  // x runs along the membrane's lateral extent; y is reserved for the curvature+ring offset.
+  const centers=[]; const minSpacingPx=minSpacing/px;
+  let tries=0;
+  while(centers.length<count && tries<count*200){
+    tries++;
+    const cx=marginPx+rng()*(w-2*marginPx), cy=marginPx+rng()*(h-2*marginPx);
+    if(centers.every(([px0,py0])=>Math.hypot(cx-px0,cy-py0)>=minSpacingPx)) centers.push([cx,cy]);
+  }
+
+  // Gentle bowl-shaped curvature over the FOV, mean-subtracted so the patch stays centred
+  // around zero (per the user's own "membrane... centered around zero" spec) — a bowl rather
+  // than a plane so it reads as real membrane shape, not a uniform tilt.
+  const cx0=w/2, cy0=h/2, maxR2=Math.max(1,(w/2)**2+(h/2)**2);
+  const bowl=(x,y)=>curveAmp*(((x-cx0)**2+(y-cy0)**2)/maxR2 - 0.5);
+
+  const pts=[];
+  for(const [ccx,ccy] of centers){
+    const {emitter}=buildNupLocalPoints(rng);
+    const rot=rng()*2*Math.PI, cr=Math.cos(rot), sr=Math.sin(rot);
+    for(const {a,b,c} of emitter){
+      const ra=a*cr-b*sr, rb=a*sr+b*cr;   // random azimuthal rotation within the ring plane
+      if(membraneType==='sideways'){
+        // pore axis along image-Y: ring's own a-extent -> world X, ring's b-extent -> Z (depth/
+        // defocus), ring separation + curvature (c) -> image Y — viewing the envelope edge-on.
+        const x=ccx + ra/px;
+        const z=rb;
+        const y=ccy + (bowl(ccx,ccy) + c)/px;
+        pts.push([x,y,z]);
+      } else {
+        // pore axis along optical Z (default): ring plane -> world X,Y; ring separation +
+        // curvature -> Z (defocus).
+        const x=ccx + ra/px, y=ccy + rb/px, z=bowl(ccx,ccy) + c;
+        pts.push([x,y,z]);
+      }
+    }
+  }
   return pts;
 }
 
@@ -3875,7 +4191,7 @@ async function simulateCalibFramesParallel(pool, ctx){
 // makeStack()'s own interface so the rest of the app can't tell it apart
 // from a loaded file.
 async function generateSynthetic(){
-  const w=128,h=128;
+  const w=paramValue('simulation_fov'), h=paramValue('simulation_fov');
   const n=paramValue('frames'), dens=paramValue('dens'), photPerFrame=paramValue('phot');
   const lifetime=paramValue('simlifetime'), bg=paramValue('simbg');
   const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
@@ -3899,7 +4215,15 @@ async function generateSynthetic(){
   // render loop below actually VARIES the PSF with it depends on psfModel (see zKernelStack below
   // — only the Zernike model has a z-dependent width to vary at all).
   const is3d=paramValue('simulation_3d'), zRange=is3d?paramValue('simulation_zRange'):0;
-  const gt=buildStructure(w,h,zRange), rad=Math.ceil(sigma*3);
+  const gtAll=buildStructure(w,h,zRange,rng), rad=Math.ceil(sigma*3);
+  // simulation_labelEfficiency = the fraction of physical structure sites that ever carry a
+  // functional label at all (real SMLM labels — antibodies, SNAP/Halo, FP fusions — never reach
+  // 100% of their target), applied ONCE here as a random keep/drop over buildStructure()'s own
+  // candidate list, before the Poisson emitter-arrival process below ever gets to pick a site —
+  // an unlabeled site can never light up, at any frame, not just "less often".
+  const labelEff=paramValue('simulation_labelEfficiency')/100;
+  const gt = labelEff>=1 ? gtAll : gtAll.filter(()=>rng()<labelEff);
+  if(labelEff<1) log(`Labeling efficiency ${(labelEff*100).toFixed(0)}%: kept ${gt.length}/${gtAll.length} candidate site(s).`);
 
   // Zernike-aberrated PSF path (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §10) — builds/reuses
   // the same oversampled kernel the PSF preview uses. Two shapes, chosen by is3d:
@@ -4001,6 +4325,10 @@ async function generateSynthetic(){
     : await simulateFramesSerial(simCtx);
   setProg(null);
   groundTruth=gt;
+  // GT localizations for "View GT localizations" — one entry per simulated blink (matches
+  // groundTruthEvents' own per-blink shape), not one per structure site, so it's the fair thing
+  // to compare visually against a real reconstruction's own per-blink localizations.
+  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal}));
   // store the true per-frame drift (nm) so drift correction can be scored
   simTrueDrift = driftPx>0 ? {n, px, dx:fi=>driftAt(fi)*ddx, dy:fi=>driftAt(fi)*ddy, total:driftPx} : null;
   if(driftPx>0) log(`Simulated ${driftPx} px total drift along (${ddx.toFixed(2)}, ${ddy.toFixed(2)}).`);
@@ -4032,7 +4360,7 @@ async function generateSynthetic(){
 async function generateCalibrationStack(){
   if(paramValue('simulation_psfModel')!=='zernike')
     throw new Error('needs "PSF model" set to Zernike-aberrated (Simulation settings) — a fixed-sigma Gaussian PSF has no z-dependent width to calibrate against');
-  const w=128,h=128;
+  const w=paramValue('simulation_fov'), h=paramValue('simulation_fov');
   const photPerFrame=paramValue('phot'), bg=paramValue('simbg');
   const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
   const readNoiseE=paramValue('simulation_readnoise');   // electrons, applied before the gain conversion — see PARAMS.simulation_readnoise
@@ -4086,7 +4414,7 @@ async function generateCalibrationStack(){
     ? await simulateCalibFramesParallel(calibPool, calibCtx)
     : await simulateCalibFramesSerial(calibCtx);
   setProg(null);
-  groundTruth=null; simTrueDrift=null;   // no filament ground truth / drift to score for a calibration stack
+  groundTruth=null; simTrueDrift=null; groundTruthLocs=null;   // no filament ground truth / drift / GT locs to score for a calibration stack
   log(`Simulated calibration stack: ${nz} z-planes × ${zStepNm}nm (focus @ frame ${focusIndex+1}/${nz}), `+
       `${beadXY.length} bead(s) at fixed x,y.`);
   return { stack: makeStack(w,h,nz,px, fi=>frames[fi]), focusIndex, zStepNm };
@@ -12544,7 +12872,7 @@ async function run(){
   // lock the data sources too: swapping the stack mid-run would pull frames
   // out from under the loop.
   $('runBtn').disabled=true; $('loadBtn').disabled=true; $('genBtn').disabled=true;
-  $('stopBtn').disabled=false; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; calib=null; srIsPlot=false; setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; renderLocs=null; _tableFilters=[]; $('zmin').value=''; $('zmax').value='';
+  $('stopBtn').disabled=false; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; calib=null; srIsPlot=false; setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; renderLocs=null; _tableFilters=[]; $('zmin').value=''; $('zmax').value=''; gtShowing=false; srFullBeforeGT=null;
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   try{
     const method=paramValue('method');
@@ -13211,7 +13539,8 @@ $('genBtn').addEventListener('click',async()=>{
   log('Simulating movie…');
   $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
   try{
-    stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
+    stack=await generateSynthetic(); lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; gtShowing=false; srFullBeforeGT=null;
+    { const b=$('viewGtBtn'); if(b){ b.style.display = groundTruthLocs && groundTruthLocs.length ? '' : 'none'; b.textContent='View GT localizations'; } }
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13243,7 +13572,8 @@ $('genCalBtn').addEventListener('click',async()=>{
   $('genCalBtn').disabled=true; $('genBtn').disabled=true; $('loadBtn').disabled=true; $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null;
   try{
     const {stack:s, focusIndex, zStepNm}=await generateCalibrationStack();
-    stack=s; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated_calib'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null;
+    stack=s; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; stackName='webSMLM_simulated_calib'; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true; lastDrift=null; gtShowing=false; srFullBeforeGT=null;
+    { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
     $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
     // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
     // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13272,6 +13602,88 @@ $('genCalBtn').addEventListener('click',async()=>{
   }
 });
 
+// "View GT localizations" — renders the true simulated emitter positions (groundTruthLocs, one
+// point per simulated blink) into the SAME srFull the real reconstruction uses, via the SAME
+// renderSuperRes() call rerender() makes — so it looks and behaves exactly like a real
+// reconstruction (pan/zoom/scale bar) without being one. Swaps srFull directly (stashing/
+// restoring whatever was there before) rather than going through lastResult, since lastResult is
+// null right after Simulate movie, before any Localize run.
+$('viewGtBtn').addEventListener('click', async ()=>{
+  if(!groundTruthLocs || !groundTruthLocs.length || !stack){ log('No simulated ground truth available — click Simulate movie first.'); return; }
+  const btn=$('viewGtBtn'); btn.disabled=true;
+  try{
+    gtShowing=!gtShowing;
+    if(gtShowing){
+      srFullBeforeGT=srFull;
+      srTitleBeforeGT=$('srTitle').textContent; srInfoBeforeGT=$('srInfo').textContent;
+      srFull=await renderSuperRes(groundTruthLocs, stack.w, stack.h, paramValue('mag'), paramValue('rblur'),
+                        paramValue('lut'), +paramValue('lutpct'), false, 0, 1, null, 'z', log, paramValue('renderMode'));
+      srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); fitView(); clampView(); drawView();
+      $('srTitle').textContent='Ground truth';
+      $('srInfo').textContent=`— ${groundTruthLocs.length.toLocaleString()} simulated emitter blink(s) · true positions, not a fit`;
+      btn.textContent='Hide GT localizations';
+    } else {
+      srFull=srFullBeforeGT; srFullBeforeGT=null;
+      if(lastResult){
+        await rerender(true);
+      } else if(srFull){
+        // restore whatever non-null srFull preceded the GT view (e.g. a bead composite, or the
+        // pre-Run data projection already built by the time GT was clicked) — title/info were
+        // stashed alongside it above, so restore those verbatim rather than leaving the
+        // GT-specific labels stuck on screen.
+        setSrRecon(false); fitView(); clampView(); drawView();
+        $('srTitle').textContent=srTitleBeforeGT; $('srInfo').textContent=srInfoBeforeGT;
+      } else {
+        // nothing preceded the GT view — restore the pre-Run data projection instead of leaving
+        // a blank canvas mislabelled "Ground truth".
+        setSrRecon(false); drawView();
+        await showStackProjection();
+      }
+      btn.textContent='View GT localizations';
+    }
+    syncSaveImg();
+  }catch(err){
+    log(`⚠ View GT localizations failed: ${err.message}`); gtShowing=false;
+  }finally{
+    btn.disabled=false;
+  }
+});
+
+// Temporary debug aid (per the user, to be removed later): shows one synthetic NUP's 64
+// attachment/emitter points (top view a-vs-b, side view a-vs-c) on the raw panel, using the
+// current NUP PARAMS above — independent of Simulate movie/stack, just a geometry check.
+function drawNupDebugView(){
+  const rng=Math.random;
+  const {attachment, emitter}=buildNupLocalPoints(rng);
+  const d=$('raw'); const {ctx,W,H}=setupPlot(d,true); const C=plotColors();
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const R=paramValue('simulation_nup_radius'), halfSep=paramValue('simulation_nup_ringSeparation')/2;
+  const pad=paramValue('simulation_nup_cornerSpread')+paramValue('simulation_nup_linkerLengthMax')+4;
+  const halfW=W/2, gap=8;
+  const panelW=(halfW-gap*1.5);
+  function drawPanel(ox, title, xKey, yKey, xHalfRange, yHalfRange){
+    const pw=panelW, ph=H-40, mL=ox+8, mT=24;
+    const sx=v=> mL + (pw-16)*(v+xHalfRange)/(2*xHalfRange);
+    const sy=v=> mT + (ph-16)*(1-(v+yHalfRange)/(2*yHalfRange));
+    ctx.strokeStyle=C.grid; ctx.strokeRect(mL,mT,pw-16,ph-16);
+    ctx.fillStyle=C.text; ctx.font='12px '+PLOT_FONT; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(title, mL+(pw-16)/2, mT-8);
+    // faint attachment points, then the displaced emitter points on top, colored by ring
+    for(const p of attachment){ ctx.fillStyle='rgba(128,128,128,0.5)'; ctx.beginPath(); ctx.arc(sx(p[xKey]),sy(p[yKey]),1.5,0,2*Math.PI); ctx.fill(); }
+    for(const p of emitter){ ctx.fillStyle = p.c<0 ? '#0a7d32' : '#c81cc8'; ctx.beginPath(); ctx.arc(sx(p[xKey]),sy(p[yKey]),2.5,0,2*Math.PI); ctx.fill(); }
+  }
+  drawPanel(0, 'Top view (a vs b)', 'a', 'b', R+pad, R+pad);
+  drawPanel(halfW+gap/2, 'Side view (a vs c)', 'a', 'c', R+pad, halfSep+pad);
+  $('rawTitle').textContent='NUP debug: single NPC';
+  $('rawInfo').textContent=`— 64 points (8 corners × 4 × 2 rings) · gray = attachment point · green/magenta = emitter (nucleoplasmic/cytoplasmic ring)`;
+  _replotRaw=drawNupDebugView;
+  syncSaveImg();
+}
+$('nupDebugBtn').addEventListener('click', ()=>{
+  rawFull=null; setRawPlot(true); rawPlotName='nupDebug';
+  drawNupDebugView();
+});
+
 // Extracted from #file's own former change handler (loadBtn used to open it
 // directly) so the merged Load movie/data button (see loadBtn's own click
 // wiring near loadCsvFile() below) can dispatch here after classifying the
@@ -13279,7 +13691,8 @@ $('genCalBtn').addEventListener('click',async()=>{
 async function loadMovieFiles(fs){
   if(!fs.length) return;
   const multi=fs.length>1;
-  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
+  $('runBtn').disabled=true; $('pcfoBtn').disabled=true; $('gainOffsetFromPcfoBtn').disabled=true; $('rawCropBtn').disabled=true; $('calBtn').disabled=true; pcfoLastGain=null; pcfoLastOffset=null; lastNena=null; lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false); rawFull=null; rawIsPlot=false; measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; simTrueDrift=null; lastDrift=null; $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
+  { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
   $('sSmlmPreviewBtn').disabled=true; $('sSmlmPairBtn').disabled=true; $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false; $('sptTrackBtn').disabled=true; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;
   // a fresh stack replaces any crop wholesale — a crop rect from a differently-sized
   // previous stack (or the previous stack itself, as originalStack) is meaningless now.
@@ -13560,6 +13973,16 @@ function updateSimulation3dUI(){
 $('simulation_3d').addEventListener('change',updateSimulation3dUI);
 updateSimulation3dUI();
 
+// Structure-type rows (simTypeBox) — same "one selector, a list of rows toggled together"
+// pattern as updatePsfModelUI() above, just for the NUP-only fields.
+const NUP_ROW_IDS=['nupRadiusRow','nupCornerSpreadRow','nupRingSeparationRow','nupLinkerMinRow','nupLinkerMaxRow','nupMembraneTypeRow','nupCountRow','nupMinSpacingRow','nupCurvatureRow','nupDebugBtnRow','nupInfoBtnRow'];
+function updateStructureTypeUI(){
+  const on = paramValue('simulation_structureType')==='nup';
+  for(const id of NUP_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
+}
+$('simulation_structureType').addEventListener('change',updateStructureTypeUI);
+updateStructureTypeUI();
+
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
   try{
@@ -13763,6 +14186,7 @@ async function loadCsvFile(f){
     $('nenaBtn').disabled=false; $('sptLocErrorFromNenaBtn').disabled=false; $('frcBtn').disabled=false;
     $('sSmlmPreviewBtn').disabled=false; $('sSmlmPairBtn').disabled=false;
     $('sSmlmUnpairBtn').disabled=true; $('sSmlmHistBtn').disabled=true; $('sSmlmHistModeBtn').style.display='none'; $('sSmlmFitAngleBtn').disabled=true; $('sSmlmColorBtn').style.display='none'; sSmlmOriginalLocs=null; sSmlmPairedLocs=null; sSmlmShowingRaw=false;   // a freshly-loaded result invalidates any prior pairing state
+    groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }   // a CSV-loaded result has no simulated ground truth
     $('sptTrackBtn').disabled=false; $('sptHistBtn').disabled=true; $('sptHistModeBtn').style.display='none'; $('sptSaveBtn').disabled=true; $('sptShowTracksBtn').disabled=true; $('sptShowTrackDataBtn').disabled=true; { const b=$('srTracksOverlayBtn'); if(b){ b.style.display='none'; b.textContent='Show tracks'; } } srTracksOverlayOn=false; selectedTrackId=null; lastSpt=null;   // Track is safe to re-run even on a CSV that already has track_id/D_coeff columns; the histograms themselves need a fresh Track click (lastSpt isn't reconstructed from a loaded CSV)
     let nFrames=0; for(const L of locs) if(L.frame+1>nFrames) nFrames=L.frame+1;
     $('rawInfo').textContent='— no raw frame data (loaded from CSV)';
@@ -14129,7 +14553,8 @@ function rawClickToNative(e){
 // the load handlers already guard against.
 function resetAfterCropChange(){
   lastResult=null; srFull=null; srIsPlot=false; srSpots=null; srLocs=null; setSrRecon(false);
-  setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; simTrueDrift=null; lastDrift=null; lastNena=null;
+  setRawPlot(false); measureLine=null; measurePt0=null; cropPt0=null; calib=null; groundTruth=null; groundTruthLocs=null; gtShowing=false; srFullBeforeGT=null; simTrueDrift=null; lastDrift=null; lastNena=null;
+  { const b=$('viewGtBtn'); if(b){ b.style.display='none'; b.textContent='View GT localizations'; } }
   $('saveBtn').disabled=true; $('driftBtn').disabled=true; $('driftShowBtn').disabled=true; $('nenaBtn').disabled=true; $('sptLocErrorFromNenaBtn').disabled=true; $('frcBtn').disabled=true; $('tableBtn').disabled = true;
   // lastResult=null above orphans any sSMLM pairing state too (unpairSSmlm()
   // would otherwise try to write lastResult.locs on a null lastResult) — same
@@ -14404,17 +14829,15 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.0-dev · build 2026-09-03i — Simulate movie now splats+noises frames across a
-dedicated worker pool (getSimWorkerPool(), MODULE: workers) instead of one at a time on the main
-thread, when workers are available — a real speedup on multi-core machines for large frame counts
-or the Zernike 3D PSF path. Reproducibility for a given random seed is preserved: each frame now
-draws its camera noise from its own simFrameSeed(seed,frame)-derived stream rather than one
-continuing sequential stream, so a seeded run reproduces the exact same movie regardless of
-worker availability or dispatch order (verified: parallel and single-threaded fallback produce
-byte-identical frames for the same seed).
-"Simulate calib. stack" (3D calibration tab) now shares the SAME worker pool for its own
-per-z-plane bead splat+noise loop (simulateCalibFramesParallel()/simulateCalibFramesSerial()) —
-no seeded-reproducibility scheme there since that path was never seeded to begin with.
+log(`webSMLM v0.12.0-dev · build 2026-09-03j — Simulation settings sidebar reorganized into
+sub-groups: Frames/Pixel size/Emitter density/Background stay as flat "User parameters" rows, while
+3D/drift/seed ("Simulation type"), photons/ON lifetime ("Fluorophore parameters"),
+gain/offset/offset std/read noise ("Camera parameters"), and the Zernike PSF controls ("PSF
+parameters") each moved into their own collapsed-by-default nested dropdown (new details.subsim
+CSS class). Each group now has its own "more info…" popup (hint-simulation-user/-type/
+-fluorophore/-camera/-psf), split out of the single hint-simulation popup that used to cover
+everything; a final, coarse hint-simulation popup still sits at the bottom of the panel with a
+short overview naming the 5 groups.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

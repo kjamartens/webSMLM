@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-04i</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-08a</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2086,7 +2086,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Stream heap (MB) <input type="number" id="chunkmb" value="500" min="50" max="2000" step="50" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-memory"><span class="pill">module: in/out</span>
-
           <ul>
           <li><b>Budget</b> — if the decoded stack fits, keep it all in RAM; re-runs then skip decoding entirely. Beyond it, frames are decoded as the analysis reaches them and discarded (“streaming”), so memory stays bounded but re-runs re-decode.</li>
           <li><b>Heap</b> — chunk size for streaming, used only when every frame must go through the TIFF decoder. Contiguous ImageJ stacks decode one frame at a time and ignore this.</li>
@@ -2125,7 +2124,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation-user"><span class="pill">module: simulation</span>
-
           <p><b>Frames</b> is the length of the simulated movie; <b>FOV (pixels)</b> is the simulated camera's
           square field of view; <b>Pixel size (nm)</b> is this simulated stack's own camera pixel size —
           independent of any pixel size later used for localization/rendering.
@@ -2148,7 +2146,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-type"><span class="pill">module: simulation</span>
-
           <p><b>Structure type</b> picks which synthetic ground-truth structure emitters attach to —
           <b>Filaments + ring</b> (default, unchanged) or <b>Nuclear pore complex (NPC)</b> (see that option's
           own "more info…" below). <b>3D simulation?</b> makes the generated filament structure oscillate in
@@ -2178,9 +2175,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="viewGtBtnRow" style="display:none" title="Render the true simulated emitter positions (one point per simulated blink) into the reconstruction panel, the same way a real reconstruction is drawn — for comparing what Localize actually recovers against the known ground truth.">
             <button type="button" id="viewGtBtn">View GT localizations</button>
           </label>
-          <label class="row" id="nupInfoBtnRow" style="display:none"><button type="button" class="infobtn">more info…</button></label>
+          <button type="button" class="infobtn" id="nupInfoBtnRow" style="display:none">more info…</button>
           <div class="hint" hidden id="hint-simulation-nup"><span class="pill">module: simulation</span>
-
           <p>Models the endogenously SNAP-tagged Nup96 nuclear pore complex (NPC) reference standard from
           Thevathasan <i>et al.</i>, "Nuclear pores as versatile reference standards for quantitative
           superresolution microscopy", <i>Nat. Methods</i> 16, 1045–1053 (2019),
@@ -2211,7 +2207,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
-
           <p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
           frame 0, so the exponential's tail can already be mid-event at frame 0) and an
           exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
@@ -2227,7 +2222,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-camera"><span class="pill">module: simulation</span>
-
           <p><b>Gain/offset/offset std/read noise</b> forward-model a real sensor: Gaussian read noise (σ in
           electrons) is added to the photon count before the gain conversion, then a per-pixel offset map
           (Gaussian around the mean offset, fixed for the whole stack) is added — independent of the fit-side
@@ -2284,7 +2278,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="genCalBtnRow" style="display:none" title="Builds a bead z-stack from the SAME PSF kernel as Preview PSF above (PSF z range/step), focus exactly on the centre frame, and writes z-step/z=0 ref frame straight into the 3D calibration section below — Localize/3D calibration → Calibrate then needs no other setting changed."><button type="button" id="genCalBtn">Simulate calib. stack</button></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-psf"><span class="pill">module: simulation</span>
-
           <p><b>PSF model</b> — <code>gaussian</code> (default, unchanged) is the fixed-σ=1.3 isotropic
           Gaussian above. <code>zernike</code> reveals a Gibson-Lanni + Zernike-pupil optical model (NA,
           wavelength, sample/immersion refractive index, working distance, emitter depth, z range/step,
@@ -2319,7 +2312,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </details>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation"><span class="pill">module: simulation</span>
-
           <p>"Simulate movie" builds a fully synthetic ground-truth stack — random emitter placement along a
           simulated structure, physically modelled blinking, shot/read/offset camera noise, and (optionally) a
           real vectorial PSF — for validating and teaching the rest of the pipeline against known-correct
@@ -2339,7 +2331,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-pcfo"><span class="pill">module: fit</span>
-
           <p>Estimates camera gain (photons/ADU) and offset (ADU) directly from the loaded stack via the
           Rieger–Heintzman photon-conversion-factor method (PCFO; Heintzmann, Relich, Nieuwenhuizen, Lidke &amp;
           Rieger, <a href="https://arxiv.org/abs/1611.05654" target="_blank" rel="noopener">arXiv:1611.05654</a>) —
@@ -2385,7 +2376,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-calibration"><span class="pill">module: 3D calibration</span>
-
           <p>Load a bead z-stack (stage scanned through focus). Uses the detection settings above. Crop the range to ~±500 nm around focus for a good fit.</p>
           <ul>
           <li>Detects every spot per frame.</li>
@@ -2436,7 +2426,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="10" step="1" value="4" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-detectfit"><span class="pill">module: detect/fit</span>
-
           <p><b>Fit method</b> — σ_noise below is the spread of the filtered image, not the PSF width.</p>
           <ul>
           <li><b>Phasor 2D/3D</b> — ~100–250× faster per candidate (265× on the GATTA-PAINT test stack). No per-localization uncertainty; 3D needs a phasor-magnitude calibration.</li>
@@ -2472,7 +2461,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-export"><span class="pill">module: export</span>
-
           <ul>
           <li><b>Pixel size (nm)</b> sets the physical scale used by the scale bar, z, and the exported CSV coordinates.</li>
           <li>With gain 1 the exported “intensity [photon]” is really <b>ADU</b> (analog-to-digital unit — the camera's raw pixel count, before any photon conversion), and the uncertainty column (∝ 1/√N) is not physically meaningful.</li>
@@ -2513,7 +2501,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-render"><span class="pill">module: render</span>
-
           <ul>
           <li><b>Render mode</b> — <b>Localization precision</b> (default) renders each localization as its own Gaussian sized by its real fitted precision, the scientifically correct choice for most datasets. <b>Fixed blur</b> is the older uniform-blur-over-everything behaviour, controlled by <b>Render blur σ_render</b> below (which only appears in this mode). <b>Precision (fast/dithered)</b> is a much faster stochastic approximation, best suited to very large/dense datasets where the exact per-localization rendering gets slow — it looks grainier on sparse data, so it isn't the default.</li>
           <li><b>Colour map</b> — Inferno/Viridis are perceptually uniform; Fire is the classic SMLM look.</li>
@@ -2539,7 +2526,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-drift"><span class="pill">module: drift</span>
-
           <p>Point-based drift correction — adaptive intersection maximization (AIM; Ma et al., <i>Sci. Adv.</i> 2024, after <code>picasso/aim.py</code>; see <a href="https://websmlm.readthedocs.io/en/latest/content/09-references-further-reading.html" target="_blank" rel="noopener">References &amp; further reading</a>). <b>Localize first, then Correct drift.</b></p>
           <ul>
           <li>The search radius must exceed the drift <b>increment per segment</b> — shrink the segment for faster drift.</li>
@@ -2565,7 +2551,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-locprecision"><span class="pill">module: locprecision</span>
-
           <ul>
           <li><b>NeNA</b> estimates the mean per-localization precision from the nearest-neighbour distance distribution — data-driven, and the honest single number for the phasor fit (which has no per-localization uncertainty). It assumes the labelled structure is <b>static</b>: consecutive-frame displacements must be localization error, not motion. A <b>diffusing probe</b> — e.g. Nile Red and similar solvatochromic dyes that partition into and move within membranes — adds diffusion to the distance and <b>inflates σ</b>. Fixed-target methods like <b>DNA-PAINT</b> (imager binding a static docking strand, as in the GATTAquant nanorulers) satisfy the assumption.</li>
           <li><b>FRC</b> reports image resolution at the <b>1/7</b> threshold by splitting the localisations into two independent halves (odd/even frames), rendering each and correlating over Fourier rings; <b>FSC</b> is the 3D shell version, once z exists.</li>
@@ -2594,7 +2579,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-sSMLM"><span class="pill">module: sSMLM</span>
-
           <p>Pairs 0th/1st-order localizations from a diffraction grating placed in the emission path — each emitter appears twice per frame, offset by a wavelength-dependent distance at a <b>fixed, known bearing</b> (not just orientation — <b>Primary angle</b> is a genuine direction, e.g. 0° always means the 1st order sits to the same side of every 0th order in the image). A point qualifies as a 0th order only if it has a candidate on that bearing AND no candidate on the opposite bearing (which would mean it's more likely someone else's 1st order) — this needs no brightness signal, since real data shows brightness alone doesn't reliably tell 0th from 1st order here. The paired position is the <b>0th order's own</b> — undispersed, so its centroid is the true emitter position — not the midpoint between the two (that would blur position by up to half the per-emitter spectral offset). The inter-order distance is stored in its own <b>dist</b> field (never <b>z</b> — kept independent so a future 3D-fit result could carry real depth and spectral distance at once), so the depth-coding render option (Rendering settings → Colour by depth/distance) shows it directly as a wavelength proxy with no other change needed. Localizations that don't find an unambiguous pair within the window are dropped from the result entirely.</p>
           <p>Localizing with <b>Gauss MLE 3D rotated elliptical</b> first (Fit method, above — <b>3D localisation?</b> unchecked fixes its angle to Primary angle below, exactly this section's own bearing) gives BOTH orders a genuine per-axis σx/σy after <b>Pair</b>, instead of the single symmetric-σ proxy (<code>sigma1st</code>) every other method reports for the spectrally-smeared 1st order.</p>
           <p><b>Preview pairs</b> only computes — <b>Show histograms</b> draws them: a distance histogram (every candidate pair in range, any angle) by default, or an angle histogram restricted to the current distance window via the toggle next to the raw panel's own title (labelled <b>Distances</b>/<b>Angles</b>, whichever it would switch to), so you can find your own setup's true peak instead of guessing. Both histograms are accumulated across ALL frames (only same-frame localizations are ever compared to each other — the accumulation just pools every frame's own candidates into one plot). Narrow <b>Distance min/max</b> and <b>Primary angle</b>/<b>tolerance</b> to that peak, then click <b>Pair</b> to commit — or click <b>Fit angle &amp; tol.</b> to fill Primary angle/Angle tolerance in automatically from the angle histogram's peak (its half-max width), a conservative starting point you can widen by hand.</p>
@@ -2650,7 +2634,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-spt"><span class="pill">module: spt</span>
-
           <p>Links each frame's localizations onto the previous frames' active tracks — a trackpy-<b>inspired</b> variant (same <code>search_range</code>/<code>memory</code> terminology and linking philosophy as the Python <code>trackpy</code> package), not a literal port of its source, since there's no way to call real Python trackpy from a static HTML page. Frame-to-frame candidates within <b>Search range</b> are grouped into small connected clusters and each solved via an optimal (minimum total squared displacement) assignment, which keeps crossing trajectories from swapping identity in the common case. <b>Memory</b> lets a track skip up to that many frames with no detection and still be relinked when it reappears.</p>
           <p>Every localization gets a <code>track_id</code> (even length-1 tracks); track-length filtering happens only at the diffusion-coefficient step. <b>Track</b> is safe to re-run any time — it only sets/overwrites <code>track_id</code>/<code>D_coeff</code>, never drops or replaces rows, so there's no separate "original vs. tracked" state to manage the way sSMLM's Pair/Unpair needs.</p>
           <p>One diffusion coefficient (D, µm²/s) is computed per track with at least <b>Min track length</b> localizations, from the gap-corrected mean of ALL of that track's own single-frame squared displacements (an average, not a linear MSD-vs-lag-time fit) — corrected for <b>Localization error</b>: D = MSD/(4·frame time) − error²/frame time. Changing <b>Frame time</b> or <b>Localization error</b> after <b>Track</b> has run instantly rescales every already-computed D (and the shown histogram) from cached per-track MSDs, no re-tracking needed — only <b>Search range</b>/<b>Memory</b>/<b>Min track length</b> require a fresh <b>Track</b> click, since those change which tracks/steps exist in the first place.</p>
@@ -14609,10 +14592,13 @@ updateSimulation3dUI();
 
 // Structure-type rows (simTypeBox) — same "one selector, a list of rows toggled together"
 // pattern as updatePsfModelUI() above, just for the NUP-only fields.
-const NUP_ROW_IDS=['nupRadiusRow','nupCornerSpreadRow','nupRingSeparationRow','nupLinkerMinRow','nupLinkerMaxRow','nupMembraneTypeRow','nupCountRow','nupMinSpacingRow','nupCurvatureRow','nupDebugBtnRow','nupInfoBtnRow'];
+const NUP_ROW_IDS=['nupRadiusRow','nupCornerSpreadRow','nupRingSeparationRow','nupLinkerMinRow','nupLinkerMaxRow','nupMembraneTypeRow','nupCountRow','nupMinSpacingRow','nupCurvatureRow','nupDebugBtnRow'];
 function updateStructureTypeUI(){
   const on = paramValue('simulation_structureType')==='nup';
   for(const id of NUP_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
+  // nupInfoBtnRow is a bare .infobtn (not a label.row, see wireInfoButtons()'s
+  // nextElementSibling requirement), so it toggles with 'block', not 'flex'.
+  const infoBtn=$('nupInfoBtnRow'); if(infoBtn) infoBtn.style.display = on ? 'block' : 'none';
 }
 $('simulation_structureType').addEventListener('change',updateStructureTypeUI);
 updateStructureTypeUI();
@@ -15488,17 +15474,12 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-04i — Merged upstream v0.12.0 (live streaming,
-precision-informed rendering) into this branch, so the simulation/validation work now sits on top
-of the current release rather than beside it. No functional conflicts: upstream's live-streaming
-work and this branch's simulator work touch different modules — the only overlap was the
-end-of-session button-enable chain, where upstream unlocks the table mid-session and this branch
-enables Score vs truth, and both now apply.
-Carried in from this branch: the Test structure library (filaments+ring, NPC, tilted plane,
-uniform 3D volume, spherical shell), Score vs truth with robust median/percentile statistics, the
-single-valued z-range guard, and the fixes from the verification pass — including a pre-existing
-one where a raw-panel plot without its own mode toggle left the previous plot's toggle stranded
-on top of it.
+log(`webSMLM v0.12.1-dev · build 2026-09-08a — Fixed the NUP structure's "more info…" button: it
+was wrapped in a <label class="row"> (unlike every other info button in the sidebar), so its hint
+div was never its DOM nextElementSibling and wireInfoButtons() silently never attached a click
+handler — clicking it did nothing. Also fixed tools/sync_hints.mjs to normalize CRLF from
+docs/DOCUMENTATION.md before extracting hint content, removing a stray blank line that had been
+injected into the top of every single "more info…" popup in the app.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

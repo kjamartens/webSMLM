@@ -34,7 +34,14 @@ const HTML_PATH = path.join(ROOT, 'webSMLM.html');
 const DOC_PATH = path.join(ROOT, 'docs', 'DOCUMENTATION.md');
 const checkOnly = process.argv.includes('--check');
 
-const doc = readFileSync(DOC_PATH, 'utf8');
+// doc is normalized to LF regardless of on-disk line endings (this repo's Windows/git-bash
+// checkouts can mix CRLF in, even within one file — seen in practice right after the
+// HINT:liveStreaming marker). Left as "\r\n<p>..." a marker's content only has its "\n"
+// stripped by the leading-trim below, leaving a stray "\r" line that survives as a spurious
+// blank line in the synced .hint div — a real bug caught this way. html is deliberately left
+// as-is (not normalized) since it's mostly LF already and a blanket rewrite would churn every
+// CRLF line in the file for no reason.
+const doc = readFileSync(DOC_PATH, 'utf8').replace(/\r\n/g, '\n');
 let html = readFileSync(HTML_PATH, 'utf8');
 
 // Extract every <!-- HINT:id --> ... <!-- /HINT:id --> block from the docs.

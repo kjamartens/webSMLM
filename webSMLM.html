@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6034   score localizations against the simulator's own
+    validation      6057   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6361   per-frame band-pass + local-maxima detection
-    fit             6638   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6384   per-frame band-pass + local-maxima detection
+    fit             6661   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7147   accumulate to offscreen buffer; view/colour/blur;
+    render          7170   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8429   frame-parallel detect/fit worker pool; dedicated
+    workers         8452   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          8998   ThunderSTORM-compatible CSV; exportPlotEither()
+    export          9021   ThunderSTORM-compatible CSV; exportPlotEither()
     3D calibration  8685   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           9707   AIM drift correction (2D+z); drift-vs-frame or
+    drift           9730   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10213   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10236   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           10928  spectrally resolved SMLM pair-finding; merged
+    sSMLM           10951  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11398  single particle tracking, trackpy-inspired;
+    spt             11421  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        12900  top-level orchestration, *Core()/wrapper split;
+    pipeline        12923  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13524  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13547  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,7 +290,7 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           15620  localizations table, filtering, histograms;
+    table           15643  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
     headless API    16207  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-08a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-08b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -4089,6 +4089,23 @@ function buildNupStructure(w,h,zRange=0,rng=Math.random){
 const STRUCTURE_SITES=2000;
 const STRUCTURE_MARGIN_PX=6;    // keep every site this far from the frame edge, as filaments do
 
+// Filaments/ring/NUP self-scale their candidate density with the object's own extent (the
+// filament loop steps every 0.35px across the whole frame width, so a bigger FOV automatically
+// gets more candidates) — but tiltedPlane/uniform3D fill the WHOLE frame area with a flat
+// STRUCTURE_SITES count, so their point SPACING grows with FOV size. At the default 128px FOV
+// that's already only ~2.6px between neighbours, coarser than the typical rendered pixel size;
+// past that, arrivals (typically a few thousand over a real movie, see generateSynthetic()'s own
+// Poisson process) start reusing the same handful of candidate points, which reads as "only a
+// few spots, repeated a lot" instead of a filled plane/volume. Scale the count with the sampled
+// area to keep spacing roughly constant (~2px) regardless of FOV, capped so a very large FOV
+// doesn't blow up memory/build time for no visible gain.
+const AREA_STRUCTURE_TARGET_SPACING_PX=2;
+const AREA_STRUCTURE_SITES_MAX=50000;
+function areaStructureSiteCount(areaPx2){
+  return Math.max(STRUCTURE_SITES,
+    Math.min(AREA_STRUCTURE_SITES_MAX, Math.round(areaPx2/(AREA_STRUCTURE_TARGET_SPACING_PX**2))));
+}
+
 // Candidate emitter-site positions for the synthetic sample — the structure simulated emitters
 // attach to. Returns [[x,y,z], …] with x,y in CAMERA PIXELS (origin top-left, pixel X centred on
 // integer X) and z in NANOMETRES relative to the focal plane; buildPsfKernelStack() centres its
@@ -4108,21 +4125,25 @@ function buildGeometricStructure(w,h,zRange,kind,sizeNm,px,rng){
     // z ramps linearly with x across the whole frame, independent of y. One plot of fitted z
     // against x then shows bias, axial compression and the point where z stops being invertible
     // (the fitted ramp folds back on itself) in a single picture — the cheapest 3D diagnostic here.
-    case 'tiltedPlane':
+    case 'tiltedPlane': {
       pts=[];
-      for(let i=0;i<STRUCTURE_SITES;i++){
+      const nSites=areaStructureSiteCount(spanX*spanY);
+      for(let i=0;i<nSites;i++){
         const x=M+rng()*spanX, y=M+rng()*spanY;
         pts.push([x, y, (x-cx)/(w/2)*zRange]);
       }
       break;
+    }
     // Uniform in x, y AND z — the only structure that samples z without any correlation to
     // position or any pile-up, so bias/RMS binned against true z are unbiased estimates rather
     // than a reflection of how the object happens to distribute its own z.
-    case 'uniform3D':
+    case 'uniform3D': {
       pts=[];
-      for(let i=0;i<STRUCTURE_SITES;i++)
+      const nSites=areaStructureSiteCount(spanX*spanY);
+      for(let i=0;i<nSites;i++)
         pts.push([M+rng()*spanX, M+rng()*spanY, (rng()*2-1)*zRange]);
       break;
+    }
     // Hollow sphere of radius sizeNm centred in the frame at z=0, sampled uniformly over its
     // SURFACE via normalized Gaussian vectors (Marsaglia) — the classic 3D-SMLM test object.
     // A sphere that reconstructs flattened is direct evidence of axial compression, which this
@@ -15474,12 +15495,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-08a — Fixed the NUP structure's "more info…" button: it
-was wrapped in a <label class="row"> (unlike every other info button in the sidebar), so its hint
-div was never its DOM nextElementSibling and wireInfoButtons() silently never attached a click
-handler — clicking it did nothing. Also fixed tools/sync_hints.mjs to normalize CRLF from
-docs/DOCUMENTATION.md before extracting hint content, removing a stray blank line that had been
-injected into the top of every single "more info…" popup in the app.
+log(`webSMLM v0.12.1-dev · build 2026-09-08b — Fixed the 'Tilted plane'/'Uniform 3D volume'
+simulation structures generating localizations clustered on only a few repeated xy positions:
+buildGeometricStructure() sampled them from a FIXED pool of 2000 candidate points regardless of
+the frame area, so a typical movie's emitter-arrival count already exceeded that pool (and grows
+worse at larger FOV), forcing many blinking events to reuse the exact same point instead of
+filling the plane/volume. Candidate count now scales with the sampled area (~2px target spacing,
+capped at 50000) so spacing stays fine regardless of FOV, matching how filaments/ring/NUP already
+self-scale their own candidate density with the object's extent.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));

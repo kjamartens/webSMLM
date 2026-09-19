@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2723   PARAMS registry, single source of truth for params;
+    params          2727   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3608   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3634   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3907   synthetic stack generator ("Simulate movie");
+    simulation      3933   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6059   score localizations against the simulator's own
+    validation      6137   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6521   per-frame band-pass + local-maxima detection
-    fit             6798   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6599   per-frame band-pass + local-maxima detection
+    fit             6876   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7307   accumulate to offscreen buffer; view/colour/blur;
+    render          7385   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8589   frame-parallel detect/fit worker pool; dedicated
+    workers         8667   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9158   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9450   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9236   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9528   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           9867   AIM drift correction (2D+z); drift-vs-frame or
+    drift           9945   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10373   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10451   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11088  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11166  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11558  single particle tracking, trackpy-inspired;
+    spt             11636  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13060  top-level orchestration, *Core()/wrapper split;
+    pipeline        13138  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13684  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13762  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           15791  localizations table, filtering, histograms;
+    table           15902  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16378  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16489  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2119,6 +2119,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="300" class="num"></label>
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row">Pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
+        <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), med 0.5 (typical SMLM), high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.5)</option><option value="high">High (2)</option><option value="custom">Custom</option></select></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
@@ -2205,6 +2206,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <summary>Fluorophore parameters</summary>
           <label class="row">Photons/emitter/frame <input type="number" id="phot" min="0" max="50000" step="50" value="900" class="num"></label>
           <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
+          <label class="row" title="Chance that an ON period ends in bleaching instead of a return to the dark state. 1 = a molecule blinks exactly once (the original model); 0.2 = five blinks on average. The emitter density setting keeps its meaning either way.">Bleach prob. per blink <input type="number" id="simulation_blinkBleachProb" min="0.01" max="1" step="0.01" value="1" class="num"></label>
+          <label class="row" title="Mean time a molecule spends dark between two of its blinks. Only matters when the bleach probability is below 1.">Dark lifetime (frames, mean) <input type="number" id="simulation_offLifetime" min="0.1" max="5000" step="1" value="20" class="num"></label>
+          <label class="row" title="Blink-to-blink brightness spread: each blink's photon rate is log-normal around Photons/emitter/frame with this coefficient of variation. 0 = every blink equally bright.">Photon rate spread (CV) <input type="number" id="simulation_photCV" min="0" max="2" step="0.05" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
           <p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
@@ -3027,6 +3031,28 @@ const PARAMS = {
   // simlifetime = mean ON-period duration (frames) of a simulated emitter's single, exponentially-
   // distributed activation; fractional (e.g. 3.5 frames) and physically motivated (exponential decay)
   simlifetime: { type:'number', id:'simlifetime', label:'Simulated ON lifetime (frames, mean)', min:0.1, max:20, step:0.1, default:1, int:false },
+  // ---- blinking: ON <-> dark -> bleached, per MOLECULE ----
+  // simulation_blinkBleachProb = the chance an ON period ends in bleaching rather than in a return
+  // to the dark state, so a molecule blinks a geometric number of times, mean 1/this. 1 (default)
+  // is the original model exactly — one ON period, then gone — and leaves the random-number stream
+  // untouched, so a seeded run reproduces byte-for-byte. `dens` keeps its meaning (mean ON emitters
+  // per µm² per frame) whatever this is set to: the molecule activation rate is scaled down by the
+  // mean blink count, otherwise the density presets would mean different things per kinetics.
+  simulation_blinkBleachProb: { type:'number', id:'simulation_blinkBleachProb', label:'Bleach probability per blink', min:0.01, max:1, step:0.01, default:1, int:false },
+  // simulation_offLifetime = mean dark-state duration (frames, exponential) between two blinks of
+  // the same molecule. Only matters when the bleach probability is below 1.
+  simulation_offLifetime: { type:'number', id:'simulation_offLifetime', label:'Dark-state lifetime (frames, mean)', min:0.1, max:5000, step:1, default:20, int:false },
+  // simulation_photCV = blink-to-blink brightness spread: each blink's photon rate is log-normal
+  // with mean `phot` and this coefficient of variation. 0 (default) = every blink equally bright,
+  // the original model. Log-normal because brightness is a product of many positive factors
+  // (excitation at that spot, orientation, local environment), is never negative, and has the
+  // long bright tail real photon-count histograms show.
+  simulation_photCV: { type:'number', id:'simulation_photCV', label:'Photon rate spread (CV)', min:0, max:2, step:0.05, default:0, int:false },
+  // simulation_densityPreset = low/med/high shorthand that WRITES `dens` (0.05 / 0.5 / 2) and
+  // nothing else; `dens` stays the single source of truth, and editing it by hand flips this to
+  // 'custom'. Roughly: sparse enough that PSFs never overlap / typical SMLM / dense enough that
+  // single-emitter fitting visibly breaks down (compare the isolated/crowded split in Score vs truth).
+  simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','custom'], default:'low' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
   simbg: { type:'number', id:'simbg', label:'Simulation background (photons/px)', min:0, max:500, step:1, default:0, int:false },
@@ -4469,26 +4495,73 @@ async function generateSynthetic(){
   const areaUm2=(w*px/1000)*(h*px/1000);
   const arrivalRate=lifetime>0 ? (dens*areaUm2)/lifetime : 0;
   const lead=5*lifetime, rangeLen=n+lead;
+  const events=[];                                 // ground-truth {x,y,z,tStart,tEnd} per BLINK
+  const frameEvents=Array.from({length:n}, ()=>[]); // per-frame [x,y,z,overlapFraction x brightness]
+  // Multi-blink / variable-brightness photophysics (PARAMS.simulation_blinkBleachProb,
+  // _offLifetime, _photCV). Two separate code paths ON PURPOSE: with the defaults (bleach prob 1,
+  // CV 0) the original loop below runs untouched, drawing exactly the random numbers it always
+  // drew in exactly the order it always drew them, so a seeded movie stays byte-identical to
+  // every earlier build — verified by pixel hash. Any new draw lives only in the other branch.
+  const pBleach=Math.min(1,Math.max(0.01,paramValue('simulation_blinkBleachProb')));
+  const offLife=paramValue('simulation_offLifetime'), photCV=paramValue('simulation_photCV');
+  const richPhotophysics = pBleach<1 || photCV>0;
+  let nMolecules=0;
+  const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol)=>{
+    if(tEnd<=0 || tStart>=n) return;                // never overlaps the movie — nothing to record
+    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol});
+    const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
+    for(let fi=f0; fi<=f1; fi++){
+      const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
+      // brightness rides in on the overlap weight: splatSimFrame() multiplies photPerFrame by this
+      // one number, so the stringified worker code needs no change at all for variable brightness
+      if(ov>0) frameEvents[fi].push([ex, ey, ez, ov*bright]);
+    }
+  };
+  if(richPhotophysics){
+    // A MOLECULE activates once, then alternates ON (exp, mean `lifetime`) and dark (exp, mean
+    // offLife) until an ON period ends in bleaching (prob pBleach) — a geometric number of blinks,
+    // mean 1/pBleach. `dens` is the mean number of emitters ON per µm² per frame, and must stay
+    // that: a molecule is ON for meanBlinks x lifetime in total, so molecules activate at
+    // dens·area / (lifetime · meanBlinks). The lead-in covers 5 mean molecule lifespans (capped),
+    // so frame 0 already sees molecules mid-life rather than a population that all just switched on.
+    const meanBlinks=1/pBleach, molSpan=meanBlinks*lifetime+(meanBlinks-1)*offLife;
+    const leadM=Math.min(5*molSpan, 20000), rangeM=n+leadM;
+    const molRate=lifetime>0 ? (dens*areaUm2)/(lifetime*meanBlinks) : 0;
+    nMolecules=poisson(molRate*rangeM, rng);
+    const s2=Math.log(1+photCV*photCV), sLn=Math.sqrt(s2);      // log-normal with mean exactly 1
+    for(let m=0;m<nMolecules;m++){
+      const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
+      let t=-leadM+rng()*rangeM;
+      for(let guard=0; guard<10000 && t<n; guard++){
+        const tEnd=t-lifetime*Math.log(1-rng());
+        const bright = photCV>0 ? Math.exp(-s2/2+sLn*gauss(rng)) : 1;
+        addBlink(ex,ey,ez,t,tEnd,bright,m);
+        if(rng()<pBleach) break;                    // this ON period ended in bleaching
+        t=tEnd-offLife*Math.log(1-rng());           // otherwise: dark, then blink again
+      }
+    }
+  } else {
   const nEvents=poisson(arrivalRate*rangeLen, rng);
-  const events=[];                                 // ground-truth {x,y,z,tStart,tEnd} per emitter
-  const frameEvents=Array.from({length:n}, ()=>[]); // per-frame [x,y,z,overlapFraction]
   for(let e=0;e<nEvents;e++){
     const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
     const tStart=-lead+rng()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-rng());   // exponential duration, mean=lifetime
-    events.push({x:ex, y:ey, z:ez, tStart, tEnd});
+    events.push({x:ex, y:ey, z:ez, tStart, tEnd, moleculeId:e});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
       if(ov>0) frameEvents[fi].push([ex, ey, ez, ov]);
     }
   }
+  nMolecules=nEvents;
+  }
   groundTruthEvents = events.map(e=>{
     const s=Math.max(e.tStart,0), t=Math.min(e.tEnd,n);
     // rate = this blink's photons per FULL frame of ON time; a frame it only partly overlaps gets
     // rate x overlap. scoreTruthCore() (MODULE: validation) needs it to decide whether an
     // emitter-frame was bright enough to be fairly expected to be detected at all.
-    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate:photPerFrame, photonsTotal:photPerFrame*Math.max(0,t-s)};
+    const rate = e.rate===undefined ? photPerFrame : e.rate;   // per-blink once brightness varies
+    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, photonsTotal:rate*Math.max(0,t-s)};
   });
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
@@ -4519,7 +4592,7 @@ async function generateSynthetic(){
   // happens to be set to (rblur) would blur them into blobs far larger than a "ground truth"
   // marker should be; 1 nm renders as a crisp point at any realistic magnification instead.
   const gtLp=1/px;   // 1 nm expressed in native camera px, same unit lpx/lpy are always stored in
-  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal, lpx:gtLp, lpy:gtLp}));
+  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal, moleculeId:e.moleculeId, lpx:gtLp, lpy:gtLp}));
   // Store the true per-frame drift so drift correction can be scored. driftAt() is in CAMERA
   // PIXELS (driftpx is "Simulated total drift (px)"), so the *px here is what actually makes
   // dx()/dy() nanometres — which is both what this comment always claimed and what the sole
@@ -4553,6 +4626,11 @@ async function generateSynthetic(){
             `astigmatism preset (which widens the usable range, at the cost of a broader in-focus PSF).`);
     }
   }
+  if(richPhotophysics)
+    log(`Simulated ${events.length} blinks from ${nMolecules.toLocaleString()} molecules (of ${gt.length} candidate sites) over ${n} frames`+
+        ` — bleach probability ${pBleach} per blink (${(1/pBleach).toFixed(1)} blinks/molecule on average), dark lifetime ${offLife} frames`+
+        (photCV>0?`, photon rate spread CV ${photCV}`:'')+`.`);
+  else
   log(`Simulated ${events.length} emitters (of ${gt.length} candidates) over ${n} frames.`);
   return makeStack(w,h,n,px, fi=>frames[fi]);
 }
@@ -14795,6 +14873,28 @@ function updateSimulationStructureUI(){
 $('simulation_structureType').addEventListener('change',updateSimulationStructureUI);
 updateSimulationStructureUI();
 
+// Presets WRITE parameters; they never replace them. A preset's change handler pushes its values
+// into the ordinary controls (dispatching 'change' so every existing listener reacts), and editing
+// any of those controls by hand flips the preset to 'custom'. The individual PARAMS therefore stay
+// the single source of truth — a settings JSON, the headless API and paramValue() only ever see
+// numbers and need to know nothing about presets. `_presetWriting` stops a preset's own writes
+// from being read back as a manual edit. Same idea as the Zernike preset + custom-coefficient pair.
+let _presetWriting=false;
+function wirePreset(presetId, table){
+  const ids=[...new Set(Object.values(table).flatMap(o=>Object.keys(o)))];
+  $(presetId).addEventListener('change',()=>{
+    const vals=table[$(presetId).value]; if(!vals) return;          // 'custom' writes nothing
+    _presetWriting=true;
+    try{ for(const id in vals){ const el=$(id); if(!el) continue;
+           if(el.type==='checkbox') el.checked=!!vals[id]; else el.value=vals[id];
+           el.dispatchEvent(new Event('change')); } }
+    finally{ _presetWriting=false; }
+  });
+  for(const id of ids){ const el=$(id); if(!el) continue;
+    el.addEventListener('change',()=>{ if(!_presetWriting && $(presetId).value!=='custom') $(presetId).value='custom'; }); }
+}
+wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{dens:2} });
+
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
   try{
@@ -15653,7 +15753,18 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-19a — Score vs truth now says what it COUNTS. A
+log(`webSMLM v0.12.1-dev · build 2026-09-19b — Blinking. Fluorophore parameters gain a
+three-state model — ON, dark, bleached: Bleach prob. per blink (1 = blink once, as before; 0.2 =
+five blinks on average), Dark lifetime, and Photon rate spread (CV), a log-normal blink-to-blink
+brightness around Photons/emitter/frame. Emitter density keeps its meaning — mean emitters ON per
+µm² per frame — whatever the kinetics (measured 0.0293 single-blink vs 0.0295 at five blinks, for
+a 0.03 target), and with the defaults a seeded movie is byte-identical to earlier builds. Ground
+truth stays one entry per blink, now with the molecule it belongs to and its own photon rate.
+New Density preset (low 0.05 / medium 0.5 / high 2) that simply writes Emitter density; editing
+the density by hand switches it to Custom.
+First check of NeNA against ground truth, possible now that molecules actually come back: NeNA
+2.9 nm vs 3.4 nm per axis implied by the scored error, on the same multi-blink run.
+— and from build 2026-09-19a: Score vs truth now says what it COUNTS. A
 simulated emitter only counts in a frame where it delivered at least Min photons/frame (100 by
 default) and sits outside the edge zone the fitter cannot reach; dimmer or edge emitter-frames are
 "don't care" — detecting one is not a false positive, missing one is not a miss. Matching still

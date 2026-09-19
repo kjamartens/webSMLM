@@ -569,6 +569,32 @@ that carries the simulated drift, so the score describes the *fitter*
 whatever drift correction did or did not do afterwards; drift correction has
 its own ground-truth score in [§2](#drift).
 
+**What counts.** A ground-truth emitter-frame is one of three things, not two. It is *counted*
+when it delivered at least **Min photons/frame** (100) in that frame and lies outside the **Edge
+exclusion** zone the fitter cannot reach (−1 = the Run's own detection border): matched is a hit,
+unmatched a miss. Otherwise it is *don't care* — detecting it is neither a hit nor a false
+positive, missing it is not a miss — and out-of-focus haze emitters are always don't-care.
+Matching still runs against **all** ground truth first and classifies afterwards; filtering first
+would turn a genuine detection of a dim emitter into a false positive. Setting Min photons and Edge
+exclusion to 0 reproduces the pre-2026-09-19 numbers exactly.
+
+This matters because an emitter's ON period almost never lines up with frame boundaries, so a
+large share of emitter-frames are slivers holding tens of photons. But it is only half the story
+of the ~77% recall every fit method used to show, and the **Show vs photons** view (recall and
+median lateral error against the photons an emitter put into the frame, log-spaced) shows the
+other half: on the default detector (wavelet, k = 4, background 5 photons/px) detection crosses
+50% at about **440 photons** — the log reports this figure for every score — and reaches 96–99%
+only above ~600. Emitters between the counting threshold and that point are too dim to find but
+bright enough to count; they are a real sensitivity limit, which the threshold deliberately does
+not hide.
+
+An **isolated/crowded** split reports emitters that had another counted emitter ON within
+**Crowding radius** (300 nm) in the same frame separately: on one run, 5.0 nm median lateral at
+82% recall isolated against 23.0 nm at 50% crowded — overlapping PSFs going through a
+single-emitter fit. The **challenge efficiency** of Sage *et al.*, *Nat. Methods* 16, 387 (2019)
+— E = 100 − √((100 − Jaccard%)² + α²·RMSE²), α = 1 nm⁻¹ lateral, 0.5 nm⁻¹ axial — is reported for
+comparability with published benchmarks only, since it leans on RMSE (next paragraph).
+
 **Read the median, not the RMSE.** The axial error distribution has heavy
 tails: a few localizations land past the PSF's fold-back or on a clamped
 calibration edge and are wrong by hundreds of nm. On a typical run the worst
@@ -1059,6 +1085,17 @@ actual elapsed time instead.
 | `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `phot` | Simulated photons/emitter/frame | number (int) | 0 | 50000 | 50 | 900 |
 | `simlifetime` | Simulated ON lifetime (frames, mean) | number | 0.1 | 20 | 0.1 | 1 |
+| `simulation_blinkBleachProb` | Bleach probability per blink | number | 0.01 | 1 | 0.01 | 1 |
+| `simulation_offLifetime` | Dark-state lifetime (frames, mean) | number | 0.1 | 5000 | 1 | 20 |
+| `simulation_photCV` | Photon rate spread (CV) | number | 0 | 2 | 0.05 | 0 |
+| `simulation_densityPreset` | Emitter density preset | enum (`low`, `med`, `high`, `custom`) | — | — | — | `low` |
+| `simulation_realism` | Realism/compute preset | enum (`min`, `med`, `max`, `custom`) | — | — | — | `min` |
+| `simulation_bgCellContrast` | Background: cell contrast (×) | number | 1 | 20 | 0.5 | 1 |
+| `simulation_bgHazeWeight` | Background: out-of-focus haze (weight) | number | 0 | 10 | 0.1 | 0 |
+| `simulation_bgHazeWidth` | Background: haze blur σ (nm) | number | 100 | 5000 | 50 | 800 |
+| `simulation_bgDecayFrames` | Background: fade time constant (frames) | number | 0 | 100000 | 10 | 0 |
+| `simulation_hazeRatio` | Out-of-focus emitters (per in-focus emitter) | number | 0 | 10 | 0.1 | 0 |
+| `simulation_hazeDepth` | Out-of-focus depth (± nm) | number | 300 | 5000 | 50 | 1500 |
 | `simulation_gain` | Simulation camera gain (photons/ADU) | number | 0.001 | 1000 | 0.01 | 0.34 |
 | `simulation_offset` | Simulation camera offset (ADU) | number | 0 | 65535 | 1 | 100 |
 | `simulation_offset_std` | Simulation offset std (ADU, per-pixel) | number | 0 | 200 | 0.5 | 3 |
@@ -1161,12 +1198,34 @@ directly.</p>
 **Fluorophore parameters** (`hint-simulation-fluorophore`):
 
 <!-- HINT:simulation-fluorophore -->
-<p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
-frame 0, so the exponential's tail can already be mid-event at frame 0) and an
-exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
-scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits
-half the photons.</p>
+<p>A <b>molecule</b> activates at a random time (drawn from well before frame 0, so the movie
+starts in equilibrium rather than with everything switching on at once) and then blinks: an
+exponentially-distributed ON period (mean = <b>ON lifetime</b>) ends either in bleaching, with
+probability <b>Bleach prob. per blink</b>, or in a dark period (exponential, mean = <b>Dark
+lifetime</b>) followed by another blink. At the default bleach probability of 1 every molecule
+blinks exactly once — the original model. <b>Photons/emitter/frame</b> is scaled by the fraction of
+a frame the emitter was actually on, so a half-frame overlap emits half the photons; <b>Photon rate
+spread (CV)</b> makes each blink's rate log-normal around that value (0 = every blink equally
+bright). <b>Emitter density</b> keeps meaning the mean number of emitters ON per µm² per frame
+whatever the kinetics — molecules simply activate less often when each one blinks more.</p>
 <!-- /HINT:simulation-fluorophore -->
+
+**Background** (`hint-simulation-background`):
+
+<!-- HINT:simulation-background -->
+<p><b>Background (photons/px)</b> above stays the mean over the whole field of view; this
+section only reshapes it in space and time. <b>Cell contrast</b> draws a soft-edged cell that many
+times brighter inside than outside (autofluorescence). <b>Out-of-focus haze</b> adds the labelled
+structure's own projected density, blurred to <b>Haze blur σ</b> — a static stand-in for light from
+far above and below the focal plane. <b>Fade time constant</b> lets the background bleach down to a
+30% floor over the movie, which is what a temporal-median (FTM) correction exists for.
+<b>Out-of-focus emitters</b> goes further: a second, blinking population on the same structure,
+0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so it
+needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
+tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the
+score. A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
+thresholding — but it costs <i>precision</i>, through the extra shot noise.</p>
+<!-- /HINT:simulation-background -->
 
 **Camera parameters** (`hint-simulation-camera`):
 
@@ -1270,6 +1329,9 @@ scoring drift correction. See the **simulation** module.
 |---|---|---|---|---|---|---|
 | `validation_matchRadius` | Match radius (nm) | number | 20 | 2000 | 10 | 250 |
 | `validation_zBins` | Score z bins | number (int) | 4 | 100 | 1 | 20 |
+| `validation_minPhotons` | Score: min photons/frame | number | 0 | 100000 | 10 | 100 |
+| `validation_border` | Score: edge exclusion (px, -1 = auto) | number (int) | -1 | 100 | 1 | -1 |
+| `validation_crowdRadius` | Score: crowding radius (nm) | number | 0 | 5000 | 10 | 300 |
 
 **Match radius** is how close, laterally, a localization must be to a
 ground-truth emitter in the same frame to count as its detection. 250 nm is

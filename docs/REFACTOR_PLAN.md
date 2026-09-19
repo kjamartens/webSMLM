@@ -23,9 +23,29 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     81.8 nm). Currently handled by warning above a 50 nm step. A width-aware interpolation (or a
     spline through the z-stack, which the cubic-spline PSF item below would bring anyway) would
     remove the trade-off rather than manage it.
-  - Not yet done: cross-validating **Phasor 3D against Gaussian MLE 3D** on the same scored
-    dataset. The tooling for it now exists — run both over one simulated stack and compare the
-    axial bias/RMS-versus-depth curves.
+  - Done since (2026-09-04h): **Phasor 3D vs Gaussian MLE 3D** on one scored stack — axial medians
+    23.4 / 23.8 / 24.6 nm (phasor3d / mle3d / gaussmleEll), within 5% of each other; phasor better
+    near focus, MLE better at depth, phasor ~55% worse laterally.
+
+- **Simulator realism, after the 2026-09-19 photophysics/background/scoring work** — what it
+  showed and what it leaves open:
+  - **The detector's sensitivity limit is now a visible number**: ~440 photons/frame for 50%
+    detection on the defaults (wavelet, k=4). Worth a sweep of `k` and the three detection filters
+    against the recall-vs-photons curve — the tooling makes that a loop, and the default `k` has
+    never been chosen against a measured curve.
+  - **NeNA vs ground truth, first data point**: 2.9 nm (NeNA) vs 3.4 nm per axis (scored), on one
+    multi-blink run. One point is not a validation — repeat across photon levels and blink
+    lengths, since NeNA's consecutive-frame pairing favours long, full-frame blinks.
+  - **A smooth background does not stress the detector** (the band-pass removes it); it costs
+    precision instead. What would stress it is background with structure at the PSF's own
+    scale — which the out-of-focus emitters provide: 5.8% of localizations on a 'max' run were
+    out-of-focus light. A filter that rejects them (σ or photon based) can now be scored.
+  - Not modelled, in rough order of how much they would change a conclusion: per-pixel sCMOS gain
+    and read-noise maps and EMCCD excess noise (demoCam_SMLM_MM has the former — see `PARITY.md`),
+    a separate short-lived triplet state, fixed-dipole emission, field-dependent aberration.
+  - `PARITY.md`'s demoCam column is stale for every row the 2026-09-19 builds touched.
+  - Pre-existing, found in passing: `mulberry32()` is declared twice in `webSMLM.html` (the later
+    declaration wins; both are equivalent generators, so harmless today, confusing tomorrow).
 
 
 - **Cubic-spline PSF fitting** (`picasso/fitting/splinefit.py`) for PSFs that deviate from

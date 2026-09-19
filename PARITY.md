@@ -13,6 +13,15 @@ device adapter at `C:\GitHub\demoCam_SMLM_MM`
   "webSMLM parity feature" section for the authoritative up-to-date
   status once those changes are committed.
 
+**Partial refresh, 2026-09-19 (webSMLM side only).** webSMLM builds
+`2026-09-19a`–`d` added multi-blink photophysics, a structured background,
+blinking out-of-focus emitters and scoring criteria. The rows those builds
+invalidate are updated below and marked *(webSMLM 2026-09-19)*; **the
+demoCam_SMLM_MM column was NOT re-checked** — that repo was not available to
+the session making this edit — so wherever such a row says "same" or
+"absent" for demoCam it describes the 2026-09-08 snapshot, and every one of
+them now reads **webSMLM ahead** until demoCam is diffed again.
+
 **Staleness warning:** this project has other collaborators and no
 mechanism here notifies demoCam_SMLM_MM of new commits. Before starting
 *any* simulation-engine work in either repo that assumes parity (or a gap)
@@ -51,9 +60,9 @@ has not been modified for parity (this file is the only addition here).
 | Concept | webSMLM | demoCam_SMLM_MM |
 |---|---|---|
 | Arrival process | areal-density Poisson, sites reused across the movie | areal-density Poisson (per-frame or per-tick), continuous patterns draw a fresh position -- same core math, different site-reuse semantics per the sampling-model row above |
-| ON duration | single exponential (mean = `simlifetime`), exactly one blink per arrival | single exponential (mean = `OnLifetimeSec`/`OnLifetimeFrames`), exactly one blink per arrival -- same model |
-| Photon count | constant per emitter (no distribution), scaled by frame-overlap fraction | constant per emitter (no distribution), scaled by frame-overlap fraction -- same |
-| Bleaching, dark/triplet states, multi-blink kinetics | absent (single finite ON period *is* the "bleach") | absent, same |
+| ON duration | single exponential (mean = `simlifetime`); one blink per molecule by default, a geometric number (mean 1/`simulation_blinkBleachProb`) otherwise *(webSMLM 2026-09-19)* | single exponential (mean = `OnLifetimeSec`/`OnLifetimeFrames`), exactly one blink per arrival -- same model |
+| Photon count | constant by default; per-blink log-normal rate with CV `simulation_photCV`, mean preserved; scaled by frame-overlap fraction *(webSMLM 2026-09-19)* | constant per emitter (no distribution), scaled by frame-overlap fraction -- same |
+| Bleaching, dark/triplet states, multi-blink kinetics | three-state ON ⇄ dark → bleached per molecule (`simulation_blinkBleachProb`, `simulation_offLifetime`); `dens` keeps meaning ON-density; no separate triplet state; default = original single-blink model, byte-identical for a seed *(webSMLM 2026-09-19)* | absent, same |
 | Sub-pixel position | continuous float positions both paths | continuous float positions both paths |
 
 ## Camera / noise model
@@ -71,8 +80,8 @@ has not been modified for parity (this file is the only addition here).
 
 | Concept | webSMLM | demoCam_SMLM_MM |
 |---|---|---|
-| Background | uniform scalar, Poisson-fluctuating | uniform scalar (`BackgroundPhotonsPerSec`), Poisson-fluctuating -- same |
-| Structured background, vignetting, autofluorescence | absent | absent |
+| Background | `simbg` = FOV-mean photons/px, Poisson-fluctuating; flat by default *(webSMLM 2026-09-19)* | uniform scalar (`BackgroundPhotonsPerSec`), Poisson-fluctuating -- same |
+| Structured background, vignetting, autofluorescence | cell-shaped autofluorescence field (`simulation_bgCellContrast`), static out-of-focus haze from the structure's projected density (`simulation_bgHazeWeight`/`Width`), fade to a 30% floor (`simulation_bgDecayFrames`), and blinking out-of-focus emitters through the real defocused PSF (`simulation_hazeRatio`/`Depth`); no vignetting *(webSMLM 2026-09-19)* | absent |
 | Drift | linear, single random direction (X/Y), stored ground truth | linear, fixed diagonal (`DriftNmPerSecX`, Y = half rate) -- not random-direction; no ground-truth export (see below) |
 | Focus / Z stage | no separate stage concept -- structure Z is absolute | real `SMLMDemoZStage` MM::Stage device, global focus offset, live-drivable -- **demoCam ahead** (no equivalent in webSMLM) |
 
@@ -82,7 +91,14 @@ has not been modified for parity (this file is the only addition here).
 |---|---|---|
 | Raw movie export | **absent** (in-memory only) | uint16 stack via standard MM camera API -- **demoCam ahead** |
 | Ground-truth emitter/localization export | in-memory only (`groundTruthEvents`/`groundTruthLocs`), consumed by "View GT" and "Score vs truth"; no file export | **absent entirely** -- `BlinkEvent` positions are discarded after rendering; this is demoCam's single biggest ground-truth gap |
-| GT scoring vs. localization output | yes (`scoreTruthCore`, recall/precision/Jaccard/lateral+axial error stats) | absent |
+| GT scoring vs. localization output | yes (`scoreTruthCore`): recall/precision/Jaccard, median+percentile lateral/axial error, photon-threshold + edge "don't care" classes, isolated/crowded split, recall-vs-photons curve with 50% point, challenge efficiency *(webSMLM 2026-09-19)* | absent |
+
+## Presets (webSMLM only, 2026-09-19)
+
+`simulation_realism` (`min`/`med`/`max`) and `simulation_densityPreset`
+(`low`/`med`/`high`) are UI shorthands that only WRITE the ordinary parameters
+above; they carry no physics of their own, so a port needs the underlying
+parameters, not the presets.
 
 ## Not tracked here
 

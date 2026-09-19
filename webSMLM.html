@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2737   PARAMS registry, single source of truth for params;
+    params          2757   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3680   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3700   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3979   synthetic stack generator ("Simulate movie");
+    simulation      3999   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6285   score localizations against the simulator's own
+    validation      6305   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6750   per-frame band-pass + local-maxima detection
-    fit             7027   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6770   per-frame band-pass + local-maxima detection
+    fit             7047   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7536   accumulate to offscreen buffer; view/colour/blur;
+    render          7556   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8818   frame-parallel detect/fit worker pool; dedicated
+    workers         8838   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9387   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9679   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9407   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9699   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10096   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10116   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10602   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10622   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11317  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11337  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11787  single particle tracking, trackpy-inspired;
+    spt             11807  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13289  top-level orchestration, *Core()/wrapper split;
+    pipeline        13309  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13913  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13933  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16087  localizations table, filtering, histograms;
+    table           16110  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16674  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16697  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19d</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19e</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2212,12 +2212,17 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="Blink-to-blink brightness spread: each blink's photon rate is log-normal around Photons/emitter/frame with this coefficient of variation. 0 = every blink equally bright.">Photon rate spread (CV) <input type="number" id="simulation_photCV" min="0" max="2" step="0.05" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
-          <p>Each emitter turns on exactly once: a fractional start time (drawn from up to 5×lifetime before
-          frame 0, so the exponential's tail can already be mid-event at frame 0) and an
-          exponentially-distributed ON duration (mean = <b>ON lifetime</b>). <b>Photons/emitter/frame</b> is
-          scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits
-          half the photons.</p>
-        </div>
+<p>A <b>molecule</b> activates at a random time (drawn from well before frame 0, so the movie
+starts in equilibrium rather than with everything switching on at once) and then blinks: an
+exponentially-distributed ON period (mean = <b>ON lifetime</b>) ends either in bleaching, with
+probability <b>Bleach prob. per blink</b>, or in a dark period (exponential, mean = <b>Dark
+lifetime</b>) followed by another blink. At the default bleach probability of 1 every molecule
+blinks exactly once — the original model. <b>Photons/emitter/frame</b> is scaled by the fraction of
+a frame the emitter was actually on, so a half-frame overlap emits half the photons; <b>Photon rate
+spread (CV)</b> makes each blink's rate log-normal around that value (0 = every blink equally
+bright). <b>Emitter density</b> keeps meaning the mean number of emitters ON per µm² per frame
+whatever the kinetics — molecules simply activate less often when each one blinks more.</p>
+</div>
         </details>
         <details class="subsim" id="backgroundBox">
           <summary>Background</summary>
@@ -2227,6 +2232,21 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="A second, blinking population on the same structure, 0.3–2 µm out of focus, rendered with the real defocused PSF. Per in-focus emitter; 0 = none. Needs the Zernike-aberrated PSF model. These emitters are in the movie but never in the score.">Out-of-focus emitters (×) <input type="number" id="simulation_hazeRatio" min="0" max="10" step="0.1" value="0" class="num"></label>
           <label class="row" title="How far from focus the out-of-focus emitters reach. Capped at the PSF z range.">Out-of-focus depth (± nm) <input type="number" id="simulation_hazeDepth" min="300" max="5000" step="50" value="1500" class="num"></label>
           <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="0" class="num"></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-simulation-background"><span class="pill">module: simulation</span>
+<p><b>Background (photons/px)</b> above stays the mean over the whole field of view; this
+section only reshapes it in space and time. <b>Cell contrast</b> draws a soft-edged cell that many
+times brighter inside than outside (autofluorescence). <b>Out-of-focus haze</b> adds the labelled
+structure's own projected density, blurred to <b>Haze blur σ</b> — a static stand-in for light from
+far above and below the focal plane. <b>Fade time constant</b> lets the background bleach down to a
+30% floor over the movie, which is what a temporal-median (FTM) correction exists for.
+<b>Out-of-focus emitters</b> goes further: a second, blinking population on the same structure,
+0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so it
+needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
+tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the
+score. A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
+thresholding — but it costs <i>precision</i>, through the extra shot noise.</p>
+</div>
         </details>
         <details class="subsim" id="cameraBox">
           <summary>Camera parameters</summary>
@@ -15041,8 +15061,16 @@ function wirePreset(presetId, table){
            el.dispatchEvent(new Event('change')); } }
     finally{ _presetWriting=false; }
   });
+  // Only a value that actually DIFFERS from what the active preset prescribes makes it 'custom'.
+  // Without the comparison, a settings load broke every saved preset: it replays controls in PARAMS
+  // order, so any governed field that happens to sit after its preset (simbg does) was "edited"
+  // back to the very value the preset had just written, and the preset fell to 'custom'.
   for(const id of ids){ const el=$(id); if(!el) continue;
-    el.addEventListener('change',()=>{ if(!_presetWriting && $(presetId).value!=='custom') $(presetId).value='custom'; }); }
+    el.addEventListener('change',()=>{
+      if(_presetWriting || $(presetId).value==='custom') return;
+      const want=(table[$(presetId).value]||{})[id]; if(want===undefined) return;
+      const have = el.type==='checkbox' ? el.checked : parseFloat(el.value);
+      if(have!==want && !(Math.abs(have-want)<1e-9)) $(presetId).value='custom'; }); }
 }
 wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{dens:2} });
 // 'min' is, field for field, the defaults — i.e. the original model, byte-identical for a seed.
@@ -15912,7 +15940,10 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-19d — Realism/compute gains Maximal: blinking
+log(`webSMLM v0.12.1-dev · build 2026-09-19e — Documentation pass for the 2026-09-19 work: the
+Fluorophore "more info" now describes the blinking model, Background has its own, and the manual
+covers what Score vs truth counts. No behaviour change.
+— and from build 2026-09-19d: Realism/compute gains Maximal: blinking
 out-of-focus emitters. A second population on the same labelled structure, with the same
 blinking, 0.45–1.5 µm either side of focus (Out-of-focus emitters ×, Out-of-focus depth), rendered
 with the real defocused PSF through the ordinary splat — so it needs the Zernike PSF model.

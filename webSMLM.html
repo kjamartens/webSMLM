@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2737   PARAMS registry, single source of truth for params;
+    params          2723   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3607   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3608   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3906   synthetic stack generator ("Simulate movie");
+    simulation      3907   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6057   score localizations against the simulator's own
+    validation      6059   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6384   per-frame band-pass + local-maxima detection
-    fit             6661   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6521   per-frame band-pass + local-maxima detection
+    fit             6798   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7170   accumulate to offscreen buffer; view/colour/blur;
+    render          7307   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8452   frame-parallel detect/fit worker pool; dedicated
+    workers         8589   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9021   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  8685   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9158   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9450   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           9730   AIM drift correction (2D+z); drift-vs-frame or
+    drift           9867   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10236   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10373   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           10951  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11088  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11421  single particle tracking, trackpy-inspired;
+    spt             11558  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        12923  top-level orchestration, *Core()/wrapper split;
+    pipeline        13060  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13547  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13684  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           15643  localizations table, filtering, histograms;
+    table           15791  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16207  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16378  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-08b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19a</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2549,6 +2549,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </div>
         <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
         <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
+        <label class="row" id="validationMinPhotRow" title="A simulated emitter only counts in a frame where it delivered at least this many photons. Dimmer emitter-frames are ignored either way: detecting one is not a false positive, missing one is not a miss. 0 = count everything.">Min photons/frame <input type="number" id="validation_minPhotons" min="0" max="100000" step="10" value="100" class="num"></label>
+        <label class="row" id="validationBorderRow" title="Emitters this close to the frame edge are ignored: the fitter cannot localize there by construction. -1 = use the Run's own detection border.">Edge exclusion (px) <input type="number" id="validation_border" min="-1" max="100" step="1" value="-1" class="num"></label>
+        <label class="row" id="validationCrowdRow" title="An emitter is 'crowded' when another counted emitter is ON within this distance in the same frame. Reported as a separate isolated/crowded split. 0 = off.">Crowding radius (nm) <input type="number" id="validation_crowdRadius" min="0" max="5000" step="10" value="300" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-locprecision"><span class="pill">module: locprecision</span>
           <ul>
@@ -3136,6 +3139,21 @@ const PARAMS = {
   // validation_zBins = how many bins the true-z axis is split into for the bias/RMS curve. Too
   // few hides where accuracy falls off, too many leaves each bin too sparse to mean anything.
   validation_zBins: { type:'number', id:'validation_zBins', label:'Score z bins', min:4, max:100, step:1, default:20, int:true },
+  // validation_minPhotons = a ground-truth emitter only COUNTS in a frame where it delivered at
+  // least this many photons. Below it the emitter-frame is "don't care": detecting it is neither a
+  // hit nor a false positive, missing it is not a miss. An ON period almost never lines up with
+  // frame boundaries, so without this a large share of the truth is slivers of a frame holding
+  // tens of photons, and recall measures the simulator's timing rather than the detector.
+  // 0 = count everything (the pre-2026-09-19 behaviour, exactly).
+  validation_minPhotons: { type:'number', id:'validation_minPhotons', label:'Score: min photons/frame', min:0, max:100000, step:10, default:100, int:false },
+  // validation_border = emitters within this many px of the frame edge are "don't care" too: the
+  // fitter cannot return a localization there by construction (its window would leave the frame).
+  // -1 = use the Run's own detection border automatically; 0 = no exclusion.
+  validation_border: { type:'number', id:'validation_border', label:'Score: edge exclusion (px, -1 = auto)', min:-1, max:100, step:1, default:-1, int:true },
+  // validation_crowdRadius = a counted emitter is "crowded" when another counted emitter is ON
+  // within this distance in the same frame — overlapping PSFs going through a single-emitter fit.
+  // Reported as a separate isolated/crowded split, never folded silently into the headline. 0 = off.
+  validation_crowdRadius: { type:'number', id:'validation_crowdRadius', label:'Score: crowding radius (nm)', min:0, max:5000, step:10, default:300, int:false },
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — a Zernike-aberrated PSF
   // model for "Simulate movie", alongside the fixed-sigma=1.3 isotropic Gaussian fallback. These
   // params build/preview an oversampled PSF kernel (see buildPsfKernelStack()) shown in the raw
@@ -4467,7 +4485,10 @@ async function generateSynthetic(){
   }
   groundTruthEvents = events.map(e=>{
     const s=Math.max(e.tStart,0), t=Math.min(e.tEnd,n);
-    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, photonsTotal:photPerFrame*Math.max(0,t-s)};
+    // rate = this blink's photons per FULL frame of ON time; a frame it only partly overlaps gets
+    // rate x overlap. scoreTruthCore() (MODULE: validation) needs it to decide whether an
+    // emitter-frame was bright enough to be fairly expected to be detected at all.
+    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate:photPerFrame, photonsTotal:photPerFrame*Math.max(0,t-s)};
   });
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
@@ -6050,14 +6071,18 @@ let lastTruthScore=null;         // stashed like lastNena, so the plot can be re
 // itself used when it decided which frames to splat that emitter into. Deriving it rather than
 // storing frameEvents keeps the simulator's memory profile unchanged, and — more importantly —
 // guarantees the two sets agree by construction instead of by two copies of one rule staying in
-// sync. Returns a Map frame -> [{x,y,z}, …], x/y in camera px, z in nm.
+// sync. Returns a Map frame -> [{x,y,z,phot}, …], x/y in camera px, z in nm, phot = the photons
+// that emitter actually put into THAT frame (its rate x the fraction of the frame it was ON for).
+// An event with no `rate` (ground truth from before that field existed) gets phot=Infinity, i.e.
+// it always clears any photon threshold — the old behaviour.
 function groundTruthByFrame(gtEvents, nFrames, first, last){
   const byFrame=new Map();
   for(const e of gtEvents){
     const f0=Math.max(0,Math.floor(e.tStart)), f1=Math.min(nFrames-1,Math.floor(e.tEnd));
     for(let fi=Math.max(f0,first); fi<=Math.min(f1,last); fi++){
+      const ov=Math.min(fi+1,e.tEnd)-Math.max(fi,e.tStart);
       let a=byFrame.get(fi); if(!a){ a=[]; byFrame.set(fi,a); }
-      a.push({x:e.x, y:e.y, z:e.z});
+      a.push({x:e.x, y:e.y, z:e.z, phot: e.rate===undefined ? Infinity : e.rate*Math.max(0,ov)});
     }
   }
   return byFrame;
@@ -6128,28 +6153,67 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   const byFrameLoc=new Map();
   for(const L of locs){ const f=L.frame|0; let a=byFrameLoc.get(f); if(!a){ a=[]; byFrameLoc.set(f,a); } a.push(L); }
 
+  // ---- what COUNTS. Every ground-truth emitter-frame is one of three things, not two:
+  //   cared-for  — bright enough, and far enough from the edge, that a detector can fairly be
+  //                expected to find it: matched = TP, unmatched = FN;
+  //   don't-care — below validation_minPhotons, or inside the border the fitter cannot reach by
+  //                construction: matched = neither TP nor FP, unmatched = NOT an FN.
+  // The order matters: match against EVERYTHING first, classify afterwards. Filtering the truth
+  // before matching would turn a genuine detection of a dim emitter into a false positive.
+  // Why this exists: an emitter's ON period rarely aligns with frame boundaries, so with a mean
+  // ON time of ~1 frame a large share of emitter-frames hold a small fraction of a frame's photons
+  // — tens, not thousands. Counting those as misses capped recall near 77% for EVERY fit method
+  // alike, which is the signature of a definition problem rather than a detector problem.
+  const minPhot = cfg.validation_minPhotons>0 ? cfg.validation_minPhotons : 0;
+  const borderPx = cfg.validation_border>=0 ? cfg.validation_border : (cfg._detBorder||0);
+  const W=cfg._frameW||Infinity, H=cfg._frameH||Infinity;
+  const crowdPx=(cfg.validation_crowdRadius>0?cfg.validation_crowdRadius:0)/px;
+  const inField=g=> g.x>=borderPx && g.y>=borderPx && g.x<=W-1-borderPx && g.y<=H-1-borderPx;
+  const cares=g=> g.phot>=minPhot && inField(g);
+
   const dx=[], dy=[], dz=[], zTrue=[];             // matched-pair errors (px, px, nm) + true z (nm)
-  let tp=0, fp=0, fn=0, zClampedMatched=0, nZ=0;
+  let tp=0, fp=0, fn=0, zClampedMatched=0, nZ=0, nIgnoredGT=0, nIgnoredPairs=0;
+  const sub={ isolated:{tp:0,fn:0,lat:[]}, crowded:{tp:0,fn:0,lat:[]} };
+  const photSamples=[];                            // [phot, matched 0/1, lateral error nm] per in-field GT
   const frames=[...new Set([...byFrameGT.keys(), ...byFrameLoc.keys()])].sort((a,b)=>a-b);
   let yld=performance.now();
   for(let i=0;i<frames.length;i++){
     const f=frames[i];
     const L=byFrameLoc.get(f)||[], G=byFrameGT.get(f)||[];
-    if(!L.length){ fn+=G.length; continue; }
     if(!G.length){ fp+=L.length; continue; }
     // Truth for THIS frame = structure position + the drift the simulator applied to it. Note
     // trueDrift's accessors are in nm (see simTrueDrift), so convert back to camera pixels here.
     const drx=trueDrift? trueDrift.dx(f)/px : 0, dry=trueDrift? trueDrift.dy(f)/px : 0;
-    const Gf=drx||dry ? G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z})) : G;
+    const Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot}));
+    for(const g of Gf) g.care=cares(g);
+    // Crowded = another cared-for emitter is ON within validation_crowdRadius in this same frame,
+    // so the two PSFs overlap and a single-emitter fit is being asked something it cannot answer.
+    // Plain O(n^2): a frame holds tens of emitters, and gridNN() against the set itself would
+    // only ever hand each point back as its own neighbour at distance 0.
+    if(crowdPx>0) for(let a=0;a<Gf.length;a++){ if(!Gf[a].care) continue;
+      for(let b=a+1;b<Gf.length;b++){ if(!Gf[b].care) continue;
+        if(Math.hypot(Gf[a].x-Gf[b].x, Gf[a].y-Gf[b].y)<=crowdPx) Gf[a].crowded=Gf[b].crowded=true; } }
     // Raw (pre-drift-correction) coordinates when a correction has been applied — see the header.
     const Lf=L.map(l=>({x:l.x0!==undefined?l.x0:l.x, y:l.y0!==undefined?l.y0:l.y,
                         z:l.z0!==undefined?l.z0:l.z, zClamped:l.zClamped}));
-    const {pairs,usedL,usedG}=matchFrame(Lf, Gf, radiusPx);
-    tp+=pairs.length; fp+=Lf.length-usedL.size; fn+=Gf.length-usedG.size;
+    const {pairs,usedL,usedG}= Lf.length ? matchFrame(Lf, Gf, radiusPx) : {pairs:[],usedL:new Set(),usedG:new Set()};
+    fp+=Lf.length-usedL.size;
+    const latOf=new Map();
     for(const p of pairs){
+      const lat=Math.hypot(p.a.x-p.b.x, p.a.y-p.b.y)*px; latOf.set(p.b,lat);
+      if(!p.b.care){ nIgnoredPairs++; continue; }
+      tp++; const k=p.b.crowded?sub.crowded:sub.isolated; k.tp++; k.lat.push(lat);
       dx.push(p.a.x-p.b.x); dy.push(p.a.y-p.b.y);
       if(isFinite(p.a.z) && isFinite(p.b.z)){ dz.push(p.a.z-p.b.z); zTrue.push(p.b.z); nZ++;
         if(p.a.zClamped) zClampedMatched++; }
+    }
+    for(const g of Gf){
+      const hit=usedG.has(g);
+      if(!g.care) nIgnoredGT++;
+      else if(!hit){ fn++; (g.crowded?sub.crowded:sub.isolated).fn++; }
+      // The photon curve deliberately keeps SUB-threshold emitters (it is what shows where the
+      // threshold belongs) but not edge ones — those are a geometric impossibility, not a dim one.
+      if(isFinite(g.phot) && inField(g)) photSamples.push([g.phot, hit?1:0, hit?latOf.get(g):NaN]);
     }
     if(onProgress && performance.now()-yld>50){ onProgress(i/frames.length); await tick(); yld=performance.now(); }
   }
@@ -6176,6 +6240,40 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   // separately so the tail is visible as a COUNT instead of silently inflating the RMSE.
   const grossZnm=Math.max(150, (cfg.validation_matchRadius||250));
   const nGrossZ=has3d?dz.filter(v=>Math.abs(v)>grossZnm).length:0;
+
+  // Detection and lateral accuracy against photons-per-frame, log-spaced: shows WHERE the detector
+  // lets go, which one recall figure at one threshold cannot.
+  let photonBins=null;
+  if(photSamples.length>=20){
+    let lo=Infinity, hi=0; for(const q of photSamples){ if(q[0]>0&&q[0]<lo)lo=q[0]; if(q[0]>hi)hi=q[0]; }
+    lo=Math.max(lo,5);
+    if(hi>lo*1.5){ const NB=12, lw=Math.log(hi/lo)/NB;
+      photonBins=Array.from({length:NB},(_,i)=>({p0:lo*Math.exp(i*lw), p1:lo*Math.exp((i+1)*lw),
+                                                 pc:lo*Math.exp((i+0.5)*lw), n:0, hit:0, lat:[]}));
+      for(const q of photSamples){ if(q[0]<lo) continue;
+        const b=photonBins[Math.min(NB-1, Math.floor(Math.log(q[0]/lo)/lw))];
+        b.n++; if(q[1]){ b.hit++; b.lat.push(q[2]); } }
+      for(const b of photonBins){ b.recall=b.n?b.hit/b.n:NaN; b.lat50=b.lat.length?pct(b.lat,0.5):NaN; delete b.lat; }
+    }
+  }
+  // Where detection crosses 50%, log-interpolated between the two bins that straddle it: the
+  // detector's own sensitivity limit at these settings, in photons. It is what puts
+  // validation_minPhotons in context — a threshold well below it still counts emitters the
+  // detector has no realistic chance of finding, so recall then measures that gap, not a fault.
+  let phot50=NaN;
+  if(photonBins){ const B=photonBins.filter(b=>b.n>=5);
+    for(let i=1;i<B.length;i++) if(B[i-1].recall<0.5 && B[i].recall>=0.5){
+      const t=(0.5-B[i-1].recall)/(B[i].recall-B[i-1].recall);
+      phot50=Math.exp(Math.log(B[i-1].pc)+t*Math.log(B[i].pc/B[i-1].pc)); } }
+  const subStat=k=>({ n:k.tp+k.fn, recall:(k.tp+k.fn)?k.tp/(k.tp+k.fn):NaN, medLat:k.lat.length?pct(k.lat,0.5):NaN });
+  const isolated=subStat(sub.isolated), crowded=subStat(sub.crowded);
+  // SMLM-challenge "efficiency" (Sage et al., Nat. Methods 16, 387, 2019): one number trading
+  // detection against accuracy, E = 100 - sqrt((100-Jaccard%)^2 + alpha^2 * RMSE^2), alpha = 1/nm
+  // laterally and 0.5/nm axially. Reported for comparability with published benchmarks ONLY — it
+  // leans on RMSE, which here is dominated by a percent of gross failures (see pct() above).
+  const J100=100*tp/(tp+fp+fn);
+  const eff={ lat:100-Math.hypot(100-J100, 1.0*rmseLat) };
+  if(has3d){ eff.ax=100-Math.hypot(100-J100, 0.5*rmseZ); eff.e3d=(eff.lat+eff.ax)/2; }
 
   // Binned on TRUE z — the axis that matters. Binning on fitted z would fold the very error being
   // measured into the x-axis and flatten the curve towards zero.
@@ -6209,6 +6307,18 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     onLog(`matched ${tp.toLocaleString()} of ${(tp+fn).toLocaleString()} ground-truth emitter-frames `+
           `(${fp.toLocaleString()} unmatched localization${fp===1?'':'s'}) · recall ${(tp/(tp+fn)*100).toFixed(1)}% · `+
           `precision ${(tp/(tp+fp)*100).toFixed(1)}% · Jaccard ${(tp/(tp+fp+fn)).toFixed(3)}`);
+    if(minPhot>0||borderPx>0)
+      onLog(` counting only emitter-frames with ≥ ${minPhot} photons`+(borderPx>0?` and ≥ ${borderPx} px from the edge`:'')+
+            `: ${nIgnoredGT.toLocaleString()} dimmer/edge emitter-frame(s) left out of the tally, `+
+            `${nIgnoredPairs.toLocaleString()} of them detected anyway (counted as neither a hit nor a false positive).`);
+    if(isFinite(phot50))
+      onLog(` detection reaches 50% at ≈ ${phot50.toFixed(0)} photons/frame at these detection settings`+
+            (minPhot>0 && phot50>1.5*minPhot ? ` — well above the ${minPhot}-photon counting threshold, so most remaining misses are emitters `+
+              `between the two: too dim to find, bright enough to count. See “Show vs photons”.` : '.'));
+    if(crowdPx>0 && crowded.n)
+      onLog(` isolated: recall ${(isolated.recall*100).toFixed(1)}% · lateral median ${isFinite(isolated.medLat)?isolated.medLat.toFixed(1):'–'} nm (${isolated.n.toLocaleString()})  |  `+
+            `crowded (neighbour within ${(crowdPx*px).toFixed(0)} nm): recall ${(crowded.recall*100).toFixed(1)}% · `+
+            `lateral median ${isFinite(crowded.medLat)?crowded.medLat.toFixed(1):'–'} nm (${crowded.n.toLocaleString()})`);
     onLog(`lateral: median ${medLat.toFixed(1)} nm · 90th pct ${p90Lat.toFixed(1)} nm · RMSE ${rmseLat.toFixed(1)} nm · `+
           `bias (${biasX.toFixed(1)}, ${biasY.toFixed(1)}) nm`);
     if(has3d){
@@ -6221,10 +6331,13 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       else if(zClampedMatched) onLog(` ${zClampedMatched.toLocaleString()} matched loc(s) had z clamped to the calibration edge.`);
     }
     else onLog(`axial: no z on either side — a 2D fit method or a 2D simulation, so only detection and lateral accuracy apply.`);
+    onLog(`challenge efficiency: lateral ${eff.lat.toFixed(1)}`+(has3d?` · axial ${eff.ax.toFixed(1)} · 3D ${eff.e3d.toFixed(1)}`:'')+
+          ` (Sage et al. 2019; RMSE-based, so tail-sensitive — for comparison with published benchmarks, not the headline).`);
   }
   return { tp, fp, fn, jaccard:tp/(tp+fp+fn), recall:tp/(tp+fn), precision:tp/(tp+fp),
            biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
            nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
+           nIgnoredGT, nIgnoredPairs, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
            dx, dy, dz, zTrue, px, matchRadiusNm:cfg.validation_matchRadius||250 };
 }
 
@@ -6232,6 +6345,14 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
 // and the button that cycles them hides in that case — the same idiom updateMethodUI() uses to
 // hide the depth-colour row for a 2D fit method.
 let truthPlotMode='zbias';
+// The views a given result can actually show, in cycling order. The two z views need z; the photon
+// view needs photon-resolved ground truth. 'lateral' is always there, so there is always a plot.
+function truthPlotModes(res){
+  return [...(res.has3d?['zbias','scatter']:[]), 'lateral', ...(res.photonBins?['photons']:[])];
+}
+const TRUTH_PLOT_TITLES={ zbias:'Score: z error vs depth', scatter:'Score: fitted vs true z',
+                          lateral:'Score: lateral error', photons:'Score: detection vs photons' };
+const TRUTH_PLOT_BTN={ zbias:'Show z error', scatter:'Show fitted vs true', lateral:'Show lateral', photons:'Show vs photons' };
 
 // Score plot on the LEFT (raw) panel. Structure follows drawNenaPlot() exactly: setupPlot ->
 // claim the panel -> margins -> X()/Y() -> ticks/grid -> data -> axis stroked LAST -> labels ->
@@ -6239,19 +6360,18 @@ let truthPlotMode='zbias';
 function drawTruthScorePlot(res){
   const cv=_plotTarget||$('raw'); const {ctx,W,H}=setupPlot(cv,true);
   rawFull=null; setRawPlot(true); rawPlotName='truth';
-  const mode = res.has3d ? truthPlotMode : 'lateral';
-  $('rawTitle').textContent = mode==='scatter' ? 'Score: fitted vs true z'
-                            : mode==='lateral' ? 'Score: lateral error'
-                            : 'Score: z error vs depth';
+  const modes=truthPlotModes(res);
+  const mode = modes.includes(truthPlotMode) ? truthPlotMode : modes[0];
+  $('rawTitle').textContent = TRUTH_PLOT_TITLES[mode];
   hideOtherRawToggleBtns('truthPlotModeBtn');
-  { const b=$('truthPlotModeBtn');
-    if(b){ b.style.display = res.has3d ? '' : 'none';
-           b.textContent = mode==='zbias' ? 'Show fitted vs true' : mode==='scatter' ? 'Show lateral' : 'Show z error'; } }
+  { const b=$('truthPlotModeBtn');                 // labelled with the view a click leads TO
+    if(b){ b.style.display = modes.length>1 ? '' : 'none';
+           b.textContent = TRUTH_PLOT_BTN[modes[(modes.indexOf(mode)+1)%modes.length]]; } }
   const C=plotColors();
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
   const mL=62,mR=16,mT=30,mB=44, pw=W-mL-mR, ph=H-mT-mB;
   const GREEN='#0a7d32', MAG='#c81cc8', BLUE='#3572b0';
-  const axis=(X,Y,xlab,ylab,xt,yt,xdec,ydec)=>{
+  const axis=(X,Y,xlab,ylab,xt,yt,xdec,ydec,xfmt)=>{
     ctx.strokeStyle=C.grid; ctx.fillStyle=C.text; ctx.lineWidth=1; ctx.font='12px '+PLOT_FONT;
     ctx.textAlign='right'; ctx.textBaseline='middle';
     for(const v of yt){ const y=Y(v); ctx.beginPath(); ctx.moveTo(mL,y); ctx.lineTo(mL+pw,y); ctx.stroke();
@@ -6260,14 +6380,41 @@ function drawTruthScorePlot(res){
     ctx.textAlign='center'; ctx.textBaseline='top';
     for(const v of xt){ const x=X(v);
       ctx.strokeStyle=C.text; ctx.beginPath(); ctx.moveTo(x,mT+ph); ctx.lineTo(x,mT+ph+5); ctx.stroke();
-      ctx.fillText(v.toFixed(xdec), x, mT+ph+9); }
+      ctx.fillText(xfmt?xfmt(v):v.toFixed(xdec), x, mT+ph+9); }
     ctx.strokeStyle=C.text; ctx.beginPath(); ctx.moveTo(mL,mT); ctx.lineTo(mL,mT+ph); ctx.lineTo(mL+pw,mT+ph); ctx.stroke();
     ctx.fillStyle=C.axis; ctx.textAlign='center'; ctx.textBaseline='top';
     ctx.fillText(xlab, mL+pw/2, mT+ph+26);
     ctx.save(); ctx.translate(14,mT+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='middle'; ctx.fillText(ylab,0,0); ctx.restore();
   };
   let hover;
-  if(mode==='lateral'){
+  if(mode==='photons'){
+    // Recall (left axis, 0-100%) and median lateral error (same 0-100 scale read as nm) against the
+    // photons an emitter put into the frame, on a log x-axis. The dashed line is the counting
+    // threshold: everything left of it is what validation_minPhotons keeps out of the headline.
+    const B=res.photonBins.filter(b=>b.n>0);
+    const l0=Math.log10(B[0].p0), l1=Math.log10(B[B.length-1].p1);
+    let latMax=0; for(const b of B) if(isFinite(b.lat50)&&b.lat50>latMax) latMax=b.lat50;
+    const ymax=Math.max(100, latMax*1.1);
+    const X=v=>mL+pw*(Math.log10(v)-l0)/Math.max(1e-9,l1-l0), Y=v=>mT+ph*(1-v/ymax);
+    const xt=[]; for(let d=Math.ceil(l0); d<=Math.floor(l1); d++) xt.push(d);
+    axis(v=>X(Math.pow(10,v)),Y,'photons in frame (log scale)','recall (%)  /  lateral median (nm)',xt,niceTicks(0,ymax,5),0,0,
+         v=>Math.pow(10,v).toLocaleString());
+    ctx.fillStyle=C.bar; ctx.globalAlpha=0.55;
+    for(const b of B){ const x0=X(b.p0), x1=X(b.p1), y=Y(100*b.recall);
+      ctx.fillRect(x0,y,Math.max(1,x1-x0-1),(mT+ph)-y); }
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=MAG; ctx.lineWidth=1.8; ctx.beginPath(); let started=false;
+    for(const b of B){ if(!isFinite(b.lat50)) continue; const x=X(b.pc), y=Y(b.lat50);
+      started?ctx.lineTo(x,y):ctx.moveTo(x,y); started=true; } ctx.stroke();
+    if(res.minPhotons>0 && Math.log10(res.minPhotons)>l0 && Math.log10(res.minPhotons)<l1){
+      ctx.strokeStyle=C.text; ctx.lineWidth=1.2; ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.moveTo(X(res.minPhotons),mT); ctx.lineTo(X(res.minPhotons),mT+ph); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle=C.axis; ctx.fillText('▮ recall', mL+8, mT-4);
+    ctx.fillStyle=MAG;    ctx.fillText('lateral median', mL+72, mT-4);
+    if(res.minPhotons>0){ ctx.fillStyle=C.text; ctx.fillText(`┊ counted from ${res.minPhotons} photons`, mL+172, mT-4); }
+    hover={mL,mT,pw,ph,xA:l0,xB:l1,yTop:ymax,yBot:0,fmt:(vx,vy)=>`${Math.pow(10,vx).toFixed(0)} photons · ${vy.toFixed(0)}`};
+  } else if(mode==='lateral'){
     // Histogram of the per-pair lateral error. Always available, and the whole plot when there is
     // no z at all — so a 2D run still gets a real picture, not a blank panel.
     const d=[]; for(let i=0;i<res.dx.length;i++) d.push(Math.hypot(res.dx[i],res.dy[i])*res.px);
@@ -6337,6 +6484,13 @@ function drawTruthScorePlot(res){
   syncSaveImg();
 }
 
+// scoreTruthCore() is DOM- and global-free, so the two facts it cannot read from PARAMS — the
+// simulated frame's size and the border the Run's detector actually used — travel in on the
+// config. One helper, so the interactive button and analyze() cannot drift apart on it.
+function truthScoreConfig(cfg, det){
+  return {...cfg, _frameW:stack?stack.w:0, _frameH:stack?stack.h:0, _detBorder:det&&det.border?det.border:0};
+}
+
 // "Score vs truth" button handler — shaped exactly like computeNeNA().
 async function computeTruthScore(){
   if(!lastResult||!lastResult.locs.length){ log('Localize first.'); return; }
@@ -6344,12 +6498,14 @@ async function computeTruthScore(){
   $('truthBtn').disabled=true;
   try{
     logCmd({scoreVsTruth:true, pxnm:paramValue('pxnm'),
-            validation_matchRadius:paramValue('validation_matchRadius'), validation_zBins:paramValue('validation_zBins')});
+            validation_matchRadius:paramValue('validation_matchRadius'), validation_zBins:paramValue('validation_zBins'),
+            validation_minPhotons:paramValue('validation_minPhotons'), validation_border:paramValue('validation_border'),
+            validation_crowdRadius:paramValue('validation_crowdRadius')});
     log('\nScoring against simulated ground truth…');
     if(renderLocs) log(`(using the filtered subset: ${renderLocs.length.toLocaleString()} of ${lastResult.locs.length.toLocaleString()} localizations)`);
     const t0=performance.now();
     const r=await scoreTruthCore(renderLocs||lastResult.locs, groundTruthEvents, stack?stack.n:0,
-                                 lastResult.px, simTrueDrift, buildConfigFromParams(),
+                                 lastResult.px, simTrueDrift, truthScoreConfig(buildConfigFromParams(), lastResult.det),
                                  {onLog:log, onProgress:p=>setProg(100*p)});
     setProg(null);
     if(r.err){ log(r.err+'.'); return; }
@@ -14534,8 +14690,10 @@ $('nenaBtn').addEventListener('click',computeNeNA);
 $('frcBtn').addEventListener('click',computeFRC);
 $('truthBtn').addEventListener('click',computeTruthScore);
 $('truthPlotModeBtn').addEventListener('click',()=>{
-  truthPlotMode = truthPlotMode==='zbias' ? 'scatter' : truthPlotMode==='scatter' ? 'lateral' : 'zbias';
-  if(lastTruthScore && rawIsPlot && rawPlotName==='truth') drawTruthScorePlot(lastTruthScore);
+  if(!lastTruthScore) return;
+  const modes=truthPlotModes(lastTruthScore), cur=modes.includes(truthPlotMode)?truthPlotMode:modes[0];
+  truthPlotMode = modes[(modes.indexOf(cur)+1)%modes.length];
+  if(rawIsPlot && rawPlotName==='truth') drawTruthScorePlot(lastTruthScore);
 });
 $('pcfoBtn').addEventListener('click',estimateGainOffset);
 // Runs Estimate first if there's no PCFO result yet, same "run the
@@ -15495,14 +15653,23 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-08b — Fixed the 'Tilted plane'/'Uniform 3D volume'
-simulation structures generating localizations clustered on only a few repeated xy positions:
-buildGeometricStructure() sampled them from a FIXED pool of 2000 candidate points regardless of
-the frame area, so a typical movie's emitter-arrival count already exceeded that pool (and grows
-worse at larger FOV), forcing many blinking events to reuse the exact same point instead of
-filling the plane/volume. Candidate count now scales with the sampled area (~2px target spacing,
-capped at 50000) so spacing stays fine regardless of FOV, matching how filaments/ring/NUP already
-self-scale their own candidate density with the object's extent.
+log(`webSMLM v0.12.1-dev · build 2026-09-19a — Score vs truth now says what it COUNTS. A
+simulated emitter only counts in a frame where it delivered at least Min photons/frame (100 by
+default) and sits outside the edge zone the fitter cannot reach; dimmer or edge emitter-frames are
+"don't care" — detecting one is not a false positive, missing one is not a miss. Matching still
+runs against ALL ground truth first and classifies afterwards, so a real detection of a dim
+emitter is never turned into a false positive. Set Min photons to 0 and Edge exclusion to 0 for
+the previous behaviour, which it then reproduces exactly.
+New fourth plot view, Show vs photons: recall and median lateral error against the photons an
+emitter put into the frame, with the counting threshold marked — and the log now reports where
+detection crosses 50%. Measured on the default detector (wavelet, k=4, background 5): ~440
+photons, with 96-99% recall above ~600. So the ~77% recall seen for every fit method alike was a
+mix of two things: slivers of frames too dim to matter (what the threshold removes) and a real
+sensitivity limit between ~100 and ~600 photons (what it deliberately does not).
+Also new: an isolated/crowded split (another counted emitter ON within Crowding radius, 300 nm)
+— on the same run, 5.0 nm lateral median at 82% recall isolated vs 23.0 nm at 50% crowded — and
+the SMLM-challenge efficiency (Sage et al. 2019), reported for comparability only since it leans
+on RMSE. The view toggle now shows for 2D results too.
 Still under review; not yet released to main.`);
 $('themeLightBtn').addEventListener('click', ()=>applyTheme('light'));
 $('themeDarkBtn').addEventListener('click', ()=>applyTheme('dark'));
@@ -16464,7 +16631,8 @@ async function analyze(config){
   // whatever drift/pairing/tracking left behind.
   let truthScore=null;
   if(cfg.scoreVsTruth && locs.length && groundTruthEvents)
-    truthScore = await scoreTruthCore(locs, groundTruthEvents, stack?stack.n:0, cfg.pxnm, simTrueDrift, cfg,
+    truthScore = await scoreTruthCore(locs, groundTruthEvents, stack?stack.n:0, cfg.pxnm, simTrueDrift,
+                                      truthScoreConfig(cfg, r&&r.det),
                                       {onLog, onProgress:p=>onProgress(100*p)});
   // config.sptTrack — the headless equivalent of clicking Track (MODULE:
   // spt). Unlike sSmlmPair, runs AFTER drift/NeNA/FRC rather than before:

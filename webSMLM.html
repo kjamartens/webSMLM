@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2735   PARAMS registry, single source of truth for params;
+    params          2737   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3668   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3680   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3967   synthetic stack generator ("Simulate movie");
+    simulation      3979   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6237   score localizations against the simulator's own
+    validation      6285   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6699   per-frame band-pass + local-maxima detection
-    fit             6976   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6750   per-frame band-pass + local-maxima detection
+    fit             7027   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7485   accumulate to offscreen buffer; view/colour/blur;
+    render          7536   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8767   frame-parallel detect/fit worker pool; dedicated
+    workers         8818   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9336   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9628   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9387   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9679   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10045   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10096   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10551   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10602   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11266  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11317  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11736  single particle tracking, trackpy-inspired;
+    spt             11787  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13238  top-level orchestration, *Core()/wrapper split;
+    pipeline        13289  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13862  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13913  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16023  localizations table, filtering, histograms;
+    table           16087  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16610  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16674  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19c</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19d</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2119,7 +2119,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="300" class="num"></label>
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row">Pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
-        <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min" selected>Minimal (fastest)</option><option value="med">Medium</option><option value="custom">Custom</option></select></label>
+        <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. Maximal: also adds blinking out-of-focus emitters rendered with the real defocused PSF (Zernike PSF model only) — roughly doubles the simulation time. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min" selected>Minimal (fastest)</option><option value="med">Medium</option><option value="max">Maximal (slowest)</option><option value="custom">Custom</option></select></label>
         <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), med 0.5 (typical SMLM), high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.5)</option><option value="high">High (2)</option><option value="custom">Custom</option></select></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
@@ -2224,6 +2224,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="How many times brighter the background is inside the simulated cell outline than outside it. 1 = flat. Background (photons/px) above stays the mean over the whole field of view.">Cell contrast (×) <input type="number" id="simulation_bgCellContrast" min="1" max="20" step="0.5" value="1" class="num"></label>
           <label class="row" title="Static out-of-focus haze: the labelled structure's own projected density, blurred wide, relative to the flat/cell part. 0 = none.">Out-of-focus haze (weight) <input type="number" id="simulation_bgHazeWeight" min="0" max="10" step="0.1" value="0" class="num"></label>
           <label class="row" title="How wide the haze is blurred (Gaussian σ).">Haze blur σ (nm) <input type="number" id="simulation_bgHazeWidth" min="100" max="5000" step="50" value="800" class="num"></label>
+          <label class="row" title="A second, blinking population on the same structure, 0.3–2 µm out of focus, rendered with the real defocused PSF. Per in-focus emitter; 0 = none. Needs the Zernike-aberrated PSF model. These emitters are in the movie but never in the score.">Out-of-focus emitters (×) <input type="number" id="simulation_hazeRatio" min="0" max="10" step="0.1" value="0" class="num"></label>
+          <label class="row" title="How far from focus the out-of-focus emitters reach. Capped at the PSF z range.">Out-of-focus depth (± nm) <input type="number" id="simulation_hazeDepth" min="300" max="5000" step="50" value="1500" class="num"></label>
           <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="0" class="num"></label>
         </details>
         <details class="subsim" id="cameraBox">
@@ -3084,9 +3086,19 @@ const PARAMS = {
   // run spends, written into the ordinary parameters by wirePreset() exactly like the density
   // preset: 'min' is the original model (blink once, constant brightness, flat background) and the
   // cheapest; 'med' adds multi-blink kinetics, brightness spread, a cell-shaped fading background
-  // and a static haze — all O(pixels) per frame, so nearly free. Deliberately does NOT touch the
+  // and a static haze — all O(pixels) per frame, so nearly free; 'max' adds blinking out-of-focus
+  // emitters, each a full PSF splat, so cost grows with simulation_hazeRatio. Does NOT touch the
   // PSF model: that choice has its own control and its own, much larger, cost.
-  simulation_realism: { type:'enum', id:'simulation_realism', label:'Realism/compute preset', options:['min','med','custom'], default:'min' },
+  // simulation_hazeRatio = out-of-focus emitters per in-focus emitter: a second blinking population
+  // on the same structure, 0.3-2 µm either side of focus (see generateSynthetic()), rendered with
+  // the real defocused PSF through the ordinary kernel-stack splat. 0 = none. This is the one
+  // realism feature with a real per-frame cost — every such emitter is a full splat — which is why
+  // it is what separates the 'max' preset from 'med'. `dens` stays the IN-FOCUS density. Needs the
+  // Zernike PSF model (a fixed-σ Gaussian has no defocus to show). Never scored: see cares().
+  simulation_hazeRatio: { type:'number', id:'simulation_hazeRatio', label:'Out-of-focus emitters (per in-focus emitter)', min:0, max:10, step:0.1, default:0, int:false },
+  // simulation_hazeDepth = how far from focus (nm) that population reaches; capped at the PSF z range.
+  simulation_hazeDepth: { type:'number', id:'simulation_hazeDepth', label:'Out-of-focus depth (± nm)', min:300, max:5000, step:50, default:1500, int:false },
+  simulation_realism: { type:'enum', id:'simulation_realism', label:'Realism/compute preset', options:['min','med','max','custom'], default:'min' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
   simbg: { type:'number', id:'simbg', label:'Simulation background (photons/px)', min:0, max:500, step:1, default:0, int:false },
@@ -4528,7 +4540,10 @@ async function generateSynthetic(){
   // render loop below untouched for that case — a Gaussian PSF has no z-dependent width to vary.
   const psfModel=paramValue('simulation_psfModel');
   let zKernel=null, zKernelStack=null;
-  if(psfModel==='zernike' && is3d){
+  // Out-of-focus emitters need a z-dependent PSF even in a 2D simulation, so they force the full
+  // kernel stack too; the in-focus emitters then simply all use its focal plane (their z is 0).
+  const hazeRatio=paramValue('simulation_hazeRatio'), hazeDepth=paramValue('simulation_hazeDepth');
+  if(psfModel==='zernike' && (is3d || hazeRatio>0)){
     const cfg=readPsfConfigFromUI();
     const kstack=await getOrBuildPsfKernelStack(cfg);
     const norm=new Array(kstack.nz);
@@ -4591,9 +4606,9 @@ async function generateSynthetic(){
   const offLife=paramValue('simulation_offLifetime'), photCV=paramValue('simulation_photCV');
   const richPhotophysics = pBleach<1 || photCV>0;
   let nMolecules=0;
-  const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol)=>{
+  const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol,haze)=>{
     if(tEnd<=0 || tStart>=n) return;                // never overlaps the movie — nothing to record
-    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol});
+    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
@@ -4602,29 +4617,35 @@ async function generateSynthetic(){
       if(ov>0) frameEvents[fi].push([ex, ey, ez, ov*bright]);
     }
   };
-  if(richPhotophysics){
-    // A MOLECULE activates once, then alternates ON (exp, mean `lifetime`) and dark (exp, mean
-    // offLife) until an ON period ends in bleaching (prob pBleach) — a geometric number of blinks,
-    // mean 1/pBleach. `dens` is the mean number of emitters ON per µm² per frame, and must stay
-    // that: a molecule is ON for meanBlinks x lifetime in total, so molecules activate at
-    // dens·area / (lifetime · meanBlinks). The lead-in covers 5 mean molecule lifespans (capped),
-    // so frame 0 already sees molecules mid-life rather than a population that all just switched on.
+  // A MOLECULE activates once, then alternates ON (exp, mean `lifetime`) and dark (exp, mean
+  // offLife) until an ON period ends in bleaching (prob pBleach) — a geometric number of blinks,
+  // mean 1/pBleach. `density` is the mean number of emitters ON per µm² per frame, and must stay
+  // that: a molecule is ON for meanBlinks x lifetime in total, so molecules activate at
+  // density·area / (lifetime · meanBlinks). The lead-in covers 5 mean molecule lifespans (capped),
+  // so frame 0 already sees molecules mid-life rather than a population that all just switched on.
+  // `r` is the random stream to draw from, `zOf` optionally overrides a site's own z, `idBase`
+  // keeps molecule ids unique across populations. Returns how many molecules it spawned.
+  const spawnMolecules=(r, density, zOf, haze, idBase)=>{
     const meanBlinks=1/pBleach, molSpan=meanBlinks*lifetime+(meanBlinks-1)*offLife;
     const leadM=Math.min(5*molSpan, 20000), rangeM=n+leadM;
-    const molRate=lifetime>0 ? (dens*areaUm2)/(lifetime*meanBlinks) : 0;
-    nMolecules=poisson(molRate*rangeM, rng);
+    const molRate=lifetime>0 ? (density*areaUm2)/(lifetime*meanBlinks) : 0;
+    const nMol=poisson(molRate*rangeM, r);
     const s2=Math.log(1+photCV*photCV), sLn=Math.sqrt(s2);      // log-normal with mean exactly 1
-    for(let m=0;m<nMolecules;m++){
-      const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
-      let t=-leadM+rng()*rangeM;
+    for(let m=0;m<nMol;m++){
+      const gi=Math.floor(r()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=zOf?zOf(r):gt[gi][2];
+      let t=-leadM+r()*rangeM;
       for(let guard=0; guard<10000 && t<n; guard++){
-        const tEnd=t-lifetime*Math.log(1-rng());
-        const bright = photCV>0 ? Math.exp(-s2/2+sLn*gauss(rng)) : 1;
-        addBlink(ex,ey,ez,t,tEnd,bright,m);
-        if(rng()<pBleach) break;                    // this ON period ended in bleaching
-        t=tEnd-offLife*Math.log(1-rng());           // otherwise: dark, then blink again
+        const tEnd=t-lifetime*Math.log(1-r());
+        const bright = photCV>0 ? Math.exp(-s2/2+sLn*gauss(r)) : 1;
+        addBlink(ex,ey,ez,t,tEnd,bright,idBase+m,haze);
+        if(r()<pBleach) break;                      // this ON period ended in bleaching
+        t=tEnd-offLife*Math.log(1-r());             // otherwise: dark, then blink again
       }
     }
+    return nMol;
+  };
+  if(richPhotophysics){
+    nMolecules=spawnMolecules(rng, dens, null, false, 0);
   } else {
   const nEvents=poisson(arrivalRate*rangeLen, rng);
   for(let e=0;e<nEvents;e++){
@@ -4640,13 +4661,39 @@ async function generateSynthetic(){
   }
   nMolecules=nEvents;
   }
+  // Out-of-focus emitters ("max" realism): a second population on the SAME labelled structure,
+  // with the same photophysics, displaced in z to between the PSF's single-valued range and
+  // simulation_hazeDepth, either side of focus — the part of a thick labelled sample that sits
+  // just outside the focal slab. They go through the ordinary kernel-stack splat, so each one is
+  // rendered with the real defocused PSF; no separate convolution layer. A dedicated FFT layer was
+  // planned and dropped on arithmetic: at the 2-3 µm where it would have paid off, the PSF is wider
+  // than half the frame, i.e. an almost flat, barely fluctuating pedestal — which the static haze
+  // (simulation_bgHazeWeight) already is. The regime that actually disturbs detection and fitting,
+  // 0.5-2 µm out of focus, is exactly what the kernel stack already covers.
+  // Own random stream, drawn after everything above: the in-focus emitters do not move when this
+  // is switched on. `dens` stays the IN-FOCUS density; hazeRatio is out-of-focus per in-focus.
+  let nHazeBlinks=0;
+  if(hazeRatio>0 && zKernelStack){
+    const hzRng = simSeed>0 ? mulberry32((simSeed^0x27d4eb2f)>>>0) : Math.random;
+    const halfKernel=zKernelStack.zStepNm*(zKernelStack.nz-1)/2;
+    const zLo=Math.min(Math.max(zKernelStack.zUsableNm||0, 300), halfKernel), zHi=Math.min(Math.max(hazeDepth,zLo), halfKernel);
+    const before=events.length;
+    spawnMolecules(hzRng, dens*hazeRatio, r=>(r()<0.5?-1:1)*(zLo+r()*(zHi-zLo)), true, 1e9);
+    nHazeBlinks=events.length-before;
+    log(`Out-of-focus emitters: ${nHazeBlinks.toLocaleString()} blinks at ${zLo.toFixed(0)}–${zHi.toFixed(0)} nm either side of focus `+
+        `(${hazeRatio}× the in-focus density), rendered with the real defocused PSF. They are in the movie but `+
+        `not in the score: detecting one is neither a hit nor a false positive.`+
+        (hazeDepth>halfKernel?` Depth capped at the PSF z range (±${halfKernel.toFixed(0)} nm) — widen it to go deeper.`:''));
+  } else if(hazeRatio>0)
+    log(`Out-of-focus emitters need the Zernike-aberrated PSF model — a fixed-σ Gaussian looks the same at every depth, `+
+        `so they would just be extra in-focus emitters. Skipped; the static haze still applies.`);
   groundTruthEvents = events.map(e=>{
     const s=Math.max(e.tStart,0), t=Math.min(e.tEnd,n);
     // rate = this blink's photons per FULL frame of ON time; a frame it only partly overlaps gets
     // rate x overlap. scoreTruthCore() (MODULE: validation) needs it to decide whether an
     // emitter-frame was bright enough to be fairly expected to be detected at all.
     const rate = e.rate===undefined ? photPerFrame : e.rate;   // per-blink once brightness varies
-    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, photonsTotal:rate*Math.max(0,t-s)};
+    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, haze:!!e.haze, photonsTotal:rate*Math.max(0,t-s)};
   });
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
@@ -4691,7 +4738,8 @@ async function generateSynthetic(){
   // happens to be set to (rblur) would blur them into blobs far larger than a "ground truth"
   // marker should be; 1 nm renders as a crisp point at any realistic magnification instead.
   const gtLp=1/px;   // 1 nm expressed in native camera px, same unit lpx/lpy are always stored in
-  groundTruthLocs = groundTruthEvents.map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal, moleculeId:e.moleculeId, lpx:gtLp, lpy:gtLp}));
+  // (the out-of-focus haze population is NOT part of the structure's ground truth to look at)
+  groundTruthLocs = groundTruthEvents.filter(e=>!e.haze).map(e=>({x:e.x, y:e.y, z:e.z, photons:e.photonsTotal, moleculeId:e.moleculeId, lpx:gtLp, lpy:gtLp}));
   // Store the true per-frame drift so drift correction can be scored. driftAt() is in CAMERA
   // PIXELS (driftpx is "Simulated total drift (px)"), so the *px here is what actually makes
   // dx()/dy() nanometres — which is both what this comment always claimed and what the sole
@@ -6260,7 +6308,7 @@ function groundTruthByFrame(gtEvents, nFrames, first, last){
     for(let fi=Math.max(f0,first); fi<=Math.min(f1,last); fi++){
       const ov=Math.min(fi+1,e.tEnd)-Math.max(fi,e.tStart);
       let a=byFrame.get(fi); if(!a){ a=[]; byFrame.set(fi,a); }
-      a.push({x:e.x, y:e.y, z:e.z, phot: e.rate===undefined ? Infinity : e.rate*Math.max(0,ov)});
+      a.push({x:e.x, y:e.y, z:e.z, haze:!!e.haze, phot: e.rate===undefined ? Infinity : e.rate*Math.max(0,ov)});
     }
   }
   return byFrame;
@@ -6347,10 +6395,12 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   const W=cfg._frameW||Infinity, H=cfg._frameH||Infinity;
   const crowdPx=(cfg.validation_crowdRadius>0?cfg.validation_crowdRadius:0)/px;
   const inField=g=> g.x>=borderPx && g.y>=borderPx && g.x<=W-1-borderPx && g.y<=H-1-borderPx;
-  const cares=g=> g.phot>=minPhot && inField(g);
+  // An out-of-focus haze emitter (simulation_hazeRatio) is never cared for: it is real light in the
+  // movie, so finding it is no false positive, but it is not part of the structure being scored.
+  const cares=g=> !g.haze && g.phot>=minPhot && inField(g);
 
   const dx=[], dy=[], dz=[], zTrue=[];             // matched-pair errors (px, px, nm) + true z (nm)
-  let tp=0, fp=0, fn=0, zClampedMatched=0, nZ=0, nIgnoredGT=0, nIgnoredPairs=0;
+  let tp=0, fp=0, fn=0, zClampedMatched=0, nZ=0, nIgnoredGT=0, nIgnoredPairs=0, nHazeDetected=0;
   const sub={ isolated:{tp:0,fn:0,lat:[]}, crowded:{tp:0,fn:0,lat:[]} };
   const photSamples=[];                            // [phot, matched 0/1, lateral error nm] per in-field GT
   const frames=[...new Set([...byFrameGT.keys(), ...byFrameLoc.keys()])].sort((a,b)=>a-b);
@@ -6362,7 +6412,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     // Truth for THIS frame = structure position + the drift the simulator applied to it. Note
     // trueDrift's accessors are in nm (see simTrueDrift), so convert back to camera pixels here.
     const drx=trueDrift? trueDrift.dx(f)/px : 0, dry=trueDrift? trueDrift.dy(f)/px : 0;
-    const Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot}));
+    const Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot, haze:g.haze}));
     for(const g of Gf) g.care=cares(g);
     // Crowded = another cared-for emitter is ON within validation_crowdRadius in this same frame,
     // so the two PSFs overlap and a single-emitter fit is being asked something it cannot answer.
@@ -6379,7 +6429,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     const latOf=new Map();
     for(const p of pairs){
       const lat=Math.hypot(p.a.x-p.b.x, p.a.y-p.b.y)*px; latOf.set(p.b,lat);
-      if(!p.b.care){ nIgnoredPairs++; continue; }
+      if(!p.b.care){ nIgnoredPairs++; if(p.b.haze) nHazeDetected++; continue; }
       tp++; const k=p.b.crowded?sub.crowded:sub.isolated; k.tp++; k.lat.push(lat);
       dx.push(p.a.x-p.b.x); dy.push(p.a.y-p.b.y);
       if(isFinite(p.a.z) && isFinite(p.b.z)){ dz.push(p.a.z-p.b.z); zTrue.push(p.b.z); nZ++;
@@ -6391,7 +6441,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       else if(!hit){ fn++; (g.crowded?sub.crowded:sub.isolated).fn++; }
       // The photon curve deliberately keeps SUB-threshold emitters (it is what shows where the
       // threshold belongs) but not edge ones — those are a geometric impossibility, not a dim one.
-      if(isFinite(g.phot) && inField(g)) photSamples.push([g.phot, hit?1:0, hit?latOf.get(g):NaN]);
+      if(!g.haze && isFinite(g.phot) && inField(g)) photSamples.push([g.phot, hit?1:0, hit?latOf.get(g):NaN]);
     }
     if(onProgress && performance.now()-yld>50){ onProgress(i/frames.length); await tick(); yld=performance.now(); }
   }
@@ -6485,10 +6535,11 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     onLog(`matched ${tp.toLocaleString()} of ${(tp+fn).toLocaleString()} ground-truth emitter-frames `+
           `(${fp.toLocaleString()} unmatched localization${fp===1?'':'s'}) · recall ${(tp/(tp+fn)*100).toFixed(1)}% · `+
           `precision ${(tp/(tp+fp)*100).toFixed(1)}% · Jaccard ${(tp/(tp+fp+fn)).toFixed(3)}`);
-    if(minPhot>0||borderPx>0)
+    if(minPhot>0||borderPx>0||nIgnoredGT>0)
       onLog(` counting only emitter-frames with ≥ ${minPhot} photons`+(borderPx>0?` and ≥ ${borderPx} px from the edge`:'')+
             `: ${nIgnoredGT.toLocaleString()} dimmer/edge emitter-frame(s) left out of the tally, `+
             `${nIgnoredPairs.toLocaleString()} of them detected anyway (counted as neither a hit nor a false positive).`);
+    if(nHazeDetected) onLog(` ${nHazeDetected.toLocaleString()} localization(s) were out-of-focus haze emitters — real light, so not false positives, but not scored either.`);
     if(isFinite(phot50))
       onLog(` detection reaches 50% at ≈ ${phot50.toFixed(0)} photons/frame at these detection settings`+
             (minPhot>0 && phot50>1.5*minPhot ? ` — well above the ${minPhot}-photon counting threshold, so most remaining misses are emitters `+
@@ -6515,7 +6566,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   return { tp, fp, fn, jaccard:tp/(tp+fp+fn), recall:tp/(tp+fn), precision:tp/(tp+fp),
            biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
            nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
-           nIgnoredGT, nIgnoredPairs, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
+           nIgnoredGT, nIgnoredPairs, nHazeDetected, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
            dx, dy, dz, zTrue, px, matchRadiusNm:cfg.validation_matchRadius||250 };
 }
 
@@ -14997,9 +15048,11 @@ wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{
 // 'min' is, field for field, the defaults — i.e. the original model, byte-identical for a seed.
 wirePreset('simulation_realism', {
   min:{ simulation_blinkBleachProb:1,   simulation_photCV:0,   simbg:0,  simulation_bgCellContrast:1,
-        simulation_bgHazeWeight:0, simulation_bgDecayFrames:0 },
+        simulation_bgHazeWeight:0, simulation_bgDecayFrames:0,   simulation_hazeRatio:0 },
   med:{ simulation_blinkBleachProb:0.2, simulation_photCV:0.5, simbg:10, simulation_bgCellContrast:3,
-        simulation_bgHazeWeight:1, simulation_bgDecayFrames:150 } });
+        simulation_bgHazeWeight:1, simulation_bgDecayFrames:150, simulation_hazeRatio:0 },
+  max:{ simulation_blinkBleachProb:0.2, simulation_photCV:0.5, simbg:10, simulation_bgCellContrast:3,
+        simulation_bgHazeWeight:1, simulation_bgDecayFrames:150, simulation_hazeRatio:1 } });
 
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
@@ -15859,7 +15912,18 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-19c — Background, and a Realism/compute preset.
+log(`webSMLM v0.12.1-dev · build 2026-09-19d — Realism/compute gains Maximal: blinking
+out-of-focus emitters. A second population on the same labelled structure, with the same
+blinking, 0.45–1.5 µm either side of focus (Out-of-focus emitters ×, Out-of-focus depth), rendered
+with the real defocused PSF through the ordinary splat — so it needs the Zernike PSF model.
+Emitter density stays the IN-FOCUS density, and the in-focus emitters do not move when this is
+switched on (own random stream). Cost, measured: Medium 1.09× and Maximal 2.9× the time of
+Minimal (Zernike PSF, 128 px).
+They are in the movie but not in the score: finding one is neither a hit nor a false positive,
+and Score vs truth reports how many were found. On an otherwise identical run that was 163 of
+2,816 localizations — 5.8% of the reconstruction is out-of-focus light that nothing in an ordinary
+analysis would flag — with true false positives up from 12 to 31.
+— and from build 2026-09-19c: Background, and a Realism/compute preset.
 New Background section: Cell contrast (a soft-edged cell, brighter inside than out), Out-of-focus
 haze (the labelled structure's own projected density, blurred wide) and a Fade time constant
 (background bleaching down to a 30% floor). Background (photons/px) keeps its meaning as the mean

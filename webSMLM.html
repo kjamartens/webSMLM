@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2727   PARAMS registry, single source of truth for params;
+    params          2735   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3634   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3668   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3933   synthetic stack generator ("Simulate movie");
+    simulation      3967   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6137   score localizations against the simulator's own
+    validation      6237   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6599   per-frame band-pass + local-maxima detection
-    fit             6876   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6699   per-frame band-pass + local-maxima detection
+    fit             6976   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7385   accumulate to offscreen buffer; view/colour/blur;
+    render          7485   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8667   frame-parallel detect/fit worker pool; dedicated
+    workers         8767   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9236   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9528   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9336   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9628   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift           9945   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10045   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10451   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10551   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11166  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11266  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11636  single particle tracking, trackpy-inspired;
+    spt             11736  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13138  top-level orchestration, *Core()/wrapper split;
+    pipeline        13238  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13762  Micro-Manager/pycromanager camera bridge
+    liveStreaming   13862  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           15902  localizations table, filtering, histograms;
+    table           16023  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16489  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16610  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2119,6 +2119,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="300" class="num"></label>
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row">Pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
+        <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min" selected>Minimal (fastest)</option><option value="med">Medium</option><option value="custom">Custom</option></select></label>
         <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), med 0.5 (typical SMLM), high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.5)</option><option value="high">High (2)</option><option value="custom">Custom</option></select></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
@@ -2217,6 +2218,13 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           scaled by the fraction of a frame the emitter was actually on, so e.g. a half-frame overlap emits
           half the photons.</p>
         </div>
+        </details>
+        <details class="subsim" id="backgroundBox">
+          <summary>Background</summary>
+          <label class="row" title="How many times brighter the background is inside the simulated cell outline than outside it. 1 = flat. Background (photons/px) above stays the mean over the whole field of view.">Cell contrast (×) <input type="number" id="simulation_bgCellContrast" min="1" max="20" step="0.5" value="1" class="num"></label>
+          <label class="row" title="Static out-of-focus haze: the labelled structure's own projected density, blurred wide, relative to the flat/cell part. 0 = none.">Out-of-focus haze (weight) <input type="number" id="simulation_bgHazeWeight" min="0" max="10" step="0.1" value="0" class="num"></label>
+          <label class="row" title="How wide the haze is blurred (Gaussian σ).">Haze blur σ (nm) <input type="number" id="simulation_bgHazeWidth" min="100" max="5000" step="50" value="800" class="num"></label>
+          <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="0" class="num"></label>
         </details>
         <details class="subsim" id="cameraBox">
           <summary>Camera parameters</summary>
@@ -3053,6 +3061,32 @@ const PARAMS = {
   // 'custom'. Roughly: sparse enough that PSFs never overlap / typical SMLM / dense enough that
   // single-emitter fitting visibly breaks down (compare the isolated/crowded split in Score vs truth).
   simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','custom'], default:'low' },
+  // ---- structured ("biological") background. `simbg` stays the FOV-MEAN photons/px throughout:
+  // everything below only reshapes the field in space and time around that mean (see
+  // buildSimBackgroundMap()/simBgScale()), so an existing simbg value keeps its meaning. ----
+  // simulation_bgCellContrast = how many times brighter the background is inside the simulated
+  // cell outline than outside it (autofluorescence). 1 = flat (the original model). Measured, and
+  // not what was expected: a SMOOTH field like this costs the detector almost nothing (x5 contrast
+  // at a 20 photons/px mean: recall 81.9% -> 81.6%, 50%-detection point unchanged at ~437 photons)
+  // because the band-pass removes it before the mean+k·sigma threshold ever sees it. What it does
+  // cost is precision — 5.7 -> 7.1 nm median lateral — through the extra shot noise inside the
+  // cell. So this tests the FITTER's background handling, not the detector's threshold.
+  simulation_bgCellContrast: { type:'number', id:'simulation_bgCellContrast', label:'Background: cell contrast (×)', min:1, max:20, step:0.5, default:1, int:false },
+  // simulation_bgHazeWeight = strength of the static out-of-focus haze — the labelled structure's
+  // own projected density, blurred to simulation_bgHazeWidth — relative to the flat/cell part.
+  // 0 = none. Static: it fluctuates only through shot noise.
+  simulation_bgHazeWeight: { type:'number', id:'simulation_bgHazeWeight', label:'Background: out-of-focus haze (weight)', min:0, max:10, step:0.1, default:0, int:false },
+  simulation_bgHazeWidth: { type:'number', id:'simulation_bgHazeWidth', label:'Background: haze blur σ (nm)', min:100, max:5000, step:50, default:800, int:false },
+  // simulation_bgDecayFrames = time constant (frames) of the background fading to a 30% floor over
+  // the movie, as autofluorescence and the out-of-focus pool bleach. 0 = constant.
+  simulation_bgDecayFrames: { type:'number', id:'simulation_bgDecayFrames', label:'Background: fade time constant (frames)', min:0, max:100000, step:10, default:0, int:false },
+  // simulation_realism = min/med/max shorthand for how much physics (and compute) a Simulate movie
+  // run spends, written into the ordinary parameters by wirePreset() exactly like the density
+  // preset: 'min' is the original model (blink once, constant brightness, flat background) and the
+  // cheapest; 'med' adds multi-blink kinetics, brightness spread, a cell-shaped fading background
+  // and a static haze — all O(pixels) per frame, so nearly free. Deliberately does NOT touch the
+  // PSF model: that choice has its own control and its own, much larger, cost.
+  simulation_realism: { type:'enum', id:'simulation_realism', label:'Realism/compute preset', options:['min','med','custom'], default:'min' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
   simbg: { type:'number', id:'simbg', label:'Simulation background (photons/px)', min:0, max:500, step:1, default:0, int:false },
@@ -4237,6 +4271,49 @@ function structureZDescription(kind,zRange,sizeNm){
   }
 }
 
+// Background fade over the movie: autofluorescence and the out-of-focus pool bleach too, fast at
+// first and then onto a floor — bg(t) = bg·(floor + (1-floor)·exp(-t/tau)), floor 30%. Pure and
+// tiny because it is stringified into the sim worker as well (simWorkerSource()); decayFrames<=0
+// means no fade. A fading background is what a temporal-median (FTM) correction exists for.
+function simBgScale(fi, decayFrames){
+  return decayFrames>0 ? 0.3+0.7*Math.exp(-fi/decayFrames) : 1;
+}
+
+// The "biological" background field, in photons/px, built once per movie on the main thread:
+//   - a cell: a soft-edged, randomly placed and rotated superellipse, `contrast` times brighter
+//     inside than outside (autofluorescence lives in the cell, not in the buffer around it);
+//   - a static out-of-focus haze: the labelled structure's own projected site density, blurred
+//     wide — what a thick labelled sample adds from above and below the focal plane, time-averaged.
+// The two are summed (haze weighted by `hazeWeight`) and then normalized to a FOV mean of exactly
+// `simbg`, so "Background (photons/px)" keeps meaning what it always meant and only the SHAPE is
+// new. Returns null when both are off — the caller then keeps the flat scalar path untouched.
+// Draws from its OWN rng (derived from the seed, see generateSynthetic()), never the emitter
+// stream, so the same seed gives the same emitters with or without a background: the effect of
+// background on detection can be measured on otherwise identical data.
+function buildSimBackgroundMap(w,h,simbg,contrast,hazeWeight,hazeSigmaPx,sites,rng){
+  if(!(simbg>0) || (!(contrast>1) && !(hazeWeight>0))) return null;
+  const f=new Float32Array(w*h).fill(1);
+  if(contrast>1){
+    const cx=w*(0.5+0.12*(rng()-0.5)), cy=h*(0.5+0.12*(rng()-0.5));
+    const a=w*(0.34+0.08*rng()), b=h*(0.24+0.08*rng()), th=rng()*Math.PI, c=Math.cos(th), s=Math.sin(th);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const u=((x-cx)*c+(y-cy)*s)/a, v=(-(x-cx)*s+(y-cy)*c)/b;
+      const r=Math.pow(Math.pow(Math.abs(u),3)+Math.pow(Math.abs(v),3),1/3);   // superellipse radius, 1 = outline
+      f[y*w+x]=1+(contrast-1)/(1+Math.exp((r-1)/0.06));                          // soft edge, ~6% of the cell size
+    }
+  }
+  if(hazeWeight>0 && sites && sites.length){
+    const d=new Float32Array(w*h);
+    for(const p of sites){ const x=Math.round(p[0]), y=Math.round(p[1]); if(x>=0&&y>=0&&x<w&&y<h) d[y*w+x]+=1; }
+    const hz=blur(d,w,h,hazeSigmaPx);
+    let m=0; for(let i=0;i<hz.length;i++) m+=hz[i]; m/=hz.length;
+    if(m>0) for(let i=0;i<f.length;i++) f[i]+=hazeWeight*hz[i]/m;
+  }
+  let mean=0; for(let i=0;i<f.length;i++) mean+=f[i]; mean/=f.length;
+  for(let i=0;i<f.length;i++) f[i]*=simbg/mean;
+  return f;
+}
+
 // Splats every emitter active in ONE frame (evList = frameEvents[fi], see generateSynthetic())
 // into a fresh w*h image seeded at `bg`, choosing the Gaussian/Zernike-single-plane/Zernike-stack
 // path exactly as generateSynthetic()'s own frame loop used to inline. Deliberately pure —
@@ -4245,8 +4322,15 @@ function structureZDescription(kind,zRange,sizeNm){
 // directly from the single-threaded fallback (simulateFramesSerial() below); the two must produce
 // identical pixels for a given input; see MODULE: workers' own Web Worker gotcha for why a
 // function relying on outer-scope state can't just be handed to a worker as-is.
+//
+// `bg` is either a plain number (flat background, the original and default case — that path is
+// literally the old one-liner, which is what keeps a default seeded movie byte-identical and the
+// worker's ping self-test valid) or {map,scale}: a per-pixel background field in photons/px
+// (buildSimBackgroundMap()) times this frame's fade factor (simBgScale()).
 function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKernelStack, zKernel){
-  const img=new Float32Array(w*h).fill(bg);
+  let img;
+  if(typeof bg==='number') img=new Float32Array(w*h).fill(bg);
+  else { img=new Float32Array(w*h); const m=bg.map, s=bg.scale; for(let i=0;i<img.length;i++) img[i]=m[i]*s; }
   let zClamped=0, zTotal=0;
   if(zKernelStack){
     // Emitter z -> nearest kernel plane.
@@ -4319,13 +4403,14 @@ function splatBeadsFrame(w, h, bg, beadXY, photPerFrame, kernelObj, camRad, inte
 // happened to be available. baseSeed===0 keeps the original unseeded behaviour (each frame just
 // draws from Math.random()).
 async function simulateFramesSerial(ctx){
-  const {w,h,n,bg,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
   const driftAt=fi=> n>1 ? fi/(n-1)*driftPx : 0;
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, lastYield=performance.now();
   for(let fi=0; fi<n; fi++){
     const dmag=driftAt(fi), drx=dmag*ddx, dry=dmag*ddy;
-    const {img,zClamped,zTotal}=splatSimFrame(w,h,bg,frameEvents[fi],drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
+    const frameBg = bgMap ? {map:bgMap, scale:simBgScale(fi,bgDecay)} : bg;   // flat scalar unless a field was built
+    const {img,zClamped,zTotal}=splatSimFrame(w,h,frameBg,frameEvents[fi],drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
     zClampedCount+=zClamped; zTotalCount+=zTotal;
     const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
     applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng);
@@ -4569,13 +4654,27 @@ async function generateSynthetic(){
   const offsetMap=new Float32Array(w*h);
   for(let i=0;i<offsetMap.length;i++) offsetMap[i]=simOffset+simOffsetStd*gauss(rng);
 
+  // Structured background (cell field + static out-of-focus haze) and its fade. The field draws
+  // from an rng of its OWN — a different stream derived from the same seed — and is built after
+  // every emitter draw above, so switching the background on or off never moves a single emitter:
+  // same seed, same molecules, same blinks, only the background differs. bgMap stays null (and the
+  // flat scalar path stays bit-for-bit the old one) unless a contrast or a haze is actually set.
+  const bgRng = simSeed>0 ? mulberry32((simSeed^0x5bd1e995)>>>0) : Math.random;
+  const bgDecay=paramValue('simulation_bgDecayFrames');
+  let bgMap=buildSimBackgroundMap(w,h,bg,paramValue('simulation_bgCellContrast'),paramValue('simulation_bgHazeWeight'),
+                                  paramValue('simulation_bgHazeWidth')/px, gt, bgRng);
+  if(!bgMap && bgDecay>0 && bg>0) bgMap=new Float32Array(w*h).fill(bg);   // a fade needs the per-frame path even on a flat field
+  if(bgMap){ let lo=Infinity,hi=0; for(const v of bgMap){ if(v<lo)lo=v; if(v>hi)hi=v; }
+    log(`Background: structured field, mean ${bg} photons/px (range ${lo.toFixed(1)}–${hi.toFixed(1)})`+
+        (bgDecay>0?`, fading to 30% with a ${bgDecay}-frame time constant`:'')+`.`); }
+
   // Splat+noise every frame — frame-parallel across the simulation worker pool when one's
   // available (simulateFramesParallel(), MODULE: workers), each worker computing its own batch's
   // drx/dry and per-frame-independent noise seed locally; falls back to the single-threaded
   // simulateFramesSerial() otherwise. Both share splatSimFrame()/applySimCameraNoise() (above) so
   // there is exactly one implementation of the actual per-frame math to keep in sync, mirroring
   // the FTM module's own "both paths call the same shared function" convention.
-  const simCtx={w,h,n,bg,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,
+  const simCtx={w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,
                 offsetMap,simGain,readNoiseE,baseSeed:simSeed,onProgress:setProg};
   const simPool=await getSimWorkerPool();
   const {frames,zClampedCount,zTotalCount} = simPool && simPool.length>1
@@ -4627,7 +4726,8 @@ async function generateSynthetic(){
     }
   }
   if(richPhotophysics)
-    log(`Simulated ${events.length} blinks from ${nMolecules.toLocaleString()} molecules (of ${gt.length} candidate sites) over ${n} frames`+
+    // count only molecules seen IN the movie — many live and bleach entirely inside the lead-in
+    log(`Simulated ${events.length} blinks from ${new Set(events.map(e=>e.moleculeId)).size.toLocaleString()} molecules (of ${gt.length} candidate sites) over ${n} frames`+
         ` — bleach probability ${pBleach} per blink (${(1/pBleach).toFixed(1)} blinks/molecule on average), dark lifetime ${offLife} frames`+
         (photCV>0?`, photon rate spread CV ${photCV}`:'')+`.`);
   else
@@ -9099,7 +9199,7 @@ async function getPsfWorkerPool(){
 const SIM_WORKER_PRELUDE="let _g=null;\nlet _simCtx=null;\nlet _calibCtx=null;";
 function simWorkerSource(){
   const body=[
-    gauss.toString(), poisson.toString(), mulberry32.toString(), simFrameSeed.toString(),
+    gauss.toString(), poisson.toString(), mulberry32.toString(), simFrameSeed.toString(), simBgScale.toString(),
     psfKernelAt.toString(), sampleKernelNearest.toString(), sampleKernelBilinear.toString(),
     catmullRomWeights.toString(), sampleKernelBicubic.toString(), sampleKernelAt.toString(),
     nextPow2.toString(), fft1d.toString(), fft2d.toString(), fftShiftKernelTile.toString(),
@@ -9128,14 +9228,14 @@ function simWorkerSource(){
         return;
       }
       if(d.simBatch){
-        const {w,h,bg,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,driftPx,ddx,ddy,n}=_simCtx;
+        const {w,h,bg,bgMap,bgDecay,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,driftPx,ddx,ddy,n}=_simCtx;
         const {start,batch}=d, N=w*h;
         const buf=new Float32Array(batch.length*N);
         let zClamped=0, zTotal=0;
         for(let i=0;i<batch.length;i++){
           const {fi,ev}=batch[i];
           const dmag = n>1 ? fi/(n-1)*driftPx : 0, drx=dmag*ddx, dry=dmag*ddy;
-          const r=splatSimFrame(w,h,bg,ev,drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
+          const r=splatSimFrame(w,h, bgMap?{map:bgMap,scale:simBgScale(fi,bgDecay)}:bg, ev,drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
           zClamped+=r.zClamped; zTotal+=r.zTotal;
           const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
           applySimCameraNoise(r.img, offsetMap, simGain, readNoiseE, rng);
@@ -9203,8 +9303,8 @@ async function getSimWorkerPool(){
 // batch order and worker assignment can't affect which pixels end up where — verified to
 // reproduce the exact same output as simulateFramesSerial() for the same simulation_seed.
 async function simulateFramesParallel(pool, ctx){
-  const {w,h,n,bg,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
-  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,offsetMap,simGain,readNoiseE,photPerFrame,sigma,rad,zKernelStack,zKernel,baseSeed,driftPx,ddx,ddy,n}));
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,bgMap,bgDecay,offsetMap,simGain,readNoiseE,photPerFrame,sigma,rad,zKernelStack,zKernel,baseSeed,driftPx,ddx,ddy,n}));
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, done=0, err=null;
   const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(n/(pool.length*paramValue('workerBatchTarget')))));
@@ -14894,6 +14994,12 @@ function wirePreset(presetId, table){
     el.addEventListener('change',()=>{ if(!_presetWriting && $(presetId).value!=='custom') $(presetId).value='custom'; }); }
 }
 wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{dens:2} });
+// 'min' is, field for field, the defaults — i.e. the original model, byte-identical for a seed.
+wirePreset('simulation_realism', {
+  min:{ simulation_blinkBleachProb:1,   simulation_photCV:0,   simbg:0,  simulation_bgCellContrast:1,
+        simulation_bgHazeWeight:0, simulation_bgDecayFrames:0 },
+  med:{ simulation_blinkBleachProb:0.2, simulation_photCV:0.5, simbg:10, simulation_bgCellContrast:3,
+        simulation_bgHazeWeight:1, simulation_bgDecayFrames:150 } });
 
 $('psfPreviewBtn').addEventListener('click', async ()=>{
   const btn=$('psfPreviewBtn'); btn.disabled=true;
@@ -15753,7 +15859,22 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-19b — Blinking. Fluorophore parameters gain a
+log(`webSMLM v0.12.1-dev · build 2026-09-19c — Background, and a Realism/compute preset.
+New Background section: Cell contrast (a soft-edged cell, brighter inside than out), Out-of-focus
+haze (the labelled structure's own projected density, blurred wide) and a Fade time constant
+(background bleaching down to a 30% floor). Background (photons/px) keeps its meaning as the mean
+over the field of view — only the shape in space and time is new (measured 5.01 for a target of
+5, fade on the formula to within 0.01). The field has its own random stream, so the same seed
+gives the same emitters with or without it, and with everything at its default a seeded movie is
+still byte-identical to earlier builds.
+Measured, and not what was expected: a smooth ×5 cell background costs the DETECTOR almost
+nothing (recall 81.9% → 81.6%, 50% point unchanged) because the band-pass removes it before the
+threshold sees it; it costs PRECISION instead (5.7 → 7.1 nm median lateral) through shot noise.
+Realism/compute preset: Minimal = the original model; Medium = repeated blinking, brightness
+spread and a fading cell-shaped background with haze, all nearly free per frame. It only writes
+the Fluorophore and Background fields; edit one and it switches to Custom. The PSF model is a
+separate choice.
+— and from build 2026-09-19b: Blinking. Fluorophore parameters gain a
 three-state model — ON, dark, bleached: Bleach prob. per blink (1 = blink once, as before; 0.2 =
 five blinks on average), Dark lifetime, and Photon rate spread (CV), a log-normal blink-to-blink
 brightness around Photons/emitter/frame. Emitter density keeps its meaning — mean emitters ON per

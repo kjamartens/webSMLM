@@ -381,8 +381,10 @@ relevant one before editing rather than scrolling:
   recall-vs-photons bins and the logged 50%-detection point exist because the threshold alone
   misleads: the ~77% recall every fit method showed was only partly frame slivers — the default
   detector crosses 50% at ~440 photons, a real sensitivity limit the threshold must not hide.
-  `scoreTruthCore()` stays global-free: frame size and the Run's detection border come in through
-  `truthScoreConfig()`, the one helper both the button and `analyze()` use.
+  `scoreTruthCore()` stays global-free: frame size, the Run's detection border and the Run's own
+  frame range (`firstIdx`/`lastIdx`/`stopped`, so a restricted or stopped Run is not scored as
+  missing everything it never looked at) come in through `truthScoreConfig(cfg, det, run)`, the
+  one helper both the button and `analyze()` use.
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),
   or **uniform box filter** (difference of two box averages, thresholded by a plain intensity

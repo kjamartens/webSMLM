@@ -578,6 +578,11 @@ Matching still runs against **all** ground truth first and classifies afterwards
 would turn a genuine detection of a dim emitter into a false positive. Setting Min photons and Edge
 exclusion to 0 reproduces the pre-2026-09-19 numbers exactly.
 
+Only the frames the Localize run covered are scored: its **First/Last frame to fit** range, or up to
+its last localization if it was stopped (for a loaded CSV, which has no run behind it, the frames
+the localizations span). Before build 2026-09-19f the whole movie was always scored, so a run
+restricted to part of it counted every emitter outside that part as missed.
+
 This matters because an emitter's ON period almost never lines up with frame boundaries, so a
 large share of emitter-frames are slivers holding tens of photons. But it is only half the story
 of the ~77% recall every fit method used to show, and the **Show vs photons** view (recall and

@@ -415,6 +415,21 @@ relevant one before editing rather than scrolling:
   recall-vs-photons bins and the logged 50%-detection point exist because the threshold alone
   misleads: the ~77% recall every fit method showed was only partly frame slivers — the default
   detector crosses 50% at ~440 photons, a real sensitivity limit the threshold must not hide.
+  **Two conventions (2026-09-20):** `validation_preset` (`webSMLM` default | `challenge2016`)
+  writes four ordinary parameters — `validation_matchMode` (`lateral` | `cylinder3D`),
+  `validation_photonMode` (`absolute` | `quantile`), `validation_borderMode` (`dontcare` |
+  `exclude`) and the border/tolerances — so the published SMLM-Challenge-2016 rules can be
+  reproduced without our own defaults moving a digit. `matchFrameCylinder()` is a SEPARATE matcher,
+  deliberately not built on `gridNN()`: gridNN hands back each loc's nearest LATERAL truth, which
+  is the wrong candidate once z gates the pair, so the cylinder builds the full within-radius
+  candidate list over a bucket grid and ranks by true 3D distance in nm. `matchFrame()` is left
+  untouched so the default numbers cannot drift. Measured decomposition on one 2D run (Jaccard
+  0.812 → 0.976 overall): the quantile threshold does nearly all of it (0.812 → 0.971; the 25%
+  quantile lands at 541 photons against our absolute 100), the cylinder adds 0.812 → 0.817 while
+  RAISING lateral RMSE 15.9 → 20.3 nm (it rescues far pairs the NN matcher dropped), the border
+  mode moved 2 localizations. **`lateral` stays the default because the axial gate flatters the
+  axial error**: a pair that would have scored as bad z becomes a miss instead.
+
   `scoreTruthCore()` stays global-free: frame size, the Run's detection border and the Run's own
   frame range (`firstIdx`/`lastIdx`/`stopped`, so a restricted or stopped Run is not scored as
   missing everything it never looked at) come in through `truthScoreConfig(cfg, det, run)`, the

@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2785   PARAMS registry, single source of truth for params;
+    params          2791   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3758   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3783   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      4057   synthetic stack generator ("Simulate movie");
+    simulation      4082   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6461   score localizations against the simulator's own
+    validation      6486   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6942   per-frame band-pass + local-maxima detection
-    fit             7219   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          7042   per-frame band-pass + local-maxima detection
+    fit             7319   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7739   accumulate to offscreen buffer; view/colour/blur;
+    render          7839   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         9022   frame-parallel detect/fit worker pool; dedicated
+    workers         9122   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9591   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9883   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9691   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9983   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10300   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10400   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10806   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10906   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11529  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11629  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11999  single particle tracking, trackpy-inspired;
+    spt             12099  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13501  top-level orchestration, *Core()/wrapper split;
+    pipeline        13601  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   14129  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14229  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16346  localizations table, filtering, histograms;
+    table           16473  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16934  window.webSMLM.analyze()/analyzeBatch();
+    headless API    17061  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2609,11 +2609,17 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <div class="btnrow">
           <button id="truthBtn" disabled title="Compare the localizations against the simulator's own ground truth: detection rate, lateral bias/RMSE, and axial bias/RMSE versus true depth. Simulated data only.">Score vs truth</button>
         </div>
+        <label class="row" id="validationPresetRow" title="webSMLM's own conventions, or the SMLM Challenge 2016 assessment rules so the numbers can be compared with published ones. Writes the four settings below.">Score convention <select id="validation_preset" class="sel"><option value="webSMLM">webSMLM</option><option value="challenge2016">SMLM Challenge 2016</option><option value="custom">Custom</option></select></label>
         <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
         <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
         <label class="row" id="validationMinPhotRow" title="A simulated emitter only counts in a frame where it delivered at least this many photons. Dimmer emitter-frames are ignored either way: detecting one is not a false positive, missing one is not a miss. 0 = count everything.">Min photons/frame <input type="number" id="validation_minPhotons" min="0" max="100000" step="10" value="100" class="num"></label>
         <label class="row" id="validationBorderRow" title="Emitters this close to the frame edge are ignored: the fitter cannot localize there by construction. -1 = use the Run's own detection border.">Edge exclusion (px) <input type="number" id="validation_border" min="-1" max="100" step="1" value="-1" class="num"></label>
         <label class="row" id="validationCrowdRow" title="An emitter is 'crowded' when another counted emitter is ON within this distance in the same frame. Reported as a separate isolated/crowded split. 0 = off.">Crowding radius (nm) <input type="number" id="validation_crowdRadius" min="0" max="5000" step="10" value="300" class="num"></label>
+        <label class="row" id="validationMatchModeRow" title="Lateral (recommended): pair on x/y only, so the axial error being measured cannot bias its own pairing. Cylinder 3D: sort candidates by 3D distance inside a lateral+axial cylinder, as the challenge does.">Matching <select id="validation_matchMode" class="sel"><option value="lateral">Lateral only</option><option value="cylinder3D">3D cylinder</option></select></label>
+        <label class="row" id="validationAxialTolRow" style="display:none;padding-left:40px" title="Height of the matching cylinder: a pair further apart than this in z is not a pair.">Axial tolerance (nm) <input type="number" id="validation_axialTol" min="20" max="5000" step="10" value="500" class="num"></label>
+        <label class="row" id="validationPhotModeRow" title="Absolute: count an emitter-frame from Min photons/frame upward. Quantile: instead leave out the dimmest N% of emitter-frames, which is the challenge's own rule.">Photon threshold <select id="validation_photonMode" class="sel"><option value="absolute">Absolute (photons)</option><option value="quantile">Quantile (%)</option></select></label>
+        <label class="row" id="validationPhotQuantRow" style="display:none;padding-left:40px" title="The dimmest this percent of in-field emitter-frames are not counted either way.">Dimmest % not counted <input type="number" id="validation_photonQuantile" min="0" max="90" step="5" value="25" class="num"></label>
+        <label class="row" id="validationBorderModeRow" title="Don't care: match everything, then leave edge emitters out of the tally. Exclude: cut the border from truth AND localizations before matching, the challenge's order.">Edge handling <select id="validation_borderMode" class="sel"><option value="dontcare">Don't care</option><option value="exclude">Exclude before matching</option></select></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-locprecision"><span class="pill">module: locprecision</span>
           <ul>
@@ -3304,6 +3310,25 @@ const PARAMS = {
   // within this distance in the same frame — overlapping PSFs going through a single-emitter fit.
   // Reported as a separate isolated/crowded split, never folded silently into the headline. 0 = off.
   validation_crowdRadius: { type:'number', id:'validation_crowdRadius', label:'Score: crowding radius (nm)', min:0, max:5000, step:10, default:300, int:false },
+  // ---- how the score is DEFINED. The defaults are webSMLM's own conventions (and reproduce
+  // every earlier number exactly); 'challenge2016' switches all four to what the SMLM Challenge
+  // 2016 assessment code does (Sage et al., Nat. Methods 16, 387, 2019), so our Jaccard and RMSE
+  // can be put beside published ones. A preset writes these ordinary parameters and nothing else.
+  validation_preset: { type:'enum', id:'validation_preset', label:'Score convention', options:['webSMLM','challenge2016','custom'], default:'webSMLM' },
+  // 'lateral' (recommended) matches on x/y only: pairing on z pulls each pair towards whichever
+  // candidate has the flattering z, biasing the very number being measured. 'cylinder3D' sorts
+  // candidates by 3D distance inside a lateral+axial cylinder, as the challenge does.
+  validation_matchMode: { type:'enum', id:'validation_matchMode', label:'Score: matching', options:['lateral','cylinder3D'], default:'lateral' },
+  validation_axialTol: { type:'number', id:'validation_axialTol', label:'Score: axial tolerance (nm)', min:20, max:5000, step:10, default:500, int:false },
+  // 'absolute' counts an emitter-frame from validation_minPhotons photons; 'quantile' instead
+  // drops the dimmest validation_photonQuantile percent of them, which is what the challenge did
+  // (its own threshold is the 25% quantile of ground-truth intensity, not a fixed photon number).
+  validation_photonMode: { type:'enum', id:'validation_photonMode', label:'Score: photon threshold', options:['absolute','quantile'], default:'absolute' },
+  validation_photonQuantile: { type:'number', id:'validation_photonQuantile', label:'Score: dimmest % not counted', min:0, max:90, step:5, default:25, int:false },
+  // 'dontcare' keeps edge emitters in the matching and merely excludes them from the tally (so a
+  // real detection of one is never punished); 'exclude' removes both truth and localizations in
+  // the border before matching, the challenge's own order.
+  validation_borderMode: { type:'enum', id:'validation_borderMode', label:'Score: edge handling', options:['dontcare','exclude'], default:'dontcare' },
   // ---- PSF simulation (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md) — a Zernike-aberrated PSF
   // model for "Simulate movie", alongside the fixed-sigma=1.3 isotropic Gaussian fallback. These
   // params build/preview an oversampled PSF kernel (see buildPsfKernelStack()) shown in the raw
@@ -6513,6 +6538,45 @@ function matchFrame(locs, gts, radiusPx){
   return {pairs:out, usedL, usedG};
 }
 
+// The challenge-compatible matcher: candidates are every (loc, truth) pair within the LATERAL
+// radius, sorted by 3D distance, accepted greedily one-to-one, and additionally gated on |dz| —
+// i.e. a cylinder, 250 nm wide and 500 nm tall in the challenge's own settings.
+//
+// Deliberately NOT built on gridNN() the way matchFrame() is: gridNN returns each localization's
+// single nearest LATERAL neighbour, which is the right candidate when sorting laterally but the
+// wrong one here — the laterally-nearest truth can be the axially-impossible one, and the pair
+// that should have been made is then never even considered. So this builds the full candidate
+// list within the radius, over a bucket grid (a frame holds tens of points; the grid keeps it
+// linear anyway). matchFrame() is left untouched so the default convention's numbers cannot move.
+function matchFrameCylinder(locs, gts, radiusPx, axialTolNm, pxNm){
+  const cell=Math.max(1e-6,radiusPx), buckets=new Map();
+  const key=(cx,cy)=>cx+','+cy;
+  gts.forEach((g,gi)=>{ const k=key(Math.floor(g.x/cell),Math.floor(g.y/cell));
+    let a=buckets.get(k); if(!a){ a=[]; buckets.set(k,a); } a.push(gi); });
+  const pairs=[];
+  locs.forEach((l,li)=>{
+    const cx=Math.floor(l.x/cell), cy=Math.floor(l.y/cell);
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      const a=buckets.get(key(cx+dx,cy+dy)); if(!a) continue;
+      for(const gi of a){ const g=gts[gi];
+        const dlat=Math.hypot(l.x-g.x, l.y-g.y); if(dlat>radiusPx) continue;
+        const bothZ=isFinite(l.z)&&isFinite(g.z), dz=bothZ?Math.abs(l.z-g.z):0;
+        if(bothZ && dz>axialTolNm) continue;              // outside the cylinder's height
+        // Sorting key is a real 3D distance in NANOMETRES (dlat is in camera pixels, dz already
+        // in nm) — 3D where z exists on both sides, lateral otherwise, so a 2D run through this
+        // mode ranks exactly as the lateral one does instead of on a half-defined quantity.
+        pairs.push({a:l, b:g, d:dlat, rank: bothZ ? Math.hypot(dlat*pxNm, dz) : dlat*pxNm, li, gi});
+      }
+    }
+  });
+  pairs.sort((p,q)=>p.rank-q.rank);
+  const usedL=new Set(), usedG=new Set(), out=[];
+  for(const p of pairs){
+    if(usedL.has(p.a) || usedG.has(p.b)) continue;
+    usedL.add(p.a); usedG.add(p.b); out.push(p);
+  }
+  return {pairs:out, usedL, usedG};
+}
 // Score `locs` against the simulator's ground truth. Pure and DOM-free (the *Core() convention),
 // so the button handler and the headless API can share it.
 //
@@ -6576,11 +6640,27 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   // ON time of ~1 frame a large share of emitter-frames hold a small fraction of a frame's photons
   // — tens, not thousands. Counting those as misses capped recall near 77% for EVERY fit method
   // alike, which is the signature of a definition problem rather than a detector problem.
-  const minPhot = cfg.validation_minPhotons>0 ? cfg.validation_minPhotons : 0;
   const borderPx = cfg.validation_border>=0 ? cfg.validation_border : (cfg._detBorder||0);
   const W=cfg._frameW||Infinity, H=cfg._frameH||Infinity;
   const crowdPx=(cfg.validation_crowdRadius>0?cfg.validation_crowdRadius:0)/px;
   const inField=g=> g.x>=borderPx && g.y>=borderPx && g.x<=W-1-borderPx && g.y<=H-1-borderPx;
+  // Which convention this score follows (PARAMS.validation_preset writes these four).
+  const cylinder = cfg.validation_matchMode==='cylinder3D';
+  const axialTol = cfg.validation_axialTol>0 ? cfg.validation_axialTol : 500;
+  const excludeBorder = cfg.validation_borderMode==='exclude';
+  // The photon threshold is either an absolute count or — the challenge's own rule — whatever
+  // number leaves the dimmest N% of in-field emitter-frames out. The quantile needs the whole
+  // population first, so it is computed here in a pre-pass rather than per frame.
+  let minPhot = cfg.validation_minPhotons>0 ? cfg.validation_minPhotons : 0;
+  let photQuantile=NaN;
+  if(cfg.validation_photonMode==='quantile'){
+    const q=Math.max(0,Math.min(90,cfg.validation_photonQuantile||0))/100;
+    const all=[];
+    for(const arr of byFrameGT.values()) for(const g of arr) if(!g.haze && isFinite(g.phot) && inField(g)) all.push(g.phot);
+    all.sort((a,b)=>a-b);
+    minPhot = all.length ? all[Math.min(all.length-1, Math.floor(q*all.length))] : 0;
+    photQuantile=q;
+  }
   // An out-of-focus haze emitter (simulation_hazeRatio) is never cared for: it is real light in the
   // movie, so finding it is no false positive, but it is not part of the structure being scored.
   const cares=g=> !g.haze && g.phot>=minPhot && inField(g);
@@ -6598,7 +6678,8 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     // Truth for THIS frame = structure position + the drift the simulator applied to it. Note
     // trueDrift's accessors are in nm (see simTrueDrift), so convert back to camera pixels here.
     const drx=trueDrift? trueDrift.dx(f)/px : 0, dry=trueDrift? trueDrift.dy(f)/px : 0;
-    const Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot, haze:g.haze}));
+    let Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot, haze:g.haze}));
+    if(excludeBorder) Gf=Gf.filter(inField);     // cut from both sides, before matching
     for(const g of Gf) g.care=cares(g);
     // Crowded = another cared-for emitter is ON within validation_crowdRadius in this same frame,
     // so the two PSFs overlap and a single-emitter fit is being asked something it cannot answer.
@@ -6608,9 +6689,17 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       for(let b=a+1;b<Gf.length;b++){ if(!Gf[b].care) continue;
         if(Math.hypot(Gf[a].x-Gf[b].x, Gf[a].y-Gf[b].y)<=crowdPx) Gf[a].crowded=Gf[b].crowded=true; } }
     // Raw (pre-drift-correction) coordinates when a correction has been applied — see the header.
-    const Lf=L.map(l=>({x:l.x0!==undefined?l.x0:l.x, y:l.y0!==undefined?l.y0:l.y,
-                        z:l.z0!==undefined?l.z0:l.z, zClamped:l.zClamped}));
-    const {pairs,usedL,usedG}= Lf.length ? matchFrame(Lf, Gf, radiusPx) : {pairs:[],usedL:new Set(),usedG:new Set()};
+    let Lf=L.map(l=>({x:l.x0!==undefined?l.x0:l.x, y:l.y0!==undefined?l.y0:l.y,
+                      z:l.z0!==undefined?l.z0:l.z, zClamped:l.zClamped}));
+    // 'exclude' (the challenge's order): the border is cut away from BOTH sides before matching,
+    // so an edge localization is not a false positive and an edge emitter is not a miss. The
+    // default 'dontcare' instead matches everything and settles it afterwards, which is the
+    // stricter reading — a detection of an edge emitter is then never punished either way, but
+    // a SPURIOUS localization in the border still counts against precision.
+    if(excludeBorder) Lf=Lf.filter(inField);
+    const {pairs,usedL,usedG}= !Lf.length ? {pairs:[],usedL:new Set(),usedG:new Set()}
+      : cylinder ? matchFrameCylinder(Lf, Gf, radiusPx, axialTol, px)
+      : matchFrame(Lf, Gf, radiusPx);
     fp+=Lf.length-usedL.size;
     const latOf=new Map();
     for(const p of pairs){
@@ -6721,6 +6810,11 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     onLog(`matched ${tp.toLocaleString()} of ${(tp+fn).toLocaleString()} ground-truth emitter-frames `+
           `(${fp.toLocaleString()} unmatched localization${fp===1?'':'s'}) · recall ${(tp/(tp+fn)*100).toFixed(1)}% · `+
           `precision ${(tp/(tp+fp)*100).toFixed(1)}% · Jaccard ${(tp/(tp+fp+fn)).toFixed(3)}`);
+    if(cylinder || cfg.validation_photonMode==='quantile' || excludeBorder)
+      onLog(` convention: ${cylinder?`3D cylinder matching (${(cfg.validation_matchRadius||250).toFixed(0)} nm lateral × ±${axialTol.toFixed(0)} nm axial)`:'lateral matching'}`+
+            `${cfg.validation_photonMode==='quantile'?`, dimmest ${(100*photQuantile).toFixed(0)}% of emitter-frames not counted (= ${minPhot.toFixed(0)} photons here)`:''}`+
+            `${excludeBorder?`, ${borderPx} px border cut from truth AND localizations before matching`:''}`+
+            ` — SMLM Challenge 2016 rules, for comparison with published numbers.`);
     if(minPhot>0||borderPx>0||nIgnoredGT>0)
       onLog(` counting only emitter-frames with ≥ ${minPhot} photons`+(borderPx>0?` and ≥ ${borderPx} px from the edge`:'')+
             `: ${nIgnoredGT.toLocaleString()} dimmer/edge emitter-frame(s) left out of the tally, `+
@@ -6753,6 +6847,9 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
            biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
            nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
            nIgnoredGT, nIgnoredPairs, nHazeDetected, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
+           matchMode: cylinder?'cylinder3D':'lateral', axialTolNm: cylinder?axialTol:NaN,
+           photonMode: cfg.validation_photonMode==='quantile'?'quantile':'absolute', photonQuantile:photQuantile,
+           borderMode: excludeBorder?'exclude':'dontcare',
            dx, dy, dz, zTrue, px, matchRadiusNm:cfg.validation_matchRadius||250 };
 }
 
@@ -6921,7 +7018,10 @@ async function computeTruthScore(){
     logCmd({scoreVsTruth:true, pxnm:paramValue('pxnm'),
             validation_matchRadius:paramValue('validation_matchRadius'), validation_zBins:paramValue('validation_zBins'),
             validation_minPhotons:paramValue('validation_minPhotons'), validation_border:paramValue('validation_border'),
-            validation_crowdRadius:paramValue('validation_crowdRadius')});
+            validation_crowdRadius:paramValue('validation_crowdRadius'),
+            validation_matchMode:paramValue('validation_matchMode'), validation_axialTol:paramValue('validation_axialTol'),
+            validation_photonMode:paramValue('validation_photonMode'), validation_photonQuantile:paramValue('validation_photonQuantile'),
+            validation_borderMode:paramValue('validation_borderMode')});
     log('\nScoring against simulated ground truth…');
     if(renderLocs) log(`(using the filtered subset: ${renderLocs.length.toLocaleString()} of ${lastResult.locs.length.toLocaleString()} localizations)`);
     const t0=performance.now();
@@ -15279,11 +15379,32 @@ function wirePreset(presetId, table){
     el.addEventListener('change',()=>{
       if(_presetWriting || $(presetId).value==='custom') return;
       const want=(table[$(presetId).value]||{})[id]; if(want===undefined) return;
-      const have = el.type==='checkbox' ? el.checked : parseFloat(el.value);
-      if(have!==want && !(Math.abs(have-want)<1e-9)) $(presetId).value='custom'; }); }
+      // Compare like with like: a <select>'s value is a STRING, and parseFloat('lateral') is NaN,
+      // which never equals anything — so a numeric-only comparison would flip an enum-governed
+      // preset to 'custom' on the very settings load that just restored it (the same failure the
+      // comment above describes, one type further along).
+      const isText = el.tagName==='SELECT' || el.type==='text';
+      const have = el.type==='checkbox' ? el.checked : isText ? el.value : parseFloat(el.value);
+      const same = (el.type==='checkbox'||isText) ? have===want : (have===want || Math.abs(have-want)<1e-9);
+      if(!same) $(presetId).value='custom'; }); }
 }
 wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{dens:2} });
 // 'min' is, field for field, the defaults — i.e. the original model, byte-identical for a seed.
+// The two score conventions, as plain parameter values (see PARAMS.validation_preset). The
+// challenge numbers are its own assessment settings: 250 nm lateral / 500 nm axial tolerance,
+// the dimmest 25% of emitter-frames not counted, and a 450 nm border — 4.5 px at a 100 nm pixel,
+// which is what its own double-helix PSF radius came to — cut from both sides before matching.
+wirePreset('validation_preset', {
+  webSMLM:       { validation_matchMode:'lateral',    validation_photonMode:'absolute', validation_borderMode:'dontcare', validation_border:-1 },
+  challenge2016: { validation_matchMode:'cylinder3D', validation_photonMode:'quantile', validation_borderMode:'exclude',  validation_border:5, validation_matchRadius:250, validation_axialTol:500, validation_photonQuantile:25 },
+});
+// The two conditional sub-rows follow their own select, same idiom as the EMCCD rows.
+(function(){
+  const m=$('validation_matchMode'), p=$('validation_photonMode');
+  const sync=()=>{ $('validationAxialTolRow').style.display = m.value==='cylinder3D' ? '' : 'none';
+                   $('validationPhotQuantRow').style.display = p.value==='quantile' ? '' : 'none'; };
+  m.addEventListener('change', sync); p.addEventListener('change', sync); sync();
+})();
 wirePreset('simulation_realism', {
   min:{ simulation_blinkBleachProb:1,   simulation_photCV:0,   simbg:0,  simulation_bgCellContrast:1,
         simulation_bgHazeWeight:0, simulation_bgDecayFrames:0,   simulation_hazeRatio:0 },
@@ -16150,7 +16271,13 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20b — Illumination profile.
+log(`webSMLM v0.12.1-dev · build 2026-09-20c — Score conventions.
+Score vs truth can now follow the SMLM Challenge 2016 assessment rules instead of webSMLM’s own,
+so its Jaccard and RMSE can be laid beside published numbers: 3D-cylinder matching (250 nm
+lateral × ±500 nm axial), a photon threshold as the dimmest 25% rather than a fixed count, and
+the border cut from truth AND localizations before matching. One Score convention dropdown
+writes those four ordinary settings; the defaults are unchanged, and so are their numbers.
+— and from build 2026-09-20b: Illumination profile.
 A real beam is brightest in the middle, so an emitter’s photon count depends on where it sits:
 Illumination profile (Simulation settings → Fluorophore) offers a Gaussian beam or a flat-top
 disc, with Beam width as a percentage of the field of view. The field is normalised to mean 1,

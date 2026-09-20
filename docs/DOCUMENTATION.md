@@ -578,6 +578,30 @@ Matching still runs against **all** ground truth first and classifies afterwards
 would turn a genuine detection of a dim emitter into a false positive. Setting Min photons and Edge
 exclusion to 0 reproduces the pre-2026-09-19 numbers exactly.
 
+**Two conventions.** **Score convention** = `SMLM Challenge 2016` writes four ordinary settings
+that together reproduce the rules the challenge's own assessment code uses (Sage et al.,
+*Nat. Methods* 16, 387, 2019), so webSMLM's Jaccard and RMSE can be laid beside published numbers:
+candidates sorted by 3D distance inside a 250 nm × ±500 nm cylinder instead of laterally; the
+photon threshold as *the dimmest 25% of emitter-frames* instead of a fixed count; and the border
+cut from truth **and** localizations before matching instead of settled afterwards. The defaults
+stay webSMLM's own.
+
+Measured on one scored 2D run, the same localizations score **Jaccard 0.812** our way and **0.976**
+the challenge's way, and almost all of that gap is the threshold: the 25% quantile lands at 541
+photons here, while our absolute default counts everything above 100 — including the emitter-frames
+the detector cannot see (its 50% point is ~440 photons). Switching only the matcher moves Jaccard
+0.812 → 0.817 but raises the lateral RMSE 15.9 → 20.3 nm, because the full candidate list rescues
+pairs the nearest-neighbour matcher dropped and those rescued pairs are the far ones. Switching
+only the border handling changed 2 localizations.
+
+**Why `lateral` remains the default.** A hand-built case makes the trade concrete: two truths, and
+localizations 0.02 px away laterally but 600 and 900 nm off in z, plus one 0.1 px away and 50 nm
+off. Lateral matching reports 2 hits with axial errors of 600 and 900 nm; the cylinder refuses
+those pairs and reports 1 hit with an axial error of 50 nm. Neither is wrong — but the cylinder's
+axial gate flatters the axial error by construction (pairs that would have been scored as bad z
+become misses instead), which is exactly the number a 3D method is being judged on. Read the
+challenge convention for comparability, the default for measuring your own fitter.
+
 Only the frames the Localize run covered are scored: its **First/Last frame to fit** range, or up to
 its last localization if it was stopped (for a loaded CSV, which has no run behind it, the frames
 the localizations span). Before build 2026-09-19f the whole movie was always scored, so a run
@@ -1385,6 +1409,12 @@ scoring drift correction. See the **simulation** module.
 | `validation_minPhotons` | Score: min photons/frame | number | 0 | 100000 | 10 | 100 |
 | `validation_border` | Score: edge exclusion (px, -1 = auto) | number (int) | -1 | 100 | 1 | -1 |
 | `validation_crowdRadius` | Score: crowding radius (nm) | number | 0 | 5000 | 10 | 300 |
+| `validation_preset` | Score convention | enum | `webSMLM`, `challenge2016`, `custom` | | | `webSMLM` |
+| `validation_matchMode` | Score: matching | enum | `lateral`, `cylinder3D` | | | `lateral` |
+| `validation_axialTol` | Score: axial tolerance (nm) | number | 20 | 5000 | 10 | 500 |
+| `validation_photonMode` | Score: photon threshold | enum | `absolute`, `quantile` | | | `absolute` |
+| `validation_photonQuantile` | Score: dimmest % not counted | number | 0 | 90 | 5 | 25 |
+| `validation_borderMode` | Score: edge handling | enum | `dontcare`, `exclude` | | | `dontcare` |
 
 **Match radius** is how close, laterally, a localization must be to a
 ground-truth emitter in the same frame to count as its detection. 250 nm is

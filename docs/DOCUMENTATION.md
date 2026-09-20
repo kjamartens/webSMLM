@@ -578,6 +578,28 @@ Matching still runs against **all** ground truth first and classifies afterwards
 would turn a genuine detection of a dim emitter into a false positive. Setting Min photons and Edge
 exclusion to 0 reproduces the pre-2026-09-19 numbers exactly.
 
+**Per molecule.** Alongside the per-emitter-frame figures, the score groups matched pairs by the
+simulator's own `moleculeId` and reports what fraction of counted molecules were found *at least
+once*, how many times each was found, and how far off the **average** of those localizations
+lands. That last number is the gain repeat blinks actually buy, which a per-frame median cannot
+show. Measured on the 2D reference run: molecule recall 87.0% against 81.6% per frame, 1.8
+detections per molecule, and the averaged position 4.63 nm off against 5.03 nm per single frame —
+short of the 1/√1.8 the counting argument suggests, because most molecules are found once and the
+median over molecules is dominated by them.
+
+**Effective z range.** In 3D the score also reports the widest *contiguous* depth span where
+recall stays at or above 50% — the honest answer to "how deep does this work", and one neither the
+axial median nor the RMSE can give, since both are computed over the emitters that *were* found
+and therefore improve as the fitter gives up. It is shaded in the **z error vs depth** view.
+Contiguous rather than the union of good bins on purpose: two good bands either side of a dead
+zone is a different and worse thing than one deep band.
+
+It is a *detection* criterion, not an accuracy one, and the two genuinely differ: on one
+astigmatic run the effective range came to ±559 nm while the same PSF encodes z single-valued only
+to ±460 nm (the figure `buildPsfKernelStack()` reports). Between those two numbers emitters are
+still found, but two depths share one width pair, so their z can fold to the wrong side. Read the
+effective range together with that one.
+
 **Two conventions.** **Score convention** = `SMLM Challenge 2016` writes four ordinary settings
 that together reproduce the rules the challenge's own assessment code uses (Sage et al.,
 *Nat. Methods* 16, 387, 2019), so webSMLM's Jaccard and RMSE can be laid beside published numbers:

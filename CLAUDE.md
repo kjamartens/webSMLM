@@ -415,6 +415,17 @@ relevant one before editing rather than scrolling:
   recall-vs-photons bins and the logged 50%-detection point exist because the threshold alone
   misleads: the ~77% recall every fit method showed was only partly frame slivers — the default
   detector crosses 50% at ~440 photons, a real sensitivity limit the threshold must not hide.
+  **Per-molecule + effective z range (2026-09-20):** `groundTruthByFrame()` now carries
+  `moleculeId` through, so the score can group pairs by MOLECULE (`perMol`) and report molecule
+  recall, detections per molecule, and the error of each molecule's AVERAGED position — the thing
+  repeat blinks actually buy (measured: 87.0% vs 81.6% frame recall, 4.63 vs 5.03 nm). `effZ` is
+  the widest CONTIGUOUS depth span with per-bin recall ≥ `EFF_Z_RECALL` (0.5, a constant on
+  purpose — a range is only comparable across runs if its definition never moves), which needed
+  the z bins to count misses too (`zMiss`, binned into `b.fn`), since the bins previously held
+  matched pairs only. **It is a DETECTION criterion and deliberately not the same as the PSF's
+  own `zUsableNm`**: measured ±559 nm effective against ±460 nm single-valued on the same run —
+  in between, emitters are found but their z can fold to the wrong side.
+
   **Two conventions (2026-09-20):** `validation_preset` (`webSMLM` default | `challenge2016`)
   writes four ordinary parameters — `validation_matchMode` (`lateral` | `cylinder3D`),
   `validation_photonMode` (`absolute` | `quantile`), `validation_borderMode` (`dontcare` |

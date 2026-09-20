@@ -48,6 +48,20 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     declaration wins; both are equivalent generators, so harmless today, confusing tomorrow).
 
 
+- **Lobe pairing for the double helix** — the one thing standing between `psfmle` (shipped
+  2026-09-20f) and working depth on a DH PSF. Detection returns each lobe as its own maximum, so
+  the fit window centres on a lobe and the partner ~18 camera px away is clipped; the partner's
+  direction is what carries the SIGN of z, and without it the fitter recovers |z| to ~20 nm but
+  gets the sign right about half the time (measured: 27 of 57 pairs off by >250 nm). Needed: pair
+  maxima within an expected separation window, fit once from the midpoint with a window that
+  holds both lobes, and take the pair angle as the z seed. The same step removes the duplicate
+  detections a DH movie otherwise produces.
+
+- **Worker dispatch for `psfmle`** — it runs single-threaded today (0.5 ms/spot measured, so a
+  100k-spot run is under a minute). Parallelising means getting a megabyte-scale model to every
+  worker through a one-time init message and sequencing it against the frame-batch protocol the
+  pool already has; see the Web Worker gotcha in CLAUDE.md before starting.
+
 - **Cubic-spline PSF fitting** (`picasso/fitting/splinefit.py`) for PSFs that deviate from
   Gaussian — meaningfully bigger scope than the rotated-elliptical MLE fitter (shipped): its own
   3D calibration volume and PSF-model representation, not just another free parameter. Key

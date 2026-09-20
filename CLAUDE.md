@@ -517,6 +517,26 @@ relevant one before editing rather than scrolling:
   degeneracy (swapping σx↔σy and adding ±90°/±180° to the angle describes the identical physical
   ellipse) — not a bug, confirmed against all 4 equivalent parameterisations of a synthetic fit.
 
+  **`psfmle` — PSF-model ("vector") fitting (2026-09-20).** `psfModelMLE()` fits the modelled PSF
+  itself rather than a Gaussian: `buildPsfFitModel()` box-filters each kernel plane by one camera
+  pixel (summed-area table, ~20 ms, 3.4 MB for 61 planes) and `psfModelSample()` interpolates
+  those samples tricubically (Catmull-Rom over SAMPLES, not B-spline coefficients — the
+  coefficient tensor would be ~64× the memory), giving value and d/dx,d/dy,d/dz in closed form
+  for `mleNewtonFit`'s θ=[x,y,N,bg,z]. **The box centre is half an oversampled step off the
+  sample position for an even oversample** — `sampleShift`; without it every position came out
+  biased by 0.125 camera px (measured −12.1/−12.8 nm against ground truth while the CRLB claimed
+  3.5 nm). A coarse z scan precedes Newton because the likelihood is multimodal in z for an
+  engineered PSF. Needs no calibration file: `ensurePsfFitModel()` builds the model from the
+  Simulation PSF section and warns when `simulation_pxnm` differs from the analysis `pxnm`.
+  Measured against `mle3d` on one astigmatic 3D movie: axial median 16.9 vs 22.6 nm, equal
+  recall and lateral, 1.8× the time (0.5 ms/spot for the fit itself vs 0.086).
+  **Single-threaded on purpose for now** (`useWorkers` excludes it): the model is megabytes and
+  the pool's single `onmessage` makes a second message type a scheduling hazard.
+  **Known limit — double helix**: lateral is excellent but the SIGN of z is a coin flip, because
+  detection centres the ROI on one lobe and the partner (~18 px away) is clipped; the partner's
+  direction is the sign information. A rescan-and-restart was tried and REMOVED (changed not one
+  localization). Lobe pairing is the fix, see `docs/REFACTOR_PLAN.md`.
+
   **`PARAMS.localize3D`** ("3D localisation?", default checked) is the switch between the two angle
   modes for `'gaussmleEll'` — no separate per-method setting. `updateMethodUI()` only shows the
   checkbox's row (`localize3DRow`) for `mle3d`/`gaussmleEll`; unchecked: angle FIXED at

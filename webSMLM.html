@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2802   PARAMS registry, single source of truth for params;
+    params          2803   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3800   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3809   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      4099   synthetic stack generator ("Simulate movie");
+    simulation      4108   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6642   score localizations against the simulator's own
+    validation      6651   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          7266   per-frame band-pass + local-maxima detection
-    fit             7543   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          7279   per-frame band-pass + local-maxima detection
+    fit             7556   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          8063   accumulate to offscreen buffer; view/colour/blur;
+    render          8195   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         9346   frame-parallel detect/fit worker pool; dedicated
+    workers         9478   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9916   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration 10208   astigmatic sigma_x/sigma_y vs z bead curves;
+    export         10054   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration 10346   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10625   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10763   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   11131   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   11269   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11854  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11992  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             12324  single particle tracking, trackpy-inspired;
+    spt             12462  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13826  top-level orchestration, *Core()/wrapper split;
+    pipeline        13964  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   14454  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14625  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16718  localizations table, filtering, histograms;
+    table           16899  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    17306  window.webSMLM.analyze()/analyzeBatch();
+    headless API    17487  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20e</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2473,6 +2473,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
             <option value="gaussmle" selected>Gauss MLE 2D spherical</option>
             <option value="mle3d">Gauss MLE 3D elliptical</option>
             <option value="gaussmleEll">Gauss MLE 3D rotated elliptical</option>
+            <option value="psfmle">PSF model MLE 3D (experimental)</option>
           </select></label>
         <label class="row" id="localize3DRow" style="margin-top:8px;display:none">3D localisation? <input type="checkbox" id="localize3D" checked></label>
         <div id="cal3dRow" style="display:none;margin:6px 0 2px">
@@ -2495,7 +2496,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="detection_DoG_thrRow" style="margin-top:8px">Threshold (k·σ_noise) <input type="number" id="detection_DoG_thr" min="1" max="8" step="0.5" value="4" class="num"></label>
         <label class="row" id="detection_box_thrRow" style="margin-top:8px">Threshold (intensity) <input type="number" id="detection_box_thr" min="0" max="65535" step="1" value="25" class="num"></label>
         <label class="row">σ_PSF (px) <input type="number" id="psf" min="0.8" max="5" step="0.1" value="1.3" class="num"></label>
-        <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="10" step="1" value="4" class="num"></label>
+        <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="20" step="1" value="4" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-detectfit"><span class="pill">module: detect/fit</span>
           <p><b>Fit method</b> — σ_noise below is the spread of the filtered image, not the PSF width.</p>
@@ -2830,11 +2831,19 @@ const PARAMS = {
   // psf = σ_PSF, the point-spread-function width in camera pixels; sets filter scale + fit initial guess
   psf: { type:'number', id:'psf', label:'σ_PSF — PSF width (px)', min:0.8, max:5, step:0.1, default:1.3, int:false },
   // winr = "window radius": half-width of the square fit window, so window size = 2·winr+1
-  winr: { type:'number', id:'winr', label:'Fit radius (px)', min:2, max:10, step:1, default:4, int:true },
+  // max 20, not 10: an engineered PSF is big. A double helix's two lobes sit ~1.8 µm apart at
+  // these settings, i.e. 18 camera pixels — a 21 px window (the old ceiling) barely contains one
+  // emitter, and a defocused extended-depth PSF is wider still. Ordinary Gaussian fitting has no
+  // reason to go past 10 and its default is unchanged.
+  winr: { type:'number', id:'winr', label:'Fit radius (px)', min:2, max:20, step:1, default:4, int:true },
 
   // ---- fit ----
   // method = which localization fitter runs: phasor 2D/3D, Gaussian least-squares, or Gaussian MLE 2D/3D
-  method: { type:'enum', id:'method', label:'Fit method', options:['phasor','phasor3d','gaussls','gaussmle','mle3d','gaussmleEll'], default:'gaussmle' },
+  // 'psfmle' fits the physical PSF itself (MODULE: fit, psfModelMLE) with z as a free parameter,
+  // which is the only method here that can localize a PSF with no meaningful width — a double
+  // helix or an extended-depth mask. Its model comes from the Simulation settings' own PSF
+  // section rather than a calibration file; see runCore()'s psfModel handling.
+  method: { type:'enum', id:'method', label:'Fit method', options:['phasor','phasor3d','gaussls','gaussmle','mle3d','gaussmleEll','psfmle'], default:'gaussmle' },
   // fitFirstFrame/fitLastFrame = 1-based inclusive frame range Localize actually
   // processes (the rest of the loaded stack is skipped entirely, not just hidden
   // from the result afterward). Per-dataset in spirit (fitLastFrame's *meaningful*
@@ -6652,6 +6661,10 @@ async function loadTiff(fileBuf, fileSize, onLog=log){
 // change away, but it is fixed here rather than a control because a range is only comparable
 // between runs when its definition never moves.
 const EFF_Z_RECALL=0.5;
+// The PSF-model fitter's own model (MODULE: fit, psfModelMLE), built from the Simulation
+// settings' PSF section by ensurePsfFitModel() and reused by the live preview. Null until a
+// 'psfmle' Run or preview has built one.
+let _psfFitModel=null;
 let lastTruthScore=null;         // stashed like lastNena, so the plot can be re-drawn/exported
 
 // Expands groundTruthEvents (one entry per emitter ACTIVATION, with fractional start/end times)
@@ -7726,6 +7739,125 @@ function mleNewtonFit(n, th, mstep, clampFn, r, cx, cy, img, w, gain, camoffset,
     clampFn(th);
     if(Math.abs(th[0]-ox)<eps && Math.abs(th[1]-oy)<eps){ converged=true; break; } }
   return { converged, fisher: buildFisher(false) };
+}
+/* ---- PSF-model ("vector") fitting: fit the measured/modelled PSF itself, not a Gaussian ----
+   A Gaussian describes an in-focus, unaberrated spot well and everything else badly: an
+   engineered PSF (double helix, extended-depth) has no width to read z from at all. This fitter
+   instead evaluates the SAME physical PSF the simulator renders from, interpolated continuously
+   in x, y and z, and hands it to the existing Fisher-scoring driver as just another model — so z
+   comes out of the fit as a free parameter with its own CRLB, rather than being inverted from a
+   width calibration afterwards (zFromWidths).
+
+   What is interpolated is the camera-pixel-INTEGRATED PSF, sampled on the oversampled grid: box
+   -filter each kernel plane by one camera pixel once (buildPsfFitModel), and the sample at an
+   oversampled offset IS the pixel integral for that sub-pixel emitter position. Tricubic
+   Catmull-Rom over those samples gives the value and all three derivatives in closed form.
+   Catmull-Rom over the SAMPLES rather than true B-spline coefficients (Li et al., Nat. Methods
+   15, 367 (2018)) is the cheap choice: it interpolates the samples exactly and needs no
+   coefficient tensor — 3.4 MB of samples against ~220 MB of 64-per-voxel coefficients at these
+   sizes. If interpolation bias ever shows up in a scored run, that is the thing to revisit. */
+// Box-filter every kernel plane by one camera pixel, normalised so each plane integrates to 1
+// photon. A summed-area table makes each box O(1), so the whole model builds in ~20 ms.
+function buildPsfFitModel(kern, ov){
+  const {nx,ny,nz,slices,zStepNm,focusIndex}=kern, half=ov>>1, samp=[];
+  for(let z=0;z<nz;z++){
+    const s=slices[z]; let sum=0; for(let i=0;i<s.length;i++) sum+=s[i];
+    const sat=new Float64Array((nx+1)*(ny+1));
+    for(let y=0;y<ny;y++){ let run=0;
+      for(let x=0;x<nx;x++){ run+=s[y*nx+x]/(sum||1); sat[(y+1)*(nx+1)+x+1]=sat[y*(nx+1)+x+1]+run; } }
+    const b=new Float32Array(nx*ny);
+    for(let y=0;y<ny;y++) for(let x=0;x<nx;x++){
+      const x0=Math.max(0,Math.min(nx,x-half)), x1=Math.max(0,Math.min(nx,x-half+ov));
+      const y0=Math.max(0,Math.min(ny,y-half)), y1=Math.max(0,Math.min(ny,y-half+ov));
+      b[y*nx+x]=sat[y1*(nx+1)+x1]-sat[y0*(nx+1)+x1]-sat[y1*(nx+1)+x0]+sat[y0*(nx+1)+x0];
+    }
+    samp.push(b);
+  }
+  // Where the box actually SITS. b[x] sums oversampled samples x-half … x-half+ov-1, whose
+  // centre is x-(ov-1)/2+ (ov-1)/2 … i.e. x-0.5 for an even oversample, x exactly for an odd one.
+  // Reading b[x] as if it were centred on x therefore offsets every fitted position by half an
+  // oversampled step — 0.125 camera px at ov=4, which measured as a -12.1 nm / -12.8 nm bias in
+  // x and y against ground truth while the CRLB claimed 3.5 nm. sampleShift puts it back.
+  const sampleShift = (ov%2===0) ? 0.5 : 0;
+  return {samp, nx, ny, nz, ov, zStepNm, focusIndex, sampleShift, cx:(nx-1)/2, cy:(ny-1)/2,
+          zMaxNm:(nz-1-focusIndex)*zStepNm, zMinNm:-focusIndex*zStepNm};
+}
+// Catmull-Rom weights, and their derivative with respect to the fractional coordinate.
+function crWeights(f){ const f2=f*f, f3=f2*f;
+  return [0.5*(-f3+2*f2-f), 0.5*(3*f3-5*f2+2), 0.5*(-3*f3+4*f2+f), 0.5*(f3-f2)]; }
+function crWeightsD(f){ const f2=f*f;
+  return [0.5*(-3*f2+4*f-1), 0.5*(9*f2-10*f), 0.5*(-9*f2+8*f+1), 0.5*(3*f2-2*f)]; }
+// Tricubic sample of the model at oversampled coordinates (u,v) and fractional plane kf.
+// Writes d/du, d/dv, d/dplane into gOut and returns the value. Edges clamp, which is correct
+// here: the kernel already covers the PSF's real extent, so a clamped read is in its tail.
+function psfModelSample(m, u, v, kf, gOut){
+  const iu=Math.floor(u), iv=Math.floor(v), ik=Math.floor(kf);
+  const wu=crWeights(u-iu), wv=crWeights(v-iv), wk=crWeights(kf-ik);
+  const du=crWeightsD(u-iu), dv=crWeightsD(v-iv), dk=crWeightsD(kf-ik);
+  let val=0, gu=0, gv=0, gk=0;
+  for(let c=0;c<4;c++){
+    const plane=m.samp[Math.max(0,Math.min(m.nz-1, ik-1+c))];
+    for(let b=0;b<4;b++){
+      const y=Math.max(0,Math.min(m.ny-1, iv-1+b)), row=y*m.nx;
+      for(let a=0;a<4;a++){
+        const sv=plane[row+Math.max(0,Math.min(m.nx-1, iu-1+a))], wab=wu[a]*wv[b];
+        val+=sv*wab*wk[c]; gu+=sv*du[a]*wv[b]*wk[c]; gv+=sv*wu[a]*dv[b]*wk[c]; gk+=sv*wab*dk[c];
+      } } }
+  gOut[0]=gu; gOut[1]=gv; gOut[2]=gk; return val;
+}
+// theta = [x, y, N, bg, z(nm)]. u=(px-x)*ov, so du/dx = -ov; the plane coordinate is z/zStep.
+function makePsfModelFn(m){
+  const g=[0,0,0];
+  return (px,py,th,duOut)=>{
+    const p=psfModelSample(m, m.cx+(px-th[0])*m.ov+m.sampleShift, m.cy+(py-th[1])*m.ov+m.sampleShift,
+                           m.focusIndex+th[4]/m.zStepNm, g);
+    duOut[0]=-th[2]*g[0]*m.ov; duOut[1]=-th[2]*g[1]*m.ov;
+    duOut[2]=p; duOut[3]=1; duOut[4]=th[2]*g[2]/m.zStepNm;
+    return th[2]*p+th[3];
+  };
+}
+// Poisson MLE against the PSF model. Same shape as the Gaussian fitters, plus a COARSE Z SCAN
+// before the Newton step: an engineered PSF's likelihood is not unimodal in z (a double helix at
+// +400 nm looks much like one at -400 nm rotated), so a Newton step from z=0 can settle in the
+// wrong basin. The scan costs ~13 model evaluations; leaving it out is not an option.
+function psfModelMLE(img,w,h,cx,cy,win,model,gain=1,camoffset=0,eps=0.001){
+  const r=(win-1)/2, n=5, modelFn=makePsfModelFn(model);
+  let sum=0,mx=0,my=0,mn=Infinity;
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){ const v=(img[(cy+dy)*w+(cx+dx)]-camoffset)*gain;
+    sum+=v; mx+=(cx+dx)*v; my+=(cy+dy)*v; if(v<mn)mn=v; }
+  const th=[ sum>0?mx/sum:cx, sum>0?my/sum:cy, Math.max(1,sum-mn*win*win), Math.max(1e-3,mn), 0 ];
+  const du=new Array(5);
+  const logL=t=>{ let ll=0;
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      const mu=modelFn(cx+dx,cy+dy,t,du);
+      if(mu>1e-9) ll+=(img[(cy+dy)*w+(cx+dx)]-camoffset)*gain*Math.log(mu)-mu; }
+    return ll; };
+  const step=Math.max(model.zStepNm, (model.zMaxNm-model.zMinNm)/24);
+  const scanZ=t=>{ const keep=t[4]; let bz=keep, bl=-Infinity;
+    for(let z=model.zMinNm; z<=model.zMaxNm; z+=step){ t[4]=z; const ll=logL(t); if(ll>bl){ bl=ll; bz=z; } }
+    t[4]=bz; return bl; };
+  const clamp=t=>{ if(t[2]<1)t[2]=1; if(t[3]<0)t[3]=0;
+    if(t[4]<model.zMinNm)t[4]=model.zMinNm; if(t[4]>model.zMaxNm)t[4]=model.zMaxNm; };
+  const mkStep=t=>[1,1,Math.max(100,0.3*t[2]),Math.max(2,t[3]),Math.max(100,3*model.zStepNm)];
+  scanZ(th);
+  // A rescan-and-restart from the converged position was tried here and REMOVED: on a
+  // double-helix movie whose z sign came out a coin flip it changed not one localization, at
+  // real cost. The sign was not lost to a local optimum — the fit is at the likelihood's global
+  // maximum — but to the ROI: detection centres it on ONE LOBE, the partner lobe ~18 px away
+  // then falls on or outside the window, and the partner's direction is exactly what tells +z
+  // from -z. The cure is a lobe-pairing step that centres the window between the two lobes
+  // (docs/REFACTOR_PLAN.md), not more optimisation.
+  const {converged,fisher}=mleNewtonFit(n,th,mkStep(th),clamp,r,cx,cy,img,w,gain,camoffset,eps,25,modelFn);
+  if(!converged || th[2]<=1+1e-9 || Math.abs(th[0]-cx)>r || Math.abs(th[1]-cy)>r || !isFinite(th[0])) return null;
+  const ex=solveLin(fisher,[1,0,0,0,0]), ey=solveLin(fisher,[0,1,0,0,0]), ez=solveLin(fisher,[0,0,0,0,1]);
+  const lpx=ex&&ex[0]>0?Math.sqrt(ex[0]):NaN, lpy=ey&&ey[1]>0?Math.sqrt(ey[1]):NaN;
+  if(!isFinite(lpx)||!isFinite(lpy)) return null;
+  let e2=0,cnt=0;
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    const res=modelFn(cx+dx,cy+dy,th,du)-(img[(cy+dy)*w+(cx+dx)]-camoffset)*gain; e2+=res*res; cnt++; }
+  const edge = th[4]<=model.zMinNm+1e-6 || th[4]>=model.zMaxNm-1e-6;
+  return { x:th[0], y:th[1], photons:th[2], bg:th[3], bgstd:Math.sqrt(e2/Math.max(1,cnt)),
+           sigma:NaN, z:th[4], zClamped:edge, lpx, lpy, lpz: ez&&ez[4]>0?Math.sqrt(ez[4]):NaN };
 }
 // An EMCCD's gain register makes every pixel's variance F^2 times its mean instead of equal to
 // it (F^2 = 2 at high gain), which a Poisson likelihood cannot express. The standard dodge, and
@@ -9355,6 +9487,10 @@ function drawRaw(frame,w,h,spots,locs){
 // scope, so anything missing here becomes a ReferenceError inside the worker.
 const WORKER_PRELUDE=[
   "let _mapKey='',_mapX=null,_mapY=null;",
+  // The PSF-model fitter's model. Stays null in the worker for now: 'psfmle' runs
+  // single-threaded (see runCore's useWorkers gate), so the worker's own psfmle branch is
+  // unreachable. Declared anyway, because the branch is compiled either way.
+  "let _psfFitModel=null;",
   "const _bmCache={};",
   "let _bpW=0,_bpH=0,_bpSm=null,_bpLg=null,_bpTmp=null;",
   "let _wW=0,_wH=0,_wV1=null,_wV2=null,_wTmp=null,_wOut=null;",
@@ -9381,6 +9517,7 @@ function workerSource(){
     mleClampSpherical.toString(), mleClampElliptical.toString(), mleNewtonFit.toString(),
     gaussianMLEspheric.toString(), gaussianMLEelliptic.toString(), mleModelRotated.toString(), gaussianMLEellipticangled.toString(),
     zFromWidths.toString(), phasorFit.toString(), polyEval.toString(), applyExcessNoise.toString(),
+    crWeights.toString(), crWeightsD.toString(), psfModelSample.toString(), makePsfModelFn.toString(), psfModelMLE.toString(),
     ftmSeriesGlobal.toString(),
     `onmessage=function(e){
       const d=e.data;
@@ -9454,7 +9591,8 @@ function workerSource(){
         const t1=performance.now(); tD+=t1-t0; nC+=maxima.length;
         const isPh = method==='phasor'||method==='phasor3d';
         for(const mm of maxima){
-          const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
+          const L = applyExcessNoise(method==='psfmle' ? psfModelMLE(img,w,h,mm[0],mm[1],win,_psfFitModel,gain,camoffset,eps)
+                         : method==='gaussmle' ? gaussianMLEspheric(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
                          : method==='mle3d' ? gaussianMLEelliptic(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
                          : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps,sSmlmAngleRad)
                          : isPh ? phasorFit(img,w,h,mm[0],mm[1],win,gain,camoffset)
@@ -13853,7 +13991,25 @@ function fitFrameRange(first, last, nStack){
   const lastIdx=Math.max(firstIdx+1, Math.min(nStack, last||nStack));
   return {firstIdx, lastIdx};
 }
-async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
+// Builds (or reuses) the PSF model the 'psfmle' fitter needs. Returns null when the Zernike PSF
+// model isn't selected — a fixed-sigma Gaussian has nothing to interpolate. `dataPxNm` is the
+// ANALYSIS pixel size: the model is sampled on the simulation's own pixel grid, so a mismatch
+// would silently scale every fitted position and depth.
+async function ensurePsfFitModel(dataPxNm){
+  if(paramValue('simulation_psfModel')!=='zernike') return null;
+  const cfg=readPsfConfigFromUI();
+  if(Math.abs(cfg.cameraPxNm-dataPxNm)>1e-6)
+    log(`⚠ PSF model MLE: the model is built on the Simulation pixel size (${cfg.cameraPxNm} nm) but this run uses ${dataPxNm} nm. `+
+        `Set them equal, or every fitted position and depth comes out scaled by their ratio.`);
+  const t0=performance.now();
+  const kern=await getOrBuildPsfKernelStack(cfg);
+  _psfFitModel=buildPsfFitModel(kern, cfg.oversample);
+  log(`PSF model MLE: model ready — ${_psfFitModel.nz} z-planes × ${_psfFitModel.nx}×${_psfFitModel.ny} samples `+
+      `(${(_psfFitModel.nz*_psfFitModel.nx*_psfFitModel.ny*4/1048576).toFixed(1)} MB, ${Math.round(performance.now()-t0)} ms). `+
+      `z is fitted freely over ${_psfFitModel.zMinNm.toFixed(0)}…${_psfFitModel.zMaxNm.toFixed(0)} nm and gets its own CRLB — no width calibration involved.`);
+  return _psfFitModel;
+}
+async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, hooks={}){
   // onLog/onProgress default to the real log()/setProg() — mirrors the
   // interactive path exactly when no hooks are given at all, same rule as
   // the loaders above. onRawPreview/onSrPreview stay no-op by default (no
@@ -13885,7 +14041,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
   // degrees). Only meaningful for gaussmleEll; unused (still computed, no
   // extra branch needed) when method is anything else.
   const sSmlmAngleRad = config.localize3D ? null : (config.sSmlmAngleCenter||0)*Math.PI/180;
-  const label = method==='phasor'?'Phasor 2D':method==='phasor3d'?'Phasor 3D':method==='gaussmle'?'Gauss MLE 2D spherical':method==='mle3d'?'Gauss MLE 3D elliptical':method==='gaussmleEll'?'Gauss MLE 3D rotated elliptical':'Gaussian LS 2D';
+  const label = method==='phasor'?'Phasor 2D':method==='phasor3d'?'Phasor 3D':method==='gaussmle'?'Gauss MLE 2D spherical':method==='mle3d'?'Gauss MLE 3D elliptical':method==='gaussmleEll'?'Gauss MLE 3D rotated elliptical':method==='psfmle'?'PSF model MLE 3D':'Gaussian LS 2D';
   const border=(win-1)/2+1, locs=[]; let lastSpots=null, lastFrame=null, lastFrameIdx=-1, processed=0, stopped=false;
   const filterLabel=mode==='wave'?'wavelet (B-spline)':mode==='box'?'uniform box filter':(exactBP?'DoG exact':'DoG fast (box approx.)');
   const rangeNote=(firstIdx>0||lastIdx<nStack)?` (frames ${firstIdx+1}–${lastIdx} of ${nStack})`:'';
@@ -13968,8 +14124,15 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
   // like the 82×83 GATTA-PAINT crop (~14M total px, stays single-threaded —
   // see experimental_data/README.md) so it only kicks in for genuinely long
   // runs. All three thresholds: PARAMS.workerMin{Frames,PxFrame,TotalPx}.
-  const useWorkers = pool && pool.length>1 && n>=config.workerMinFrames &&
+  // 'psfmle' runs single-threaded for now: its model is megabytes of samples that would have to
+  // reach every worker through a one-time init message, and this pool's single `onmessage` makes
+  // a second message type a real scheduling hazard (see the Web Worker gotcha in CLAUDE.md).
+  // Measured 0.5 ms/spot against 0.086 for the Gaussian MLE, so a 100k-spot run is under a
+  // minute — worth shipping before the plumbing rather than after it.
+  const useWorkers = pool && pool.length>1 && method!=='psfmle' && n>=config.workerMinFrames &&
     (w*h>=config.workerMinPxFrame || n*w*h>=config.workerMinTotalPx);
+  if(method==='psfmle' && pool && pool.length>1)
+    onLog(`PSF model MLE runs single-threaded (~0.5 ms/spot): the ${pool.length}-worker pool is skipped this Run.`);
   const t0=performance.now(); let lastYield=t0, previewMs=0, lastSrMs=0, lastRawMs=0, lastPreviewFi=-1;
   const RAW_PREVIEW_MS=config.rawPreviewMs;   // time-based, not frame-count — see PARAMS.rawPreviewMs
   const SR_PREVIEW_MS=config.srPreviewMs;   // reconstruction is expensive — preview at most ~1/s (raw stays frequent)
@@ -14242,7 +14405,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
         const tc=performance.now(); tDetect+=tc-tb; nCand+=maxima.length;
         const frameLocs=[];                         // this frame's accepted fits, for the raw-panel overlay below
         for(const [cx,cy] of maxima){
-          const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,w,h,cx,cy,win,gain,camoffset) : gaussianFit(img,w,h,cx,cy,win,sigma,gain,camoffset), excessF2);
+          const L = applyExcessNoise(method==='psfmle' ? psfModelMLE(img,w,h,cx,cy,win,psfModel,gain,camoffset,eps) : method==='gaussmle' ? gaussianMLEspheric(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,w,h,cx,cy,win,gain,camoffset) : gaussianFit(img,w,h,cx,cy,win,sigma,gain,camoffset), excessF2);
           if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
                    const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
                    L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
@@ -14404,6 +14567,14 @@ async function run(){
       [threshKey]: config[threshKey], gain:config.gain, camoffset:config.camoffset,
       fitFirstFrame:config.fitFirstFrame, fitLastFrame:config.fitLastFrame, pxnm:px,
       localize3D:config.localize3D, ...cropCmdFields() });
+    // 'psfmle' needs the PSF model itself, not a width calibration: built (and cached) from the
+    // same Simulation-settings PSF section Preview PSF and Simulate movie use. Building it is a
+    // kernel build, which takes seconds — hence a log line rather than a silent pause.
+    let psfModel=null;
+    if(method==='psfmle'){
+      psfModel=await ensurePsfFitModel(px);
+      if(!psfModel){ log('PSF model MLE needs the Zernike PSF model: set PSF model to "Zernike-aberrated" in Simulation settings, then run again.'); return; }
+    }
     const zcal = method==='phasor3d' ? cal3d : null;   // z(ratio) model for Phasor 3D
     // z(σx,σy) width model for MLE 3D / (checked) MLE 3D rotated elliptical —
     // use the current run's pixel size for the px→nm conversion. wcal's mere
@@ -14413,7 +14584,7 @@ async function run(){
     // checkbox for THAT half of its effect — the angle-mode half (fixed vs
     // free, gaussmleEll only) is separate, driven by config.localize3D itself.
     const wcal = (method==='mle3d'||method==='gaussmleEll') && localize3D && cal3dW ? {qx:cal3dW.qx,qy:cal3dW.qy,zmin:cal3dW.zmin,zmax:cal3dW.zmax,px} : null;
-    const r = await runCore(config, stack, {zcal,wcal}, {
+    const r = await runCore(config, stack, {zcal,wcal,psfModel}, {
       onLog: log,
       onProgress: setProg,
       shouldStop: () => stopRequested,
@@ -15380,7 +15551,7 @@ async function showFrame(i){
       const {firstIdx,lastIdx}=fitFrameRange(paramValue('fitFirstFrame'), paramValue('fitLastFrame'), stack.n);
       const inRange = i>=firstIdx && i<lastIdx;
       if(inRange) for(const [cx,cy] of spots){
-        const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,stack.w,stack.h,cx,cy,win,gain,camoffset) : gaussianFit(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset), excessF2);
+        const L = applyExcessNoise(method==='psfmle' ? (_psfFitModel ? psfModelMLE(img,stack.w,stack.h,cx,cy,win,_psfFitModel,gain,camoffset,eps) : null) : method==='gaussmle' ? gaussianMLEspheric(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,stack.w,stack.h,cx,cy,win,gain,camoffset) : gaussianFit(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset), excessF2);
         if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
                  const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
                  L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
@@ -15508,9 +15679,11 @@ function updateMethodUI(){
   const m=paramValue('method'), is3dMethod = m==='mle3d'||m==='gaussmleEll';
   $('localize3DRow').style.display = is3dMethod ? 'flex' : 'none';
   const localize3D = paramValue('localize3D');
-  const is3d = m==='phasor3d' || (is3dMethod && localize3D);
+  // 'psfmle' is always 3D and never needs a calibration file — it fits z against the PSF model
+  // itself, so cal3dRow stays hidden for it (is3d drives the depth-colour row, not that box).
+  const is3d = m==='phasor3d' || m==='psfmle' || (is3dMethod && localize3D);
   const calibrationPresent = !!(cal3d||cal3dW);
-  $('cal3dRow').style.display = (is3d && !calibrationPresent) ? 'block' : 'none';
+  $('cal3dRow').style.display = (is3d && m!=='psfmle' && !calibrationPresent) ? 'block' : 'none';
   // Reveal the depth-colour toggle (ticked) the moment a 3D method is chosen —
   // not only after a run. For a 2D method, keep it shown if the current
   // results still carry real z (an existing 3D reconstruction) OR an sSMLM
@@ -16503,7 +16676,15 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20e — Engineered PSFs, and a yardstick for them.
+log(`webSMLM v0.12.1-dev · build 2026-09-20f — A fit method that uses the PSF itself.
+"PSF model MLE 3D" fits the modelled PSF, interpolated continuously in x, y and z, instead of a
+Gaussian — so depth is a fitted parameter with its own CRLB rather than something inverted from
+a width calibration afterwards. On the same astigmatic 3D movie it reaches an axial median of
+16.9 nm against 22.6 nm for Gauss MLE 3D, at equal detection and lateral accuracy and 1.8x the
+time. It needs no calibration file: the model comes from the Simulation settings’ PSF section.
+Single-threaded for now, and on a double-helix PSF it recovers depth MAGNITUDE but not its sign
+— diagnosed, see the log after such a run.
+— and from build 2026-09-20e: Engineered PSFs, and a yardstick for them.
 The Zernike basis now runs to 28 terms (n≤6), with three presets that trade focal precision for
 depth range, and a double-helix phase MASK built the real way — a superposition of
 Gauss-Laguerre modes — whose two lobes rotate 60° over ±800 nm, so z is read from an angle.
@@ -17526,7 +17707,12 @@ async function analyze(config){
     if(needCal==='phasor_magnitude' && !cal3d) throw new Error(`analyze(): method "${cfg.method}" needs config.calibrationJson or config.calibrationFile to contain/produce a phasor magnitude-ratio model`);
     if(needCal==='gaussian_width' && !cal3dW) throw new Error(`analyze(): method "${cfg.method}" needs config.calibrationJson or config.calibrationFile to contain/produce a Gaussian-width model`);
     const wcalForRun = (cfg.method==='mle3d'||cfg.method==='gaussmleEll') && cfg.localize3D ? cal3dW : null;
-    r = await runCore(cfg, stack, {zcal:cal3d, wcal:wcalForRun}, {onLog, onProgress});
+    // 'psfmle' (MODULE: fit): its model comes from the PSF section of the config, built here the
+    // same way run() builds it — a headless caller needs simulation_psfModel:'zernike' plus the
+    // optical parameters, not a calibration file.
+    const psfModelForRun = cfg.method==='psfmle' ? await ensurePsfFitModel(cfg.pxnm) : null;
+    if(cfg.method==='psfmle' && !psfModelForRun) throw new Error("analyze(): method 'psfmle' needs simulation_psfModel:'zernike' — it fits the modelled PSF itself");
+    r = await runCore(cfg, stack, {zcal:cal3d, wcal:wcalForRun, psfModel:psfModelForRun}, {onLog, onProgress});
     locs=r.locs;
   }
   // config.sSmlmPair — the headless equivalent of clicking Pair (MODULE:

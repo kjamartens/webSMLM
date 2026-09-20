@@ -1349,6 +1349,33 @@ lobes, well below a real fabricated mask — the price of a phase-only analytic 
 A cheaper first attempt (concentric zones of increasing vortex charge) was built and rejected on
 measurement: one lobe at focus and a 13-peak ring at ±1 µm, no double helix at all.
 
+**Fitting them: `PSF model MLE 3D` (`psfmle`).** A Gaussian has no width to read z from once the
+PSF is engineered, so this method fits the modelled PSF itself: the camera-pixel-integrated
+kernel, interpolated continuously in x, y and z (tricubic Catmull-Rom over the oversampled
+samples), handed to the same Fisher-scoring driver the Gaussian MLEs use. Depth is therefore a
+fitted parameter with its own CRLB, not a value inverted from a width calibration afterwards —
+and the method needs **no calibration file at all**: its model comes from the Simulation
+settings' PSF section, so the optical parameters (and `simulation_pxnm`) must match the data.
+A coarse z scan precedes the Newton step, because an engineered PSF's likelihood is not unimodal
+in z.
+
+Measured on one astigmatic 3D movie (3000 photons, ±500 nm structure), against `mle3d` on the
+same data: axial median **16.9 nm vs 22.6 nm**, equal detection (79.3% vs 79.0%) and equal
+lateral accuracy (6.07 vs 6.24 nm), at 1.8× the time — 0.5 ms/spot for the fit itself, measured
+directly, against 0.086 ms for the Gaussian elliptical MLE. It runs **single-threaded** for now:
+the model is megabytes that would have to reach every worker through a second message type, which
+this pool's single `onmessage` makes a real scheduling hazard.
+
+**Known limit, on the double helix.** With a DH PSF the method localizes well laterally (5.0 nm
+median, recall 86%, bias below 1 nm) and recovers the *magnitude* of z to about 20 nm — but the
+*sign* is close to a coin flip (27 of 57 pairs off by more than 250 nm). The cause is diagnosed
+and is not the optimiser: detection centres the fit window on ONE LOBE, so the partner lobe ~18
+camera pixels away falls on or outside the window, and the partner's direction is exactly what
+distinguishes +z from −z. A rescan-and-restart was tried and removed — it changed not one
+localization. The fix is a lobe-pairing step that centres the window between the two lobes
+(`docs/REFACTOR_PLAN.md`); until then, use `psfmle` with an astigmatic or extended-depth PSF,
+where it is the better of the two 3D methods.
+
 **The yardstick: `psfZCramerRao()`.** Every PSF build now also reports the Cramér-Rao lower bound
 on x, y and z, computed from the kernel itself under the current photon and background settings,
 with N and background marginalised as nuisance parameters exactly as a real fit must. It asks only
@@ -1498,7 +1525,7 @@ each bin too sparse to mean anything.
 | `detection_box_thr` | Uniform box filter threshold (intensity) | number | 0 | 65535 | 1 | 25 |
 | `detection_DoG_exactbp` | Exact band-pass (DoG only) | bool | — | — | — | false |
 | `psf` | σ_PSF — PSF width (px) | number | 0.8 | 5 | 0.1 | 1.3 |
-| `winr` | Fit radius (px) — window size = 2·winr+1 | number (int) | 2 | 10 | 1 | 4 |
+| `winr` | Fit radius (px) — window size = 2·winr+1 | number (int) | 2 | 20 | 1 | 4 |
 
 The in-app "more info…" popup for these fields (`hint-detectfit`) is shared
 with **Fit** below — one popup covers `liveUpdate` through `winr` as a
@@ -1510,7 +1537,7 @@ single control group in the sidebar.
 
 | id | Label | Type | Min | Max | Step | Default |
 |---|---|---|---|---|---|---|
-| `method` | Fit method | enum | — | — | — | `gaussmle` (options: `phasor`, `phasor3d`, `gaussls`, `gaussmle`, `mle3d`, `gaussmleEll` — UI labels "Phasor 2D", "Phasor 3D", "Gaussian LS 2D", "Gauss MLE 2D spherical", "Gauss MLE 3D elliptical", "Gauss MLE 3D rotated elliptical") |
+| `method` | Fit method (incl. `psfmle`, PSF model MLE 3D) | enum | — | — | — | `gaussmle` (options: `phasor`, `phasor3d`, `gaussls`, `gaussmle`, `mle3d`, `gaussmleEll` — UI labels "Phasor 2D", "Phasor 3D", "Gaussian LS 2D", "Gauss MLE 2D spherical", "Gauss MLE 3D elliptical", "Gauss MLE 3D rotated elliptical") |
 | `localize3D` | 3D localisation? | bool | — | — | — | true (only shown/meaningful for `mle3d`/`gaussmleEll` — see §2/fit) |
 | `fitFirstFrame` | First frame (1-based, inclusive) | number (int) | 1 | — | 1 | 1 |
 | `fitLastFrame` | Last frame (1-based, inclusive) | number (int) | 1 | — | 1 | `Infinity` (blank field — see below) |

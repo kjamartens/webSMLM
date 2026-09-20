@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16955  localizations table, filtering, histograms;
+    table           16971  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    17543  window.webSMLM.analyze()/analyzeBatch();
+    headless API    17559  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20g</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20h</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2118,7 +2118,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <summary>Simulation settings</summary>
         <label class="row">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="300" class="num"></label>
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
-        <label class="row">Pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
+        <label class="row" title="The pixel size of the SIMULATED camera. The always-visible Pixel size (nm) above is the analysis one, used for the scale bar and exports; it is synced to this after a movie is generated, and the two are separate so a mismatch can be simulated on purpose.">Simulated pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
         <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. Maximal: also adds blinking out-of-focus emitters rendered with the real defocused PSF (Zernike PSF model only) — roughly doubles the simulation time. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min" selected>Minimal (fastest)</option><option value="med">Medium</option><option value="max">Maximal (slowest)</option><option value="custom">Custom</option></select></label>
         <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), med 0.5 (typical SMLM), high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.5)</option><option value="high">High (2)</option><option value="custom">Custom</option></select></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
@@ -2206,7 +2206,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <details class="subsim" id="fluorophoreBox">
           <summary>Fluorophore parameters</summary>
           <label class="row">Photons/emitter/frame <input type="number" id="phot" min="0" max="50000" step="50" value="900" class="num"></label>
-          <label class="row" title="How the excitation beam falls off across the field of view. Normalised to mean 1, so the average emitter still emits Photons/emitter/frame — only its dependence on position changes.">Illumination profile <select id="simulation_illumProfile" class="sel"><option value="flat">Flat (uniform)</option><option value="gaussian">Gaussian beam</option><option value="sigmoid">Flat-top disc</option></select></label>
+          <label class="row" title="How the excitation beam falls off across the field of view. Normalised to mean 1, so the average emitter still emits Photons/emitter/frame — only its dependence on position changes.">Illumination <select id="simulation_illumProfile" class="sel"><option value="flat">Flat</option><option value="gaussian">Gaussian</option><option value="sigmoid">Flat-top</option></select></label>
           <label class="row" id="illumWidthRow" style="display:none;padding-left:40px" title="Beam width as a percentage of the field of view: FWHM for the Gaussian, full width of the flat top for the disc.">Beam width (% of FOV) <input type="number" id="simulation_illumFwhmPct" min="10" max="300" step="5" value="60" class="num"></label>
           <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
           <label class="row" title="Chance that an ON period ends in bleaching instead of a return to the dark state. 1 = a molecule blinks exactly once (the original model); 0.2 = five blinks on average. The emitter density setting keeps its meaning either way.">Bleach prob. per blink <input type="number" id="simulation_blinkBleachProb" min="0.01" max="1" step="0.01" value="1" class="num"></label>
@@ -2497,7 +2497,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="detection_box_thrRow" style="margin-top:8px">Threshold (intensity) <input type="number" id="detection_box_thr" min="0" max="65535" step="1" value="25" class="num"></label>
         <label class="row">σ_PSF (px) <input type="number" id="psf" min="0.8" max="5" step="0.1" value="1.3" class="num"></label>
         <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="20" step="1" value="4" class="num"></label>
-        <label class="row" title="Detections closer together than this are merged into one at their centroid. An engineered PSF (double helix, extended depth) reaches the detector as several maxima per emitter; set this to roughly its lobe separation. 0 = off, correct for any ordinary single-blob PSF.">Merge detections within (px) <input type="number" id="detection_mergeRadius" min="0" max="40" step="1" value="0" class="num"></label>
+        <label class="row" title="Detections closer together than this are merged into one at their centroid. An engineered PSF (double helix, extended depth) reaches the detector as several maxima per emitter; set this to roughly its lobe separation. 0 = off, correct for any ordinary single-blob PSF.">Merge detections (px) <input type="number" id="detection_mergeRadius" min="0" max="40" step="1" value="0" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-detectfit"><span class="pill">module: detect/fit</span>
           <p><b>Fit method</b> — σ_noise below is the spread of the filtered image, not the PSF width.</p>
@@ -2530,7 +2530,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <hr class="sep" style="margin:10px 0 8px">
         <label class="row">Gain (photons/ADU) <input type="number" id="gain" value="1" min="0.001" max="1000" step="0.01" class="num"></label>
         <label class="row">Camera offset (ADU) <input type="number" id="camoffset" value="0" min="0" max="65535" step="1" class="num"></label>
-        <label class="row" title="Variance inflation from an EMCCD's gain register (Var = F²·N). 1 for sCMOS/CCD, 2 for an EMCCD at high gain. Positions do not change; the photon counts and the fit's own uncertainty do.">Excess noise F² (EMCCD = 2) <input type="number" id="cameraExcessNoise" value="1" min="1" max="4" step="0.05" class="num"></label>
+        <label class="row" title="Variance inflation from an EMCCD's gain register (Var = F²·N). 1 for sCMOS/CCD, 2 for an EMCCD at high gain. Positions do not change; the photon counts and the fit's own uncertainty do.">Excess noise F² <input type="number" id="cameraExcessNoise" value="1" min="1" max="4" step="0.05" class="num"></label>
         <div class="btnrow" style="margin-top:2px">
           <button id="gainOffsetFromPcfoBtn" disabled style="grid-column:2" title="Fill Gain/Camera offset in from a PCFO estimate (runs Estimate first if it hasn't been computed yet)">Get estimate</button>
         </div>
@@ -2622,7 +2622,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <div class="btnrow">
           <button id="truthBtn" disabled title="Compare the localizations against the simulator's own ground truth: detection rate, lateral bias/RMSE, and axial bias/RMSE versus true depth. Simulated data only.">Score vs truth</button>
         </div>
-        <label class="row" id="validationPresetRow" title="webSMLM's own conventions, or the SMLM Challenge 2016 assessment rules so the numbers can be compared with published ones. Writes the four settings below.">Score convention <select id="validation_preset" class="sel"><option value="webSMLM">webSMLM</option><option value="challenge2016">SMLM Challenge 2016</option><option value="custom">Custom</option></select></label>
+        <label class="row" id="validationPresetRow" title="webSMLM's own conventions, or the SMLM Challenge 2016 assessment rules so the numbers can be compared with published ones. Writes the four settings below.">Convention <select id="validation_preset" class="sel"><option value="webSMLM">webSMLM</option><option value="challenge2016">Challenge 2016</option><option value="custom">Custom…</option></select></label>
         <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
         <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
         <label class="row" id="validationMinPhotRow" title="A simulated emitter only counts in a frame where it delivered at least this many photons. Dimmer emitter-frames are ignored either way: detecting one is not a false positive, missing one is not a miss. 0 = count everything.">Min photons/frame <input type="number" id="validation_minPhotons" min="0" max="100000" step="10" value="100" class="num"></label>
@@ -2630,7 +2630,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="validationCrowdRow" title="An emitter is 'crowded' when another counted emitter is ON within this distance in the same frame. Reported as a separate isolated/crowded split. 0 = off.">Crowding radius (nm) <input type="number" id="validation_crowdRadius" min="0" max="5000" step="10" value="300" class="num"></label>
         <label class="row" id="validationMatchModeRow" title="Lateral (recommended): pair on x/y only, so the axial error being measured cannot bias its own pairing. Cylinder 3D: sort candidates by 3D distance inside a lateral+axial cylinder, as the challenge does.">Matching <select id="validation_matchMode" class="sel"><option value="lateral">Lateral only</option><option value="cylinder3D">3D cylinder</option></select></label>
         <label class="row" id="validationAxialTolRow" style="display:none;padding-left:40px" title="Height of the matching cylinder: a pair further apart than this in z is not a pair.">Axial tolerance (nm) <input type="number" id="validation_axialTol" min="20" max="5000" step="10" value="500" class="num"></label>
-        <label class="row" id="validationPhotModeRow" title="Absolute: count an emitter-frame from Min photons/frame upward. Quantile: instead leave out the dimmest N% of emitter-frames, which is the challenge's own rule.">Photon threshold <select id="validation_photonMode" class="sel"><option value="absolute">Absolute (photons)</option><option value="quantile">Quantile (%)</option></select></label>
+        <label class="row" id="validationPhotModeRow" title="Absolute: count an emitter-frame from Min photons/frame upward. Quantile: instead leave out the dimmest N% of emitter-frames, which is the challenge's own rule.">Photon threshold <select id="validation_photonMode" class="sel"><option value="absolute">Absolute</option><option value="quantile">Quantile</option></select></label>
         <label class="row" id="validationPhotQuantRow" style="display:none;padding-left:40px" title="The dimmest this percent of in-field emitter-frames are not counted either way.">Dimmest % not counted <input type="number" id="validation_photonQuantile" min="0" max="90" step="5" value="25" class="num"></label>
         <label class="row" id="validationBorderModeRow" title="Don't care: match everything, then leave edge emitters out of the tally. Exclude: cut the border from truth AND localizations before matching, the challenge's order.">Edge handling <select id="validation_borderMode" class="sel"><option value="dontcare">Don't care</option><option value="exclude">Exclude before matching</option></select></label>
         <button type="button" class="infobtn">more info…</button>
@@ -2832,7 +2832,7 @@ const PARAMS = {
   // Detections closer together than this belong to one emitter and are merged at their centroid
   // (mergeNearbyMaxima). 0 = off, which is right for any single-blob PSF; an engineered PSF needs
   // roughly its own lobe separation here.
-  detection_mergeRadius: { type:'number', id:'detection_mergeRadius', label:'Merge detections within (px)', min:0, max:40, step:1, default:0, int:false },
+  detection_mergeRadius: { type:'number', id:'detection_mergeRadius', label:'Merge detections (px)', min:0, max:40, step:1, default:0, int:false },
   // psf = σ_PSF, the point-spread-function width in camera pixels; sets filter scale + fit initial guess
   psf: { type:'number', id:'psf', label:'σ_PSF — PSF width (px)', min:0.8, max:5, step:0.1, default:1.3, int:false },
   // winr = "window radius": half-width of the square fit window, so window size = 2·winr+1
@@ -2947,7 +2947,7 @@ const PARAMS = {
   // gain/F^2 and multiplies the returned photon counts back by F^2, so positions are untouched
   // while the Poisson likelihood and its CRLB (lpx/lpy/lpz) see the true variance — see
   // MODULE: fit. Leave at 1 unless the data really came off an EM gain register.
-  cameraExcessNoise: { type:'number', id:'cameraExcessNoise', label:'Excess noise factor F² (EMCCD = 2)', min:1, max:4, step:0.05, default:1, int:false },
+  cameraExcessNoise: { type:'number', id:'cameraExcessNoise', label:'Excess noise factor F²', min:1, max:4, step:0.05, default:1, int:false },
 
   // ---- PCFO (photon-conversion-factor & offset): estimates gain/camoffset above from the
   // stack itself, via the Rieger–Heintzman high-spatial-frequency noise method (estimateGainOffset)
@@ -10605,7 +10605,7 @@ async function calibrationCore(config, stack, hooks={}){
   const fitsByFrame=new Map();
   for(const p of good){ let a=fitsByFrame.get(p.fi); if(!a){a=[];fitsByFrame.set(p.fi,a);} a.push({x:p.x,y:p.y}); }
   const calib={ first,last,step,px,zref, qx,qy,qpr, zcal, qmagX, qmagY, sourceFile:config.sourceFile, fixedXY,
-          det:{sigma,k,win,border,exactBP,mode}, fitsByFrame,
+          det:{sigma,k,win,border,exactBP,mode,mergeRadius:0}, fitsByFrame,
           pts:good.map((p,i)=>({z:zr[i],sx:sxN[i],sy:syN[i],pr:p.pr,mx:p.mx,my:p.my})),
           zmin:Math.min(...zr), zmax:Math.max(...zr) };
   const cal3d=zcal;                               // make it immediately usable by Phasor 3D
@@ -14244,7 +14244,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
         if(latestImg && latestFi>lastPreviewFi){
           lastPreviewFi=latestFi; lastRawMs=performance.now();
           const tp=performance.now();
-          const mx=detectSpots(latestImg,w,h,sigma,exactBP,mode,k,border).maxima;
+          const mx=detectSpots(latestImg,w,h,sigma,exactBP,mode,k,border,mergeRadius).maxima;
           lastSpots=mx; lastFrame=latestImg; lastFrameIdx=latestFi;
           onRawPreview(latestImg,w,h,mx,latestLocs,latestFi,nStack);   // nStack: label shows true position in the whole stack, not the selected range
           previewMs+=performance.now()-tp;
@@ -14558,7 +14558,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
   }
   if(stopped) onLog('Partial result shown — press “Localize” to start over.');
 
-  return { locs, w, h, n, px, mag:config.mag, det:{sigma,k,win,border,exactBP,mode},
+  return { locs, w, h, n, px, mag:config.mag, det:{sigma,k,win,border,exactBP,mode,mergeRadius},
            method, label, processed, stopped, useWorkers,
            lastSpots, lastFrame, lastFrameIdx, firstIdx, lastIdx,
            timings:{tGet,tDetect,tFit,nCand,dt,previewMs,runMs,otherMs,
@@ -14717,7 +14717,7 @@ function liveStreamDetectParamsFromCfg(cfg){
   const win=2*cfg.winr+1;
   return { sigma:cfg.psf, win, border:(win-1)/2+1,
            k:{wave:cfg.detection_wavelet_thr, dog:cfg.detection_DoG_thr, box:cfg.detection_box_thr}[cfg.detFilter],
-           exactBP:cfg.detection_DoG_exactbp, mode:cfg.detFilter };
+           exactBP:cfg.detection_DoG_exactbp, mode:cfg.detFilter, mergeRadius:cfg.detection_mergeRadius||0 };
 }
 
 // Shows one already-processed streamed frame (by its GLOBAL, 0-based index
@@ -14741,8 +14741,8 @@ function liveStreamShowRawFrame(globalIdx){
   }
   $('liveStreamScrubNote').style.display='none';
   const img=liveStreamState.rawFrames[localIdx];
-  const {sigma,exactBP,mode,k,border}=liveStreamDetectParamsFromCfg(liveStreamState.cfg);
-  const {maxima}=detectSpots(img, liveStreamState.w, liveStreamState.h, sigma, exactBP, mode, k, border);
+  const {sigma,exactBP,mode,k,border,mergeRadius}=liveStreamDetectParamsFromCfg(liveStreamState.cfg);
+  const {maxima}=detectSpots(img, liveStreamState.w, liveStreamState.h, sigma, exactBP, mode, k, border, mergeRadius);
   drawRaw(img, liveStreamState.w, liveStreamState.h, maxima, locsForFrame(globalIdx));
   $('rawInfo').textContent=`frame ${globalIdx+1} (streamed) — ${maxima.length} spots`;
 }
@@ -15619,7 +15619,7 @@ async function showFrame(i){
       if(runMatchesStack){ det=lastResult.det; getLocs=locsForFrame;
         if(isFinite(lastResult.firstIdx)) runInRange = i>=lastResult.firstIdx && i<lastResult.lastIdx; }
       if(det){
-        spots=detectSpots(img,stack.w,stack.h,det.sigma,det.exactBP,det.mode,det.k,det.border).maxima;
+        spots=detectSpots(img,stack.w,stack.h,det.sigma,det.exactBP,det.mode,det.k,det.border,det.mergeRadius||0).maxima;
         locsF=getLocs(i);
       }
       drawRaw(img,stack.w,stack.h,spots,locsF);
@@ -15854,10 +15854,19 @@ wirePreset('validation_preset', {
 });
 // The two conditional sub-rows follow their own select, same idiom as the EMCCD rows.
 (function(){
-  const m=$('validation_matchMode'), p=$('validation_photonMode');
-  const sync=()=>{ $('validationAxialTolRow').style.display = m.value==='cylinder3D' ? '' : 'none';
-                   $('validationPhotQuantRow').style.display = p.value==='quantile' ? '' : 'none'; };
-  m.addEventListener('change', sync); p.addEventListener('change', sync); sync();
+  const pre=$('validation_preset'), m=$('validation_matchMode'), p=$('validation_photonMode');
+  const sync=()=>{
+    // A named convention is a complete answer on its own, and every score logs which one it
+    // followed — so the four fields it writes only clutter the panel until someone wants to
+    // depart from it. 'Custom…' is that moment.
+    const custom = pre.value==='custom';
+    for(const id of ['validationMatchModeRow','validationPhotModeRow','validationBorderModeRow'])
+      $(id).style.display = custom ? '' : 'none';
+    $('validationAxialTolRow').style.display  = (custom && m.value==='cylinder3D') ? '' : 'none';
+    $('validationPhotQuantRow').style.display = (custom && p.value==='quantile')   ? '' : 'none';
+  };
+  for(const el of [pre,m,p]) el.addEventListener('change', sync);
+  sync();
 })();
 wirePreset('simulation_realism', {
   min:{ simulation_blinkBleachProb:1,   simulation_photCV:0,   simbg:0,  simulation_bgCellContrast:1,
@@ -16725,7 +16734,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20g — The phase mask never reached the PSF workers.
+log(`webSMLM v0.12.1-dev · build 2026-09-20h — Review round: a quieter panel, and one fix.
+Score vs truth shows its Convention dropdown and hides the four fields a named convention sets
+— pick Custom… to see them. Five labels shortened so they stop wrapping, and the simulation’s
+own pixel size is now labelled Simulated pixel size (nm), so it no longer reads as a duplicate
+of the analysis one above. Fixed: a scrubbed-frame preview replaying a finished run, and the
+live-streaming preview, ignored the run’s own Merge detections setting and drew more spots than
+the run had used.
+— and from build 2026-09-20g: The phase mask never reached the PSF workers.
 buildPsfPlanesParallel() and the PSF worker each spell out the optical parameters by hand, and
 neither listed the mask — so every kernel built since the mask shipped came back unaberrated,
 and every double-helix measurement I reported was really measuring a plain PSF. With it fixed,

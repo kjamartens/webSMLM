@@ -600,7 +600,7 @@ to ±460 nm (the figure `buildPsfKernelStack()` reports). Between those two numb
 still found, but two depths share one width pair, so their z can fold to the wrong side. Read the
 effective range together with that one.
 
-**Two conventions.** **Score convention** = `SMLM Challenge 2016` writes four ordinary settings
+**Two conventions.** **Convention** = `Challenge 2016` writes four ordinary settings
 that together reproduce the rules the challenge's own assessment code uses (Sage et al.,
 *Nat. Methods* 16, 387, 2019), so webSMLM's Jaccard and RMSE can be laid beside published numbers:
 candidates sorted by 3D distance inside a 250 nm × ±500 nm cylinder instead of laterally; the
@@ -1514,7 +1514,7 @@ scoring drift correction. See the **simulation** module.
 | `validation_minPhotons` | Score: min photons/frame | number | 0 | 100000 | 10 | 100 |
 | `validation_border` | Score: edge exclusion (px, -1 = auto) | number (int) | -1 | 100 | 1 | -1 |
 | `validation_crowdRadius` | Score: crowding radius (nm) | number | 0 | 5000 | 10 | 300 |
-| `validation_preset` | Score convention | enum | `webSMLM`, `challenge2016`, `custom` | | | `webSMLM` |
+| `validation_preset` | Convention | enum | `webSMLM`, `challenge2016`, `custom` | | | `webSMLM` |
 | `validation_matchMode` | Score: matching | enum | `lateral`, `cylinder3D` | | | `lateral` |
 | `validation_axialTol` | Score: axial tolerance (nm) | number | 20 | 5000 | 10 | 500 |
 | `validation_photonMode` | Score: photon threshold | enum | `absolute`, `quantile` | | | `absolute` |
@@ -1539,7 +1539,7 @@ each bin too sparse to mean anything.
 | `detection_wavelet_thr` | Wavelet threshold (k·σ_noise) | number | 1 | 8 | 0.5 | 4 |
 | `detection_DoG_thr` | DoG threshold (k·σ_noise) | number | 1 | 8 | 0.5 | 4 |
 | `detection_box_thr` | Uniform box filter threshold (intensity) | number | 0 | 65535 | 1 | 25 |
-| `detection_mergeRadius` | Merge detections within (px) | number | 0 | 40 | 1 | 0 |
+| `detection_mergeRadius` | Merge detections (px) | number | 0 | 40 | 1 | 0 |
 | `detection_DoG_exactbp` | Exact band-pass (DoG only) | bool | — | — | — | false |
 | `psf` | σ_PSF — PSF width (px) | number | 0.8 | 5 | 0.1 | 1.3 |
 | `winr` | Fit radius (px) — window size = 2·winr+1 | number (int) | 2 | 20 | 1 | 4 |
@@ -1941,7 +1941,7 @@ Camera ADU→photon conversion fields specifically.
 |---|---|---|---|---|---|---|
 | `gain` | Camera gain (photons/ADU) | number | 0.001 | 1000 | 0.01 | 1 |
 | `camoffset` | Camera offset (ADU) | number | 0 | 65535 | 1 | 0 |
-| `cameraExcessNoise` | Excess noise factor F² (EMCCD = 2) | number | 1 | 4 | 0.05 | 1 |
+| `cameraExcessNoise` | Excess noise factor F² | number | 1 | 4 | 0.05 | 1 |
 
 **In-app "more info…" popup** (`hint-export` in `webSMLM.html`, shown
 alongside `pxnm` — see **Render** above — since all three sit together in

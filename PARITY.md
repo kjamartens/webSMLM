@@ -22,6 +22,16 @@ the session making this edit — so wherever such a row says "same" or
 "absent" for demoCam it describes the 2026-09-08 snapshot, and every one of
 them now reads **webSMLM ahead** until demoCam is diffed again.
 
+**Partial refresh, 2026-09-20 (webSMLM side only).** webSMLM builds
+`2026-09-20a`-`h` added an EMCCD sensor path (QE, Gamma gain register,
+clock-induced charge, integer ADU at a settable bit depth) with its
+analysis-side excess-noise correction, a non-uniform illumination profile,
+engineered PSFs (higher-order astigmatism presets and a Gauss-Laguerre
+double-helix phase mask) with a per-PSF Cramer-Rao bound, and a PSF-model
+fitter (`psfmle`). Rows those builds invalidate or add are marked
+*(webSMLM 2026-09-20)*; **the demoCam_SMLM_MM column was again NOT
+re-checked** for the same reason as above.
+
 **Staleness warning:** this project has other collaborators and no
 mechanism here notifies demoCam_SMLM_MM of new commits. Before starting
 *any* simulation-engine work in either repo that assumes parity (or a gap)
@@ -39,10 +49,13 @@ has not been modified for parity (this file is the only addition here).
 | Richards-Wolf (scalar Debye-Kirchhoff) | absent | `RichardsWolf` (PSFGenerator) -- **demoCam ahead** |
 | Gibson-Lanni | absent as a standalone model (subsumed into the Zernike model at zero coefficients) | `GibsonLanni` (PSFGenerator) -- **demoCam ahead** |
 | Gibson-Lanni + Zernike (scalar, full 2D pupil) | `zernike` (default), N_RHO=20 x N_PHI=40 polar quadrature or chirp-Z (`simulation_psfEvalMethod`: `direct`\|`fft`, default `fft`) | `GibsonLanniZernike`, same N_RHO/N_PHI, `PsfEvalMethod`: `Direct`\|`ChirpZ`, default `Direct` -- ported this session, ~3.7x measured speedup, 0.22-0.29% relative L2 agreement with Direct |
-| Zernike coefficients | 15 (OSA 0-14), milliwaves in UI, presets + custom | 15 (OSA 0-14), waves, `PsfZernikeCoefficients` + `PsfZernikePreset` (10 presets) -- same convention/index mapping |
+| Zernike coefficients | 28 (OSA 0-27, n<=6), milliwaves in UI, presets + custom; a 15-value custom string is zero-padded, so older settings files are unchanged *(webSMLM 2026-09-20)* | 15 (OSA 0-14), waves, `PsfZernikeCoefficients` + `PsfZernikePreset` (10 presets) -- same convention/index mapping |
 | Sub-pixel kernel placement | `simulation_psfInterp`: `nearest`\|`linear`\|`cubic`\|`fft` (Fourier-shift), default `cubic` | `PsfInterp`: `Nearest`\|`Linear`\|`Cubic`, default `Nearest` (unchanged legacy behavior) -- ported this session (Linear/Cubic); FFT-shift mode not ported (deferred, see below) |
 | Z-stack / defocus | per-emitter Z (site's own z), nearest-plane lookup, no blend | per-emitter Z (site depth + Z-stage global offset add) -- ported this session, nearest-plane only (two-plane blend deliberately not ported, matching webSMLM's own removed-and-not-reintroduced decision) |
-| Measured/experimental PSF, cubic-spline PSF, DH/tetrapod/biplane | absent in both | absent in both |
+| Engineered PSFs | higher-order astigmatism presets (`saddlePoint`/`extendedRange`/`extendedRangeStrong`, astigmatism stacked at OSA j=5/13/25) and a real double-helix phase mask (`simulation_psfMaskType`, Gauss-Laguerre superposition along l=2p+1, measured ~60 deg rotation over +/-800 nm) *(webSMLM 2026-09-20)* | absent |
+| PSF figure of merit | `psfZCramerRao()`: x/y/z Cramer-Rao bound from the kernel stack, PSF-shape agnostic (the astigmatism-specific `zUsableNm` is kept alongside it) *(webSMLM 2026-09-20)* | absent |
+| PSF-model ("vector") fitting | `psfmle`: fits the camera-pixel-integrated modelled PSF itself, theta=[x,y,N,bg,z], tricubic over samples, coarse z scan then Newton, joint z CRLB, no width calibration needed; single-threaded for now *(webSMLM 2026-09-20)* | absent (fitting is out of scope for a device adapter) |
+| Measured/experimental PSF, bead-calibrated spline PSF, biplane | absent in both | absent in both |
 
 ## Emitter placement / structures
 
@@ -70,11 +83,12 @@ has not been modified for parity (this file is the only addition here).
 | Concept | webSMLM | demoCam_SMLM_MM |
 |---|---|---|
 | Chain | bg -> Poisson(signal) -> +Gaussian read noise (post-gain conversion... actually pre-gain, see webSMLM inventory) -> /gain -> +per-pixel offset -> clamp at 0 | photons -> *QE +dark current -> Poisson+Gaussian read noise (combined) -> /gain -> +offset -> clamp [0,65535] -- **demoCam ahead**: QE, dark current, 16-bit clamp, per-pixel sCMOS-style gain AND read-noise maps (not just offset) |
-| QE / dark current | absent | `QuantumEfficiency` (0.85), `DarkCurrentElectronsPerSec` (1.03) -- **demoCam ahead** |
+| QE / dark current | QE on the EMCCD path (`simulation_qe`, 0.9); no dark current *(webSMLM 2026-09-20)* | `QuantumEfficiency` (0.85), `DarkCurrentElectronsPerSec` (1.03) -- **demoCam ahead on dark current** |
 | Per-pixel maps | offset only (`simulation_offset_std`) | offset, gain (`PixelGainStdPct`), read noise (`PixelReadNoiseStdPct`) -- **demoCam ahead** |
-| EMCCD / excess noise factor | absent | absent |
-| Quantization / bit depth | none (Float32 output, no rounding) | 16-bit uint clamp -- **demoCam ahead** (more camera-realistic) |
+| EMCCD / excess noise factor | `simulation_cameraType='emccd'`: Poisson -> Gamma gain register, so variance = 2x mean (measured 2.00); clock-induced charge (`simulation_cic`); analysis side corrects for it via `cameraExcessNoise` *(webSMLM 2026-09-20)* | absent -- **webSMLM ahead** |
+| Quantization / bit depth | integer ADU clipped at 2^`simulation_bitDepth`-1 on the EMCCD path; sCMOS path still Float32 (kept for byte-identity with earlier builds) *(webSMLM 2026-09-20)* | 16-bit uint clamp |
 | Gain units | photons/ADU | photons/ADU -- same convention |
+| Illumination profile | `simulation_illumProfile`: `flat` (default) \| `gaussian` \| `sigmoid`, width `simulation_illumFwhmPct`; attenuation normalised to peak 1, applied to emitters AND background *(webSMLM 2026-09-20)* | not checked (this column is the 2026-09-08 snapshot) |
 
 ## Background / drift / focus
 
@@ -91,7 +105,7 @@ has not been modified for parity (this file is the only addition here).
 |---|---|---|
 | Raw movie export | **absent** (in-memory only) | uint16 stack via standard MM camera API -- **demoCam ahead** |
 | Ground-truth emitter/localization export | in-memory only (`groundTruthEvents`/`groundTruthLocs`), consumed by "View GT" and "Score vs truth"; no file export | **absent entirely** -- `BlinkEvent` positions are discarded after rendering; this is demoCam's single biggest ground-truth gap |
-| GT scoring vs. localization output | yes (`scoreTruthCore`): recall/precision/Jaccard, median+percentile lateral/axial error, photon-threshold + edge "don't care" classes, isolated/crowded split, recall-vs-photons curve with 50% point, challenge efficiency *(webSMLM 2026-09-19)* | absent |
+| GT scoring vs. localization output | yes (`scoreTruthCore`): recall/precision/Jaccard, median+percentile lateral/axial error, photon-threshold + edge "don't care" classes, isolated/crowded split, recall-vs-photons curve with 50% point, challenge efficiency *(webSMLM 2026-09-19)*; plus per-molecule metrics and an effective z range, and a `validation_preset` that reproduces the published SMLM-Challenge-2016 rules (3D cylinder matching, quantile photon threshold, border excluded before matching) *(webSMLM 2026-09-20)* | absent |
 
 ## Presets (webSMLM only, 2026-09-19)
 

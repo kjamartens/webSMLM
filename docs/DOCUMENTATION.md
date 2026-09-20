@@ -1346,8 +1346,10 @@ Gouy phase that advances linearly with defocus, which is why the two lobes **rot
 instead of blurring: measured 60° over ±800 nm at the default 5 modes and a waist of 1.0 pupil
 radii, with the sign of z in the direction of rotation. About 11% of the light sits in the two
 lobes, well below a real fabricated mask — the price of a phase-only analytic construction.
-A cheaper first attempt (concentric zones of increasing vortex charge) was built and rejected on
-measurement: one lobe at focus and a 13-peak ring at ±1 µm, no double helix at all.
+A cheaper first attempt (concentric zones of increasing vortex charge) was replaced by this one.
+It was reported as "measured and rejected" in build 2026-09-20e, but that measurement ran through
+the worker path while the mask was being dropped there, so it measured an unaberrated PSF and
+proves nothing about it; the Gauss-Laguerre construction is here because it is the published one.
 
 **Fitting them: `PSF model MLE 3D` (`psfmle`).** A Gaussian has no width to read z from once the
 PSF is engineered, so this method fits the modelled PSF itself: the camera-pixel-integrated

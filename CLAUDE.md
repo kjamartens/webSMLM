@@ -344,7 +344,9 @@ relevant one before editing rather than scrolling:
   show for it. `pupilMaskPhase()` is the separate, non-Zernike term: a real double helix, i.e. the
   phase of a Gauss-Laguerre superposition along l=2p+1 (Pavani & Piestun), measured rotating 60°
   over ±800 nm with ~11% of the light in the two lobes. A concentric-vortex-zone approximation was
-  tried first and **rejected on measurement** (one lobe at focus, a 13-peak ring at ±1 µm). It is
+  tried first and replaced; its "rejected on measurement" note was itself measured through the
+  broken worker path (see the 20260920g entry below), so it proves nothing — the GL construction
+  stands on being the published one. The mask is
   called from BOTH pupil builders (polar and Cartesian/FFT) and `laguerreL`+`pupilMaskPhase` are
   both in `psfWorkerSource()`'s list — miss that and the PSF pool dies on a ReferenceError.
 

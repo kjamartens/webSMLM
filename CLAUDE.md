@@ -375,6 +375,17 @@ relevant one before editing rather than scrolling:
   `mstep`'s absolute floors (`Math.max(100,0.3*N)`) are not scale-invariant — expected, not a bug.
   PCFO measures gain·F² on EMCCD data and says so rather than silently dividing.
 
+  **Illumination (2026-09-20).** `buildSimIllumination()` builds an attenuation field with **peak
+  1** (not mean 1 — that was tried and rejected: a 60% Gaussian then makes the centre 2.7x the
+  typed `phot`, which reads as the setting being ignored), so with a profile selected `phot` and
+  `simbg` are the values at the beam CENTRE. The factor is applied in exactly ONE place per
+  emitter — folded into `bright`, which `addBlink()` already feeds into BOTH the rendered frame
+  and the ground-truth `rate` — so the movie and the truth cannot disagree about how bright an
+  emitter was. The background is attenuated by the same field and deliberately NOT renormalised.
+  Consequence worth knowing: switching a profile on does NOT simply make detection worse — on one
+  scored run the 50%-detection point FELL (440 → 227 photons) because the background dimmed along
+  with the signal, while recall and lateral error still degraded (81.6% → 78.2%, 5.0 → 9.1 nm).
+
   **Presets write parameters, they never replace them**: `wirePreset()` pushes a preset's values
   into the ordinary controls and a manual edit flips the preset to `custom`, so
   `simulation_realism` (`min`/`med`/`max`) and `simulation_densityPreset` carry no physics of their

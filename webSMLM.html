@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2774   PARAMS registry, single source of truth for params;
+    params          2785   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3739   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3758   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      4038   synthetic stack generator ("Simulate movie");
+    simulation      4057   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6389   score localizations against the simulator's own
+    validation      6461   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6870   per-frame band-pass + local-maxima detection
-    fit             7147   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6942   per-frame band-pass + local-maxima detection
+    fit             7219   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7667   accumulate to offscreen buffer; view/colour/blur;
+    render          7739   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8950   frame-parallel detect/fit worker pool; dedicated
+    workers         9022   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9519   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9811   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9591   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9883   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10228   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10300   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10734   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10806   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11457  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11529  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11927  single particle tracking, trackpy-inspired;
+    spt             11999  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13429  top-level orchestration, *Core()/wrapper split;
+    pipeline        13501  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   14057  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14129  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16262  localizations table, filtering, histograms;
+    table           16346  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16850  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16934  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2206,6 +2206,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <details class="subsim" id="fluorophoreBox">
           <summary>Fluorophore parameters</summary>
           <label class="row">Photons/emitter/frame <input type="number" id="phot" min="0" max="50000" step="50" value="900" class="num"></label>
+          <label class="row" title="How the excitation beam falls off across the field of view. Normalised to mean 1, so the average emitter still emits Photons/emitter/frame — only its dependence on position changes.">Illumination profile <select id="simulation_illumProfile" class="sel"><option value="flat">Flat (uniform)</option><option value="gaussian">Gaussian beam</option><option value="sigmoid">Flat-top disc</option></select></label>
+          <label class="row" id="illumWidthRow" style="display:none;padding-left:40px" title="Beam width as a percentage of the field of view: FWHM for the Gaussian, full width of the flat top for the disc.">Beam width (% of FOV) <input type="number" id="simulation_illumFwhmPct" min="10" max="300" step="5" value="60" class="num"></label>
           <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
           <label class="row" title="Chance that an ON period ends in bleaching instead of a return to the dark state. 1 = a molecule blinks exactly once (the original model); 0.2 = five blinks on average. The emitter density setting keeps its meaning either way.">Bleach prob. per blink <input type="number" id="simulation_blinkBleachProb" min="0.01" max="1" step="0.01" value="1" class="num"></label>
           <label class="row" title="Mean time a molecule spends dark between two of its blinks. Only matters when the bleach probability is below 1.">Dark lifetime (frames, mean) <input type="number" id="simulation_offLifetime" min="0.1" max="5000" step="1" value="20" class="num"></label>
@@ -2222,6 +2224,15 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           spread (CV)</b> makes each blink's rate log-normal around that value (0 = every blink equally
           bright). <b>Emitter density</b> keeps meaning the mean number of emitters ON per µm² per frame
           whatever the kinetics — molecules simply activate less often when each one blinks more.</p>
+          <p><b>Illumination profile</b> makes an emitter's brightness depend on where it sits, as a real
+          beam does: a <b>Gaussian beam</b> or a soft-edged <b>flat-top disc</b> of <b>Beam width</b> percent
+          of the field of view. The field is an attenuation with peak 1, so Photons/emitter/frame and
+          Background (photons/px) become the values at the beam <i>centre</i> and nothing is ever brighter
+          than what you typed; the log reports what the profile costs on average (0.37× for a 60% Gaussian).
+          The background is attenuated by the same beam, which is why the detector does not simply get
+          worse: on one scored run the 50%-detection point <i>fell</i> from 440 to 227 photons, because the
+          background fell with the signal — while recall went 81.6% → 78.2% and the lateral error 5.0 →
+          9.1 nm, both from the emitters at the edge now being dim.</p>
         </div>
         </details>
         <details class="subsim" id="backgroundBox">
@@ -3171,6 +3182,14 @@ const PARAMS = {
   // simulation_gain meaning exactly one thing (photons/ADU, end to end) and keeps the ADU scale
   // comparable with the sCMOS path; simulation_emGain then enters only where it physically
   // matters at these settings, as the factor by which the register makes read noise negligible.
+  // ---- illumination profile: a real widefield/TIRF beam is brightest in the middle, so an
+  // emitter's photon count depends on WHERE it sits. The field is an ATTENUATION with peak 1
+  // (buildSimIllumination), so with a profile selected `phot` and `simbg` are the values at the
+  // beam centre and nothing is ever brighter than the number the user typed; the log reports what
+  // the profile costs in average signal. 'flat' (default) multiplies by exactly 1 and leaves
+  // every pixel bit-identical.
+  simulation_illumProfile: { type:'enum', id:'simulation_illumProfile', label:'Illumination profile', options:['flat','gaussian','sigmoid'], default:'flat' },
+  simulation_illumFwhmPct: { type:'number', id:'simulation_illumFwhmPct', label:'Illumination width (% of FOV)', min:10, max:300, step:5, default:60, int:false },
   simulation_cameraType: { type:'enum', id:'simulation_cameraType', label:'Simulation camera type', options:['scmos','emccd'], default:'scmos' },
   simulation_qe: { type:'number', id:'simulation_qe', label:'Quantum efficiency (EMCCD)', min:0.05, max:1, step:0.01, default:0.9, int:false },
   simulation_emGain: { type:'number', id:'simulation_emGain', label:'EM gain (×, EMCCD)', min:1, max:2000, step:10, default:300, int:false },
@@ -4376,6 +4395,40 @@ function simBgScale(fi, decayFrames){
 // Draws from its OWN rng (derived from the seed, see generateSynthetic()), never the emitter
 // stream, so the same seed gives the same emitters with or without a background: the effect of
 // background on detection can be measured on otherwise identical data.
+// Illumination field over the camera grid, as a multiplier with PEAK 1 — an attenuation, never a
+// gain. `phot` and `simbg` are then the values at the beam centre, which is how they are quoted at
+// a microscope, and no emitter can come out brighter than the number the user typed. (Normalising
+// to mean 1 instead was tried first and rejected: at a 60%-of-FOV Gaussian it makes the centre
+// 2.7x the typed value, which reads as the setting being ignored.) The average over the field is
+// therefore below 1 and is logged, so the lost photon budget is visible rather than hidden.
+// 'gaussian' is the ordinary beam; 'sigmoid' is a flat-topped disc with a soft edge, the shape the
+// SMLM Challenge 2016 simulator used. null for 'flat' — callers read that as "multiply by 1",
+// which is what keeps a default movie byte-identical.
+function buildSimIllumination(w,h,profile,fwhmPct){
+  if(profile!=='gaussian' && profile!=='sigmoid') return null;
+  const cx=(w-1)/2, cy=(h-1)/2, fwhm=Math.max(1e-6, (fwhmPct/100)*w);
+  const sig=fwhm/2.3548, r0=fwhm/2, edge=Math.max(1e-6, 0.15*r0);
+  const f=new Float32Array(w*h); let sum=0;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const r=Math.hypot(x-cx,y-cy);
+    const v = profile==='gaussian' ? Math.exp(-(r*r)/(2*sig*sig)) : 1/(1+Math.exp((r-r0)/edge));
+    f[y*w+x]=v; sum+=v;
+  }
+  let peak=0; for(const v of f) if(v>peak) peak=v;
+  if(!(peak>0)) return null;
+  for(let i=0;i<f.length;i++) f[i]/=peak;
+  f.meanFactor=sum/(w*h)/peak;      // what the profile costs in total signal, for the log line
+  return f;
+}
+// Bilinear read of that field at an emitter's own sub-pixel position (1 when there is no field).
+function illumAt(field,w,h,x,y){
+  if(!field) return 1;
+  const xi=Math.max(0,Math.min(w-1,x)), yi=Math.max(0,Math.min(h-1,y));
+  const x0=Math.min(w-1,Math.floor(xi)), y0=Math.min(h-1,Math.floor(yi));
+  const x1=Math.min(w-1,x0+1), y1=Math.min(h-1,y0+1), fx=xi-x0, fy=yi-y0;
+  return (field[y0*w+x0]*(1-fx)+field[y0*w+x1]*fx)*(1-fy)
+       + (field[y1*w+x0]*(1-fx)+field[y1*w+x1]*fx)*fy;
+}
 function buildSimBackgroundMap(w,h,simbg,contrast,hazeWeight,hazeSigmaPx,sites,rng){
   if(!(simbg>0) || (!(contrast>1) && !(hazeWeight>0))) return null;
   const f=new Float32Array(w*h).fill(1);
@@ -4595,6 +4648,13 @@ async function generateSynthetic(){
   const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
   const readNoiseE=paramValue('simulation_readnoise');   // electrons, applied before the gain conversion — see PARAMS.simulation_readnoise
   const cam=readSimCameraModel();
+  const illumField=buildSimIllumination(w,h,paramValue('simulation_illumProfile'),paramValue('simulation_illumFwhmPct'));
+  const illumOf=(x,y)=>illumAt(illumField,w,h,x,y);
+  if(illumField){ let lo=Infinity; for(const v of illumField) if(v<lo) lo=v;
+    log(`Illumination: ${paramValue('simulation_illumProfile')} profile, ${paramValue('simulation_illumFwhmPct')}% of the field of view wide. `+
+        `Photons/emitter/frame and Background (photons/px) are now the values at the beam CENTRE: an emitter emits between `+
+        `${lo.toFixed(2)}× and 1× of it depending on where it sits, ${illumField.meanFactor.toFixed(2)}× on average — so the same run `+
+        `carries about ${(100*illumField.meanFactor).toFixed(0)}% of the photons a flat field would give it.`); }
   if(cam.type==='emccd')
     log(`Camera: EMCCD — QE ${cam.qe}, EM gain ${cam.emGain}×, clock-induced charge ${cam.cic} e⁻/px/frame, ${cam.bitDepth}-bit. `+
         `The gain register adds noise of its own: pixel variance is 2× Poisson, so precision is ~√2 worse than the same photon `+
@@ -4739,7 +4799,10 @@ async function generateSynthetic(){
       let t=-leadM+r()*rangeM;
       for(let guard=0; guard<10000 && t<n; guard++){
         const tEnd=t-lifetime*Math.log(1-r());
-        const bright = photCV>0 ? Math.exp(-s2/2+sLn*gauss(r)) : 1;
+        // the emitter's own place in the beam multiplies its brightness, and `bright` already
+        // feeds BOTH the rendered frame and the ground-truth rate (addBlink) — one factor, no
+        // chance of the movie and the truth disagreeing about how bright an emitter was
+        const bright = (photCV>0 ? Math.exp(-s2/2+sLn*gauss(r)) : 1) * illumOf(ex,ey);
         addBlink(ex,ey,ez,t,tEnd,bright,idBase+m,haze);
         if(r()<pBleach) break;                      // this ON period ended in bleaching
         t=tEnd-offLife*Math.log(1-r());             // otherwise: dark, then blink again
@@ -4755,11 +4818,12 @@ async function generateSynthetic(){
     const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
     const tStart=-lead+rng()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-rng());   // exponential duration, mean=lifetime
-    events.push({x:ex, y:ey, z:ez, tStart, tEnd, moleculeId:e});
+    const ill=illumOf(ex,ey);   // exactly 1 on the default flat profile
+    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
-      if(ov>0) frameEvents[fi].push([ex, ey, ez, ov]);
+      if(ov>0) frameEvents[fi].push([ex, ey, ez, ov*ill]);
     }
   }
   nMolecules=nEvents;
@@ -4814,6 +4878,14 @@ async function generateSynthetic(){
   let bgMap=buildSimBackgroundMap(w,h,bg,paramValue('simulation_bgCellContrast'),paramValue('simulation_bgHazeWeight'),
                                   paramValue('simulation_bgHazeWidth')/px, gt, bgRng);
   if(!bgMap && bgDecay>0 && bg>0) bgMap=new Float32Array(w*h).fill(bg);   // a fade needs the per-frame path even on a flat field
+  // Autofluorescence is excited by the same beam, so the background is attenuated by the same
+  // field — NOT renormalised afterwards: with a profile selected `simbg`, like `phot`, is the
+  // value at the beam centre. Renormalising only the background would have the odd effect of
+  // brightening it at the edges exactly where the signal is dimmest.
+  if(illumField && bg>0){
+    if(!bgMap) bgMap=new Float32Array(w*h).fill(bg);
+    for(let i=0;i<bgMap.length;i++) bgMap[i]*=illumField[i];
+  }
   if(bgMap){ let lo=Infinity,hi=0; for(const v of bgMap){ if(v<lo)lo=v; if(v>hi)hi=v; }
     log(`Background: structured field, mean ${bg} photons/px (range ${lo.toFixed(1)}–${hi.toFixed(1)})`+
         (bgDecay>0?`, fading to 30% with a ${bgDecay}-frame time constant`:'')+`.`); }
@@ -14549,6 +14621,12 @@ $('liveStreamScrubNum').addEventListener('change', e=>{ if(!liveStreamState) ret
   f.addEventListener('change', sync); sync();
 })();
 
+// The beam-width field only means something once a profile is selected.
+(function(){
+  const sel=$('simulation_illumProfile');
+  const sync=()=>{ $('illumWidthRow').style.display = sel.value==='flat' ? 'none' : ''; };
+  sel.addEventListener('change', sync); sync();
+})();
 // The EMCCD-only camera rows: hidden on the sCMOS path, which is the default and has no
 // quantum efficiency, register or bit depth of its own in this model.
 (function(){
@@ -16072,7 +16150,13 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20a — EMCCD camera in the simulator.
+log(`webSMLM v0.12.1-dev · build 2026-09-20b — Illumination profile.
+A real beam is brightest in the middle, so an emitter’s photon count depends on where it sits:
+Illumination profile (Simulation settings → Fluorophore) offers a Gaussian beam or a flat-top
+disc, with Beam width as a percentage of the field of view. The field is normalised to mean 1,
+so Photons/emitter/frame still means the AVERAGE emitter — only its distribution changes — and
+the background, excited by the same beam, follows it while simbg stays the field mean.
+— and from build 2026-09-20a: EMCCD camera in the simulator.
 Camera type sCMOS (unchanged, the default) or EMCCD: photoelectrons through an electron-
 multiplying register, modelled as Poisson then Gamma, which is where a real EMCCD’s √2 excess
 noise comes from — plus quantum efficiency, clock-induced charge, integer ADU and saturation.

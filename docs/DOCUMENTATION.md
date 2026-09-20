@@ -1366,25 +1366,29 @@ directly, against 0.086 ms for the Gaussian elliptical MLE. It runs **single-thr
 the model is megabytes that would have to reach every worker through a second message type, which
 this pool's single `onmessage` makes a real scheduling hazard.
 
-**Known limit: the double-helix mask does not yet encode the sign of z.** With a DH PSF the
-fitter localizes well laterally (5.0 nm median, 86% recall, bias under 1 nm) and recovers the
-*magnitude* of z to a few nm — but the sign comes out close to a coin flip. Three explanations
-were tested and eliminated in turn:
+**On the double helix.** This took three wrong turns worth recording, because each looked
+convincing. `psfmle` on a DH PSF first returned the *magnitude* of z to a few nm and its *sign*
+about half the time. A rescan-and-restart of the z scan changed nothing; lobe pairing in the
+detector merged nothing; and feeding the fitter data generated from its own model reproduced the
+failure exactly — which seemed to prove the mask, not the fitter, was at fault.
 
-- *A local optimum.* A rescan-and-restart from the converged position changed not one
-  localization; the fit is already at the likelihood's global maximum. Removed again.
-- *A clipped fit window.* Lobe pairing (merge the two maxima, fit from the midpoint) was
-  implemented and measured: it merged nothing, because the maxima are not far apart. Reverted.
-- *A simulator-versus-model mismatch.* Feeding the fitter data generated **from its own model**
-  reproduces the failure exactly: at 5000 photons it returns −600, −403, −196, −202, −404,
-  −608 nm for true depths of −600 … +600. |z| to a few nm, sign essentially fixed.
+It was none of those. `buildPsfPlanesParallel()` and the PSF worker each spell the optical
+parameters out by hand instead of forwarding the config, and **neither listed the mask fields**,
+so every kernel built through the worker pool — the default path — came back unaberrated. The
+tell was there to be read earlier: six different mask settings all reported the same z-CRLB, and
+a kernel built with the mask was byte-identical to one built without it. With the parameters
+forwarded, the sign of z is encoded decisively: the expected log-likelihood ratio between +z and
+−z at ±400 nm and 5000 photons is **516**, where an unaberrated PSF gives exactly 0, and the
+fitter recovers the sign on every test emitter (−598, −384, −224, 189, 405, 595 nm for true
+−600 … +600).
 
-So the fitter is sound and the **mask** is the problem: at camera sampling this Gauss-Laguerre
-construction is a single compact peak whose image is nearly even in z. The 60°-per-1.6 µm
-rotation measured on the pupil earlier lives in faint satellite lobes at ~1 µm radius, not in a
-clean two-lobe core. Tuning the modal line and waist so real lobes separate is the open item
-(`docs/REFACTOR_PLAN.md`). Until then use `psfmle` with an astigmatic or extended-depth PSF,
-where it is measurably the better of the two 3D methods.
+On a real DH movie the fit now tracks depth (slope of fitted against true z 0.67, axial median
+37 nm), and what limits it is detection rather than fitting: the PSF arrives as several maxima
+per emitter, so each molecule is fitted several times and precision falls to 25%. **Merge
+detections within (px)** exists for that, and the trade is measured — merging within 6 px:
+precision 30%, slope 0.71; within 10 px: precision 47%, slope **1.04**, no gross failures, but
+recall down from 49% to 26% as neighbouring emitters start merging too. It defaults to 0 (off),
+which is correct for any single-blob PSF.
 
 **The yardstick: `psfZCramerRao()`.** Every PSF build now also reports the Cramér-Rao lower bound
 on x, y and z, computed from the kernel itself under the current photon and background settings,
@@ -1533,6 +1537,7 @@ each bin too sparse to mean anything.
 | `detection_wavelet_thr` | Wavelet threshold (k·σ_noise) | number | 1 | 8 | 0.5 | 4 |
 | `detection_DoG_thr` | DoG threshold (k·σ_noise) | number | 1 | 8 | 0.5 | 4 |
 | `detection_box_thr` | Uniform box filter threshold (intensity) | number | 0 | 65535 | 1 | 25 |
+| `detection_mergeRadius` | Merge detections within (px) | number | 0 | 40 | 1 | 0 |
 | `detection_DoG_exactbp` | Exact band-pass (DoG only) | bool | — | — | — | false |
 | `psf` | σ_PSF — PSF width (px) | number | 0.8 | 5 | 0.1 | 1.3 |
 | `winr` | Fit radius (px) — window size = 2·winr+1 | number (int) | 2 | 20 | 1 | 4 |

@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2803   PARAMS registry, single source of truth for params;
+    params          2804   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3809   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3814   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      4108   synthetic stack generator ("Simulate movie");
+    simulation      4113   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6651   score localizations against the simulator's own
+    validation      6662   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          7279   per-frame band-pass + local-maxima detection
-    fit             7556   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          7290   per-frame band-pass + local-maxima detection
+    fit             7602   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          8195   accumulate to offscreen buffer; view/colour/blur;
+    render          8239   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         9478   frame-parallel detect/fit worker pool; dedicated
+    workers         9522   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export         10054   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration 10346   astigmatic sigma_x/sigma_y vs z bead curves;
+    export         10098   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration 10390   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10763   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10807   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   11269   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   11313   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11992  spectrally resolved SMLM pair-finding; merged
+    sSMLM           12036  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             12462  single particle tracking, trackpy-inspired;
+    spt             12506  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13964  top-level orchestration, *Core()/wrapper split;
+    pipeline        14008  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   14625  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14672  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16899  localizations table, filtering, histograms;
+    table           16953  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    17487  window.webSMLM.analyze()/analyzeBatch();
+    headless API    17541  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20f</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20g</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2497,6 +2497,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" id="detection_box_thrRow" style="margin-top:8px">Threshold (intensity) <input type="number" id="detection_box_thr" min="0" max="65535" step="1" value="25" class="num"></label>
         <label class="row">σ_PSF (px) <input type="number" id="psf" min="0.8" max="5" step="0.1" value="1.3" class="num"></label>
         <label class="row">Fit radius (px) <input type="number" id="winr" min="2" max="20" step="1" value="4" class="num"></label>
+        <label class="row" title="Detections closer together than this are merged into one at their centroid. An engineered PSF (double helix, extended depth) reaches the detector as several maxima per emitter; set this to roughly its lobe separation. 0 = off, correct for any ordinary single-blob PSF.">Merge detections within (px) <input type="number" id="detection_mergeRadius" min="0" max="40" step="1" value="0" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-detectfit"><span class="pill">module: detect/fit</span>
           <p><b>Fit method</b> — σ_noise below is the spread of the filtered image, not the PSF width.</p>
@@ -2828,6 +2829,10 @@ const PARAMS = {
   detection_box_thr: { type:'number', id:'detection_box_thr', label:'Uniform box filter threshold (intensity)', min:0, max:65535, step:1, default:25, int:false },
   // detection_DoG_exactbp = true Gaussian background estimate instead of the faster box approximation (DoG only)
   detection_DoG_exactbp: { type:'bool', id:'detection_DoG_exactbp', label:'Exact band-pass (DoG only)', default:false },
+  // Detections closer together than this belong to one emitter and are merged at their centroid
+  // (mergeNearbyMaxima). 0 = off, which is right for any single-blob PSF; an engineered PSF needs
+  // roughly its own lobe separation here.
+  detection_mergeRadius: { type:'number', id:'detection_mergeRadius', label:'Merge detections within (px)', min:0, max:40, step:1, default:0, int:false },
   // psf = σ_PSF, the point-spread-function width in camera pixels; sets filter scale + fit initial guess
   psf: { type:'number', id:'psf', label:'σ_PSF — PSF width (px)', min:0.8, max:5, step:0.1, default:1.3, int:false },
   // winr = "window radius": half-width of the square fit window, so window size = 2·winr+1
@@ -5502,9 +5507,15 @@ async function buildPsfPlanesParallel(cfg, nx, ny, pool){
   async function runWorker(w){
     while(nextZ<cfg.nz){
       const z=nextZ++;
+      // Every field the pupil builders read must be listed HERE and unpacked in the worker: both
+      // sides spell the parameters out rather than forwarding cfg, so a new optical parameter
+      // that is added to cfg alone is silently dropped on the worker path while still working on
+      // the serial one. That is exactly how the phase mask went missing — a kernel built with
+      // maskType:'doubleHelix' came back byte-identical to one built without it.
       const resp=await dispatchPsfWorker(w, {z, nz:cfg.nz, nx, ny, resLateralM:cfg.resLateralM,
         NA:cfg.NA, lambda:cfg.lambda, ns:cfg.ns, ni:cfg.ni, ti0:cfg.ti0,
         particleAxialPosition:cfg.particleAxialPosition, zStep:cfg.zStep, zernikeCoeffs:cfg.zernikeCoeffs,
+        maskType:cfg.maskType, maskModes:cfg.maskModes, maskWaist:cfg.maskWaist,
         evalMethod:cfg.evalMethod, fftM:PSF_FFT_M, fftDk:cfg.fftDk});
       if(resp.err) throw new Error(`PSF worker failed on plane ${z+1}/${cfg.nz}: ${resp.err}`);
       slices[z]=resp.slice;
@@ -7542,14 +7553,49 @@ function findMaximaUniform(filt,w,h,thr,border,maxf3){
 // Single dispatch point used by both the main thread and the worker: picks the
 // right band-pass + maxima-finding pair for the selected detection method.
 // `thr` means k·σ_noise for wave/dog, and a plain intensity cutoff for box.
-function detectSpots(img,w,h,sigma,exactBP,mode,thr,border){
-  if(mode==='box'){
-    const filt=uniformBP(img,w,h,sigma);
-    const maxf3=Math.max(1,Math.round(5*sigma));
-    return { filt, maxima: findMaximaUniform(filt,w,h,thr,border,maxf3) };
+// Merge detections that belong to ONE emitter. An engineered PSF is not a single blob: a double
+// helix reaches the detector as two lobes plus satellite rings, so a blob detector returns
+// several maxima per emitter and the fitter then fits the same molecule several times — measured
+// on a DH movie, precision 25% with recall 49%, the missing 75% being duplicates of real
+// emitters rather than noise. Single-linkage clustering within `radiusPx`, reported at each
+// cluster's CENTROID, which for a symmetric lobe pair is the emitter itself.
+//
+// Deliberately clustering, not pairwise pairing: pairing assumes exactly two lobes at a known
+// separation, and a real engineered PSF also throws light into satellites whose count changes
+// with depth. (A pairing version was written first, measured against a mask that turned out not
+// to be reaching the kernel at all, and discarded.)
+function mergeNearbyMaxima(maxima, radiusPx){
+  if(!(radiusPx>0) || maxima.length<2) return maxima;
+  const r2=radiusPx*radiusPx, parent=maxima.map((_,i)=>i);
+  const find=i=>{ while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; };
+  for(let i=0;i<maxima.length;i++) for(let j=i+1;j<maxima.length;j++){
+    const dx=maxima[i][0]-maxima[j][0], dy=maxima[i][1]-maxima[j][1];
+    if(dx*dx+dy*dy<=r2){ const a=find(i), b=find(j); if(a!==b) parent[a]=b; }
   }
-  const filt=detectFilter(img,w,h,sigma,exactBP,mode);
-  return { filt, maxima: findMaxima(filt,w,h,thr,border) };
+  const groups=new Map();
+  for(let i=0;i<maxima.length;i++){ const root=find(i);
+    let g=groups.get(root); if(!g){ g=[]; groups.set(root,g); } g.push(maxima[i]); }
+  const out=[];
+  for(const g of groups.values()){
+    if(g.length===1){ out.push(g[0]); continue; }
+    let sx=0, sy=0; for(const m of g){ sx+=m[0]; sy+=m[1]; }
+    out.push([Math.round(sx/g.length), Math.round(sy/g.length)]);
+  }
+  return out;
+}
+// mergeRadiusPx is optional and defaults to "off", so every existing caller behaves exactly as
+// before (PARAMS.detection_mergeRadius).
+function detectSpots(img,w,h,sigma,exactBP,mode,thr,border,mergeRadiusPx){
+  let filt, maxima;
+  if(mode==='box'){
+    filt=uniformBP(img,w,h,sigma);
+    maxima=findMaximaUniform(filt,w,h,thr,border,Math.max(1,Math.round(5*sigma)));
+  } else {
+    filt=detectFilter(img,w,h,sigma,exactBP,mode);
+    maxima=findMaxima(filt,w,h,thr,border);
+  }
+  if(mergeRadiusPx>0) maxima=mergeNearbyMaxima(maxima, mergeRadiusPx);
+  return { filt, maxima };
 }
 
 /* ===========================================================================
@@ -7840,13 +7886,11 @@ function psfModelMLE(img,w,h,cx,cy,win,model,gain=1,camoffset=0,eps=0.001){
     if(t[4]<model.zMinNm)t[4]=model.zMinNm; if(t[4]>model.zMaxNm)t[4]=model.zMaxNm; };
   const mkStep=t=>[1,1,Math.max(100,0.3*t[2]),Math.max(2,t[3]),Math.max(100,3*model.zStepNm)];
   scanZ(th);
-  // A rescan-and-restart from the converged position was tried here and REMOVED: on a
-  // double-helix movie whose z sign came out a coin flip it changed not one localization, at
-  // real cost. The sign was not lost to a local optimum — the fit is at the likelihood's global
-  // maximum — but to the ROI: detection centres it on ONE LOBE, the partner lobe ~18 px away
-  // then falls on or outside the window, and the partner's direction is exactly what tells +z
-  // from -z. The cure is a lobe-pairing step that centres the window between the two lobes
-  // (docs/REFACTOR_PLAN.md), not more optimisation.
+  // A rescan-and-restart from the converged position was tried here and REMOVED: it changed not
+  // one localization, at real cost. (The double-helix sign failure it was written for turned out
+  // to be a dropped parameter in the PSF worker dispatch, not anything about this optimisation —
+  // see buildPsfPlanesParallel's own comment. With the mask actually applied, the sign of z is
+  // recovered on every test emitter.)
   const {converged,fisher}=mleNewtonFit(n,th,mkStep(th),clamp,r,cx,cy,img,w,gain,camoffset,eps,25,modelFn);
   if(!converged || th[2]<=1+1e-9 || Math.abs(th[0]-cx)>r || Math.abs(th[1]-cy)>r || !isFinite(th[0])) return null;
   const ex=solveLin(fisher,[1,0,0,0,0]), ey=solveLin(fisher,[0,1,0,0,0]), ez=solveLin(fisher,[0,0,0,0,1]);
@@ -9511,7 +9555,7 @@ function workerSource(){
     blurInto.toString(), boxSizes.toString(), boxMap.toString(),
     boxH.toString(), boxV.toString(), boxInto.toString(),
     bandpass.toString(), atrous.toString(), waveletBP.toString(), detectFilter.toString(), findMaxima.toString(),
-    roundOdd.toString(), uniformFilterInto.toString(), uniformBP.toString(), maxH.toString(), maxV.toString(), maxFilterInto.toString(), findMaximaUniform.toString(), detectSpots.toString(),
+    mergeNearbyMaxima.toString(), roundOdd.toString(), uniformFilterInto.toString(), uniformBP.toString(), maxH.toString(), maxV.toString(), maxFilterInto.toString(), findMaximaUniform.toString(), detectSpots.toString(),
     solveLin.toString(), sseWin.toString(), gaussianFit.toString(),
     mleErf.toString(), mleGInt.toString(), mleModelSpherical.toString(), mleModelElliptical.toString(),
     mleClampSpherical.toString(), mleClampElliptical.toString(), mleNewtonFit.toString(),
@@ -9583,11 +9627,11 @@ function workerSource(){
         postMessage({out:outF},[outF.buffer]);
         return;
       }
-      const {frames,start,w,h,sigma,k,win,method,border,exact,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2}=d;
+      const {frames,start,w,h,sigma,k,win,method,border,exact,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2,mergeRadius}=d;
       const out=[]; let tD=0,tF=0,nC=0;
       for(let i=0;i<frames.length;i++){
         const img=frames[i], t0=performance.now();
-        const {maxima}=detectSpots(img,w,h,sigma,exact,mode,k,border);
+        const {maxima}=detectSpots(img,w,h,sigma,exact,mode,k,border,mergeRadius);
         const t1=performance.now(); tD+=t1-t0; nC+=maxima.length;
         const isPh = method==='phasor'||method==='phasor3d';
         for(const mm of maxima){
@@ -9834,15 +9878,15 @@ function psfWorkerSource(){
         }catch(err){ postMessage({pong:0,err:String(err&&err.message||err)}); }
         return;
       }
-      const {seq,z,nz,nx,ny,resLateralM,NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,evalMethod,fftM,fftDk}=d;
+      const {seq,z,nz,nx,ny,resLateralM,NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist,evalMethod,fftM,fftDk}=d;
       try{
         const t0=performance.now();
         let slice;
         if(evalMethod==='fft'){
-          const cart=computePsfPupilCartesianForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs}, fftM, fftDk);
+          const cart=computePsfPupilCartesianForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist}, fftM, fftDk);
           slice=computePsfIntensityPlaneFFT(nx, ny, resLateralM, cart, fftM, fftDk);
         } else {
-          const pupil=computePsfPupilForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs});
+          const pupil=computePsfPupilForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist});
           slice=computePsfIntensityPlane(nx, ny, resLateralM, pupil);
         }
         let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
@@ -14029,6 +14073,9 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
   const sigma=config.psf, win=2*config.winr+1, method=config.method;
   const k={ wave:config.detection_wavelet_thr, dog:config.detection_DoG_thr, box:config.detection_box_thr }[config.detFilter];
   const exactBP=config.detection_DoG_exactbp, mode=config.detFilter;
+  // One emitter, several maxima: an engineered PSF needs its detections merged (MODULE: detect,
+  // mergeNearbyMaxima). 0 for every ordinary PSF, which leaves detection untouched.
+  const mergeRadius=config.detection_mergeRadius||0;
   const camoffset=config.camoffset, eps=config.mleEps;
   // EMCCD excess noise (PARAMS.cameraExcessNoise): fit in F^2-photon units, report photons — see
   // applyExcessNoise(). `gain` from here on is what the FITTER sees, not what the user typed.
@@ -14279,7 +14326,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
             const frames=corrected.slice(s-coreStart, e-coreStart);
             if(frames.length) shown={img:frames[0],fi:s};
             wk._pendImg=frames[0]; wk._pendStart=s;
-            wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2});
+            wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2,mergeRadius});
           };
           pool.forEach(wk=>{
             wk.onmessage=ev=>{
@@ -14340,7 +14387,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
         // hits on a real multi-worker run, only by luck on a tiny one.
         wk._pendImg=frames[0]; wk._pendStart=s;
         // no transfer list: frames are cloned, so any RAM cache survives
-        wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2});
+        wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2,mergeRadius});
       };
       pool.forEach(wk=>{
         wk.onmessage=ev=>{
@@ -14383,7 +14430,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
     locs.sort((p,q)=>p.frame-q.frame);
     if(shown){ const tp=performance.now();       // display only — not compute time
       lastFrame=shown.img; lastFrameIdx=shown.fi;
-      lastSpots=detectSpots(shown.img,w,h,sigma,exactBP,mode,k,border).maxima;
+      lastSpots=detectSpots(shown.img,w,h,sigma,exactBP,mode,k,border,mergeRadius).maxima;
       // one-time filter now that the whole batch set is in — cheap unlike
       // doing this on every preview tick against a still-growing locs array
       const shownLocs=locs.filter(L=>L.frame===shown.fi).map(L=>({x:L.x,y:L.y}));
@@ -14401,7 +14448,7 @@ async function runCore(config, stack, {zcal=null, wcal=null, psfModel=null}={}, 
       for(let j=0; j<block.length; j++){
         const fi=b+j, img=block[j];
         const tb=performance.now();
-        const {maxima}=detectSpots(img,w,h,sigma,exactBP,mode,k,border);
+        const {maxima}=detectSpots(img,w,h,sigma,exactBP,mode,k,border,mergeRadius);
         const tc=performance.now(); tDetect+=tc-tb; nCand+=maxima.length;
         const frameLocs=[];                         // this frame's accepted fits, for the raw-panel overlay below
         for(const [cx,cy] of maxima){
@@ -15541,7 +15588,7 @@ async function showFrame(i){
       const zcal = method==='phasor3d' ? cal3d : null;
       const wcal = (method==='mle3d'||method==='gaussmleEll') && localize3D && cal3dW ? {qx:cal3dW.qx,qy:cal3dW.qy,zmin:cal3dW.zmin,zmax:cal3dW.zmax,px:paramValue('pxnm')} : null;
       const sSmlmAngleRad = localize3D ? null : paramValue('sSmlmAngleCenter')*Math.PI/180;   // see runCore()'s own copy of this same line (MODULE: fit, gaussianMLEellipticangled)
-      spots=detectSpots(img,stack.w,stack.h,sigma,exactBP,mode,k,border).maxima;
+      spots=detectSpots(img,stack.w,stack.h,sigma,exactBP,mode,k,border,paramValue('detection_mergeRadius')).maxima;
       locsF=[];
       // ROIs (green boxes) show for any frame — they're just "what would be
       // detected here", harmless either way. Fit crosshairs (magenta) are
@@ -16676,7 +16723,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20f — A fit method that uses the PSF itself.
+log(`webSMLM v0.12.1-dev · build 2026-09-20g — The phase mask never reached the PSF workers.
+buildPsfPlanesParallel() and the PSF worker each spell out the optical parameters by hand, and
+neither listed the mask — so every kernel built since the mask shipped came back unaberrated,
+and every double-helix measurement I reported was really measuring a plain PSF. With it fixed,
+the DH encodes the sign of z decisively (log-likelihood ratio 516 between +z and −z where it
+was exactly 0) and PSF model MLE recovers depth on all of it. New: Merge detections within (px),
+for a PSF that reaches the detector as several maxima per emitter.
+— and from build 2026-09-20f: A fit method that uses the PSF itself.
 "PSF model MLE 3D" fits the modelled PSF, interpolated continuously in x, y and z, instead of a
 Gaussian — so depth is a fitted parameter with its own CRLB rather than something inverted from
 a width calibration afterwards. On the same astigmatic 3D movie it reaches an axial median of

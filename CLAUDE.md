@@ -532,13 +532,26 @@ relevant one before editing rather than scrolling:
   recall and lateral, 1.8× the time (0.5 ms/spot for the fit itself vs 0.086).
   **Single-threaded on purpose for now** (`useWorkers` excludes it): the model is megabytes and
   the pool's single `onmessage` makes a second message type a scheduling hazard.
-  **Known limit — the double-helix MASK, not the fitter**: |z| comes out right to a few nm, the
-  sign does not, and it fails identically on data generated from the fitter's own model (−600,
-  −403, −196, −202, −404, −608 nm for true −600 … +600) — so it is the PSF, which at camera
-  sampling is one compact peak whose image is nearly even in z. Two fixes were implemented,
-  measured to change nothing, and REVERTED: a rescan-and-restart of the z scan, and lobe pairing
-  in the detector (it merged nothing — the maxima are not separated). Don't re-add either
-  without a mask that shows real lobes first; see `docs/REFACTOR_PLAN.md`.
+  **Double helix — and the bug that faked a physics conclusion (2026-09-20g).** `psfmle` first
+  recovered |z| but not its sign on a DH PSF; a z rescan-and-restart changed nothing, lobe
+  pairing merged nothing, and the failure reproduced on data generated from the fitter's own
+  model — which looked like proof that the MASK was at fault. It was not: **`buildPsfPlanesParallel()`
+  and the PSF worker each spell the optical parameters out by hand rather than forwarding `cfg`,
+  and neither listed `maskType`/`maskModes`/`maskWaist`** — so every kernel built through the
+  pool (the default path) came back unaberrated, and every DH measurement was really measuring a
+  plain PSF. Two tells were available before the conclusion: six mask settings all reported the
+  SAME z-CRLB, and a masked kernel was byte-identical to an unmasked one. **When a physics result
+  says a model does nothing, check that the parameter reached the model.** Same class as the
+  `WORKER_PRELUDE` gotcha, one layer up: an explicit field list on both ends of a postMessage.
+  With it fixed the sign is decisive — expected log-likelihood ratio between +z and −z at ±400 nm,
+  5000 photons: 516, against exactly 0 unaberrated.
+
+  **`detection_mergeRadius` (MODULE: detect, `mergeNearbyMaxima`)** follows from it: an
+  engineered PSF reaches the detector as several maxima per emitter, so each molecule gets fitted
+  several times (DH movie: precision 25% at recall 49%). Single-linkage clustering to each
+  cluster's centroid; measured trade at 6 px precision 30%/slope 0.71, at 10 px precision
+  47%/slope 1.04 with no gross failures but recall down to 26%. Default 0 = off. Clustering, not
+  pairwise pairing: a real engineered PSF also has satellites whose count changes with depth.
 
   **`PARAMS.localize3D`** ("3D localisation?", default checked) is the switch between the two angle
   modes for `'gaussmleEll'` — no separate per-method setting. `updateMethodUI()` only shows the

@@ -48,16 +48,12 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     declaration wins; both are equivalent generators, so harmless today, confusing tomorrow).
 
 
-- **Make the double-helix mask actually two-lobed.** `pupilMaskPhase()` builds the phase of a
-  Gauss-Laguerre superposition on the line l = 2p+1, which is the textbook construction, but at
-  camera sampling the result is one compact peak whose image is nearly EVEN in z: `psfmle`
-  recovers |z| to a few nm and the sign essentially not at all, including on data generated from
-  its own model (measured: −600, −403, −196, −202, −404, −608 nm returned for −600 … +600).
-  The 60°/1.6 µm rotation measured on the pupil sits in faint satellite lobes ~1 µm out, not in a
-  usable core. Worth trying: other modal lines, a larger waist so the modes fill the pupil, an
-  amplitude-carrying (non-phase-only) mask, or fitting to a published phase map. Lobe pairing in
-  the detector was implemented for this and REVERTED — it merged nothing, since the maxima are
-  not separated; re-add it only once the mask produces real lobes.
+- **Double-helix mask: shape, not sign.** The sign of z is recovered decisively since the worker
+  dispatch was fixed (build 2026-09-20g). What remains is cosmetic-but-real: this phase-only
+  Gauss-Laguerre construction throws a lot of light into satellite rings (8-14 maxima above 40% of
+  peak, depending on depth) rather than two clean lobes, which is what forces
+  `detection_mergeRadius` and costs recall. Worth trying: other modal lines, a wider waist, an
+  amplitude-carrying mask, or fitting a published phase map.
 
 - **Worker dispatch for `psfmle`** — it runs single-threaded today (0.5 ms/spot measured, so a
   100k-spot run is under a minute). Parallelising means getting a megabyte-scale model to every

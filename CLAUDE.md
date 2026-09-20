@@ -532,10 +532,13 @@ relevant one before editing rather than scrolling:
   recall and lateral, 1.8× the time (0.5 ms/spot for the fit itself vs 0.086).
   **Single-threaded on purpose for now** (`useWorkers` excludes it): the model is megabytes and
   the pool's single `onmessage` makes a second message type a scheduling hazard.
-  **Known limit — double helix**: lateral is excellent but the SIGN of z is a coin flip, because
-  detection centres the ROI on one lobe and the partner (~18 px away) is clipped; the partner's
-  direction is the sign information. A rescan-and-restart was tried and REMOVED (changed not one
-  localization). Lobe pairing is the fix, see `docs/REFACTOR_PLAN.md`.
+  **Known limit — the double-helix MASK, not the fitter**: |z| comes out right to a few nm, the
+  sign does not, and it fails identically on data generated from the fitter's own model (−600,
+  −403, −196, −202, −404, −608 nm for true −600 … +600) — so it is the PSF, which at camera
+  sampling is one compact peak whose image is nearly even in z. Two fixes were implemented,
+  measured to change nothing, and REVERTED: a rescan-and-restart of the z scan, and lobe pairing
+  in the detector (it merged nothing — the maxima are not separated). Don't re-add either
+  without a mask that shows real lobes first; see `docs/REFACTOR_PLAN.md`.
 
   **`PARAMS.localize3D`** ("3D localisation?", default checked) is the switch between the two angle
   modes for `'gaussmleEll'` — no separate per-method setting. `updateMethodUI()` only shows the

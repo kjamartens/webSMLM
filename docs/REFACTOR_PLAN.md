@@ -48,14 +48,16 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     declaration wins; both are equivalent generators, so harmless today, confusing tomorrow).
 
 
-- **Lobe pairing for the double helix** — the one thing standing between `psfmle` (shipped
-  2026-09-20f) and working depth on a DH PSF. Detection returns each lobe as its own maximum, so
-  the fit window centres on a lobe and the partner ~18 camera px away is clipped; the partner's
-  direction is what carries the SIGN of z, and without it the fitter recovers |z| to ~20 nm but
-  gets the sign right about half the time (measured: 27 of 57 pairs off by >250 nm). Needed: pair
-  maxima within an expected separation window, fit once from the midpoint with a window that
-  holds both lobes, and take the pair angle as the z seed. The same step removes the duplicate
-  detections a DH movie otherwise produces.
+- **Make the double-helix mask actually two-lobed.** `pupilMaskPhase()` builds the phase of a
+  Gauss-Laguerre superposition on the line l = 2p+1, which is the textbook construction, but at
+  camera sampling the result is one compact peak whose image is nearly EVEN in z: `psfmle`
+  recovers |z| to a few nm and the sign essentially not at all, including on data generated from
+  its own model (measured: −600, −403, −196, −202, −404, −608 nm returned for −600 … +600).
+  The 60°/1.6 µm rotation measured on the pupil sits in faint satellite lobes ~1 µm out, not in a
+  usable core. Worth trying: other modal lines, a larger waist so the modes fill the pupil, an
+  amplitude-carrying (non-phase-only) mask, or fitting to a published phase map. Lobe pairing in
+  the detector was implemented for this and REVERTED — it merged nothing, since the maxima are
+  not separated; re-add it only once the mask produces real lobes.
 
 - **Worker dispatch for `psfmle`** — it runs single-threaded today (0.5 ms/spot measured, so a
   100k-spot run is under a minute). Parallelising means getting a megabyte-scale model to every

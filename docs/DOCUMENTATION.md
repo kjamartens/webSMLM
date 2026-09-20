@@ -1366,15 +1366,25 @@ directly, against 0.086 ms for the Gaussian elliptical MLE. It runs **single-thr
 the model is megabytes that would have to reach every worker through a second message type, which
 this pool's single `onmessage` makes a real scheduling hazard.
 
-**Known limit, on the double helix.** With a DH PSF the method localizes well laterally (5.0 nm
-median, recall 86%, bias below 1 nm) and recovers the *magnitude* of z to about 20 nm — but the
-*sign* is close to a coin flip (27 of 57 pairs off by more than 250 nm). The cause is diagnosed
-and is not the optimiser: detection centres the fit window on ONE LOBE, so the partner lobe ~18
-camera pixels away falls on or outside the window, and the partner's direction is exactly what
-distinguishes +z from −z. A rescan-and-restart was tried and removed — it changed not one
-localization. The fix is a lobe-pairing step that centres the window between the two lobes
-(`docs/REFACTOR_PLAN.md`); until then, use `psfmle` with an astigmatic or extended-depth PSF,
-where it is the better of the two 3D methods.
+**Known limit: the double-helix mask does not yet encode the sign of z.** With a DH PSF the
+fitter localizes well laterally (5.0 nm median, 86% recall, bias under 1 nm) and recovers the
+*magnitude* of z to a few nm — but the sign comes out close to a coin flip. Three explanations
+were tested and eliminated in turn:
+
+- *A local optimum.* A rescan-and-restart from the converged position changed not one
+  localization; the fit is already at the likelihood's global maximum. Removed again.
+- *A clipped fit window.* Lobe pairing (merge the two maxima, fit from the midpoint) was
+  implemented and measured: it merged nothing, because the maxima are not far apart. Reverted.
+- *A simulator-versus-model mismatch.* Feeding the fitter data generated **from its own model**
+  reproduces the failure exactly: at 5000 photons it returns −600, −403, −196, −202, −404,
+  −608 nm for true depths of −600 … +600. |z| to a few nm, sign essentially fixed.
+
+So the fitter is sound and the **mask** is the problem: at camera sampling this Gauss-Laguerre
+construction is a single compact peak whose image is nearly even in z. The 60°-per-1.6 µm
+rotation measured on the pupil earlier lives in faint satellite lobes at ~1 µm radius, not in a
+clean two-lobe core. Tuning the modal line and waist so real lobes separate is the open item
+(`docs/REFACTOR_PLAN.md`). Until then use `psfmle` with an astigmatic or extended-depth PSF,
+where it is measurably the better of the two 3D methods.
 
 **The yardstick: `psfZCramerRao()`.** Every PSF build now also reports the Cramér-Rao lower bound
 on x, y and z, computed from the kernel itself under the current photon and background settings,

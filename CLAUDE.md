@@ -352,6 +352,29 @@ relevant one before editing rather than scrolling:
   exactly this reason), and background/haze each draw from their OWN stream derived from the seed,
   after all emitter draws — so switching them on never moves an in-focus emitter, and their effect
   can be measured on otherwise identical data. Re-check with a pixel hash after touching any of it.
+  **EMCCD (2026-09-20).** `simulation_cameraType` (`'scmos'` default, `'emccd'`) switches
+  `applySimCameraNoise()`'s first two steps: photons → photoelectrons (`simulation_qe`) plus
+  `simulation_cic`, Poisson, then the gain register as `gammaSample(n, 1)` (Marsaglia-Tsang, new,
+  and in `simWorkerSource()`'s own function list — forget that and the pool dies on a
+  ReferenceError), read noise divided by `simulation_emGain`, integer ADU clipped at
+  2^`simulation_bitDepth`−1. **Poisson compounded with Gamma has variance 2λ** — that IS the √2
+  excess noise, not an added fudge (measured: variance/mean 2.00 vs 1.08 on sCMOS). Scale 1
+  instead of a literal EM gain keeps `simulation_gain` meaning photons/ADU end-to-end and the ADU
+  scale comparable across sensor types. The whole sensor model travels as ONE `cam` bundle
+  (`readSimCameraModel()`) through `simCtx`/`calibCtx` and both init messages, and
+  `cam.type==='scmos'` leaves the original one-line expression untouched — that is what keeps the
+  default byte-identical.
+
+  **The analysis-side companion is `PARAMS.cameraExcessNoise` (F², MODULE: fit)**: a Poisson
+  likelihood cannot express Var = F²·N, so `runCore()` hands the fitters `gain/F²` (fitting in
+  F²-photon units, where the data IS Poisson again) and `applyExcessNoise()` scales
+  photons/bg/bgstd back by F². Positions are untouched; the CRLB comes out inflated by exactly F.
+  Measured: CRLB coverage of the real scatter 0.66 at F²=1 → 0.93 at F²=2 on EMCCD data. Applied
+  at three of the four fit dispatch sites (worker, `runCore()`, live preview — the worker self-test
+  doesn't fit real data). `photons` can shift ~0.25% between F²=1 and 2 on the same movie because
+  `mstep`'s absolute floors (`Math.max(100,0.3*N)`) are not scale-invariant — expected, not a bug.
+  PCFO measures gain·F² on EMCCD data and says so rather than silently dividing.
+
   **Presets write parameters, they never replace them**: `wirePreset()` pushes a preset's values
   into the ordinary controls and a manual edit flips the preset to `custom`, so
   `simulation_realism` (`min`/`med`/`max`) and `simulation_densityPreset` carry no physics of their

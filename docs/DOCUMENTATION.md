@@ -1105,6 +1105,11 @@ actual elapsed time instead.
 | `simulation_offset` | Simulation camera offset (ADU) | number | 0 | 65535 | 1 | 100 |
 | `simulation_offset_std` | Simulation offset std (ADU, per-pixel) | number | 0 | 200 | 0.5 | 3 |
 | `simulation_readnoise` | Simulation read noise σ (e⁻) | number | 0 | 200 | 0.1 | 2.7 |
+| `simulation_cameraType` | Simulation camera type | enum | `scmos`, `emccd` | | | `scmos` |
+| `simulation_qe` | Quantum efficiency (EMCCD) | number | 0.05 | 1 | 0.01 | 0.9 |
+| `simulation_emGain` | EM gain (×, EMCCD) | number | 1 | 2000 | 10 | 300 |
+| `simulation_cic` | Clock-induced charge (e⁻/px/frame) | number | 0 | 1 | 0.001 | 0.002 |
+| `simulation_bitDepth` | Camera bit depth (EMCCD) | number | 8 | 16 | 1 | 16 |
 | `simbg` | Simulation background (photons/px) | number | 0 | 500 | 1 | 0 |
 | `driftpx` | Simulated total drift (px) | number | 0 | 30 | 0.5 | 0 |
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
@@ -1243,6 +1248,17 @@ estimation</b> section's own readout-noise field, combine read noise and offset 
 (√(read_noise²+offset_std²), offset std converted to photons via this panel's gain) — a static
 per-pixel offset pattern looks identical to read noise in a single frame's Fourier content, so
 leaving it out biases the fitted offset the same way.</p>
+<p><b>Camera type</b> picks the sensor model. <code>sCMOS / CCD</code> is the original path above.
+<code>EMCCD</code> sends photoelectrons (<b>Quantum efficiency</b>, plus <b>Clock-induced
+charge</b>) through an electron-multiplying register, modelled as a Gamma draw: compounded with the
+Poisson draw that gives the pixel variance <i>twice</i> its mean, which is the √2 excess noise a
+real EMCCD has. <b>EM gain</b> only decides how far the register pushes read noise below the
+signal, and <b>Bit depth</b> rounds ADU to integers and clips at saturation. Measured on a flat
+field: variance/mean = 2.00 on EMCCD against 1.08 on sCMOS at the same 100 photons/px. On a
+scored run the cost was 1.34× the lateral error (5.69 vs 4.25 nm per axis) — less than the √2 the
+excess noise alone would give, because the register also makes read noise negligible: that trade
+is the reason EMCCDs exist. When you simulate EMCCD data, set <b>Excess noise F²</b> to 2 in
+Localisation settings, or the fit's own uncertainty will claim a precision it does not have.</p>
 <!-- /HINT:simulation-camera -->
 
 **PSF parameters** (`hint-simulation-psf`):
@@ -1316,6 +1332,27 @@ gain conversion → `simulation_gain` converts photons+read-noise to ADU → a
 **fixed per-pixel offset map** (`simulation_offset` mean, `simulation_offset_std`
 Gaussian spread, generated once per stack and reused every frame — modelling
 real sensor fixed-pattern offset noise) is added → clamped ≥ 0.
+
+`simulation_cameraType` = `emccd` replaces the first two steps with an EMCCD sensor:
+photons → photoelectrons (`simulation_qe`) plus `simulation_cic` spurious electrons, Poisson →
+the electron-multiplying register as a Gamma(shape = electrons, scale = 1) draw → read noise
+referred back through the register (`simulation_readnoise`/`simulation_emGain`) → integer ADU,
+clipped at 2^`simulation_bitDepth` − 1. Compounding Poisson with Gamma gives a variance of
+**twice** the mean — the √2 excess noise factor a real gain register has (Hirsch et al.,
+*PLoS ONE* 8(1):e53671, 2013) — measured here as variance/mean = 2.00 against 1.08 on the sCMOS
+path at 100 photons/px. Scale 1 rather than a literal EM gain in electrons is a deliberate
+normalisation: it keeps `simulation_gain` meaning one thing end to end (photons/ADU) and keeps
+ADU comparable between the two sensor types, so `simulation_emGain` matters only where it
+physically does at these settings — by how far it pushes read noise below the signal.
+
+On the analysis side, `cameraExcessNoise` (F²) tells the fitter about it: `runCore()` hands the
+fitters `gain/F²` and scales the returned photon counts back by F², so positions are unchanged,
+photon counts stay in real photons, and the CRLB (`lpx`/`lpy`/`lpz`) widens by exactly √F² —
+which is what makes it honest. Measured on one scored run (3000 photons, uniform 3D): the EMCCD
+cost 1.34× the lateral error of the sCMOS path (5.69 vs 4.25 nm per axis — less than √2, because
+the register also makes read noise negligible), and the CRLB's coverage of that error went from
+0.66 at F² = 1 to 0.93 at F² = 2. Leaving F² at 1 on EMCCD data does not change where the
+molecules land; it makes the reported precision claim about 30% better than the truth.
 `simulation_pxnm` is this panel's own pixel size (kept separate from the
 shared `pxnm` render/load control so **Simulation settings** is
 self-contained); the shared `pxnm` control is synced to it automatically
@@ -1757,6 +1794,7 @@ Camera ADU→photon conversion fields specifically.
 |---|---|---|---|---|---|---|
 | `gain` | Camera gain (photons/ADU) | number | 0.001 | 1000 | 0.01 | 1 |
 | `camoffset` | Camera offset (ADU) | number | 0 | 65535 | 1 | 0 |
+| `cameraExcessNoise` | Excess noise factor F² (EMCCD = 2) | number | 1 | 4 | 0.05 | 1 |
 
 **In-app "more info…" popup** (`hint-export` in `webSMLM.html`, shown
 alongside `pxnm` — see **Render** above — since all three sit together in

@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2757   PARAMS registry, single source of truth for params;
+    params          2774   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3700   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3739   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      3999   synthetic stack generator ("Simulate movie");
+    simulation      4038   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6305   score localizations against the simulator's own
+    validation      6389   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          6786   per-frame band-pass + local-maxima detection
-    fit             7063   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          6870   per-frame band-pass + local-maxima detection
+    fit             7147   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7572   accumulate to offscreen buffer; view/colour/blur;
+    render          7667   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         8855   frame-parallel detect/fit worker pool; dedicated
+    workers         8950   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9424   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  9716   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9519   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  9811   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10133   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10228   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10639   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   10734   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11357  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11457  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             11827  single particle tracking, trackpy-inspired;
+    spt             11927  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13329  top-level orchestration, *Core()/wrapper split;
+    pipeline        13429  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   13953  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14057  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16144  localizations table, filtering, histograms;
+    table           16262  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    16732  window.webSMLM.analyze()/analyzeBatch();
+    headless API    16850  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-19f</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20a</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2212,17 +2212,17 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="Blink-to-blink brightness spread: each blink's photon rate is log-normal around Photons/emitter/frame with this coefficient of variation. 0 = every blink equally bright.">Photon rate spread (CV) <input type="number" id="simulation_photCV" min="0" max="2" step="0.05" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
-<p>A <b>molecule</b> activates at a random time (drawn from well before frame 0, so the movie
-starts in equilibrium rather than with everything switching on at once) and then blinks: an
-exponentially-distributed ON period (mean = <b>ON lifetime</b>) ends either in bleaching, with
-probability <b>Bleach prob. per blink</b>, or in a dark period (exponential, mean = <b>Dark
-lifetime</b>) followed by another blink. At the default bleach probability of 1 every molecule
-blinks exactly once — the original model. <b>Photons/emitter/frame</b> is scaled by the fraction of
-a frame the emitter was actually on, so a half-frame overlap emits half the photons; <b>Photon rate
-spread (CV)</b> makes each blink's rate log-normal around that value (0 = every blink equally
-bright). <b>Emitter density</b> keeps meaning the mean number of emitters ON per µm² per frame
-whatever the kinetics — molecules simply activate less often when each one blinks more.</p>
-</div>
+          <p>A <b>molecule</b> activates at a random time (drawn from well before frame 0, so the movie
+          starts in equilibrium rather than with everything switching on at once) and then blinks: an
+          exponentially-distributed ON period (mean = <b>ON lifetime</b>) ends either in bleaching, with
+          probability <b>Bleach prob. per blink</b>, or in a dark period (exponential, mean = <b>Dark
+          lifetime</b>) followed by another blink. At the default bleach probability of 1 every molecule
+          blinks exactly once — the original model. <b>Photons/emitter/frame</b> is scaled by the fraction of
+          a frame the emitter was actually on, so a half-frame overlap emits half the photons; <b>Photon rate
+          spread (CV)</b> makes each blink's rate log-normal around that value (0 = every blink equally
+          bright). <b>Emitter density</b> keeps meaning the mean number of emitters ON per µm² per frame
+          whatever the kinetics — molecules simply activate less often when each one blinks more.</p>
+        </div>
         </details>
         <details class="subsim" id="backgroundBox">
           <summary>Background</summary>
@@ -2234,19 +2234,19 @@ whatever the kinetics — molecules simply activate less often when each one bli
           <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-background"><span class="pill">module: simulation</span>
-<p><b>Background (photons/px)</b> above stays the mean over the whole field of view; this
-section only reshapes it in space and time. <b>Cell contrast</b> draws a soft-edged cell that many
-times brighter inside than outside (autofluorescence). <b>Out-of-focus haze</b> adds the labelled
-structure's own projected density, blurred to <b>Haze blur σ</b> — a static stand-in for light from
-far above and below the focal plane. <b>Fade time constant</b> lets the background bleach down to a
-30% floor over the movie, which is what a temporal-median (FTM) correction exists for.
-<b>Out-of-focus emitters</b> goes further: a second, blinking population on the same structure,
-0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so it
-needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
-tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the
-score. A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
-thresholding — but it costs <i>precision</i>, through the extra shot noise.</p>
-</div>
+          <p><b>Background (photons/px)</b> above stays the mean over the whole field of view; this
+          section only reshapes it in space and time. <b>Cell contrast</b> draws a soft-edged cell that many
+          times brighter inside than outside (autofluorescence). <b>Out-of-focus haze</b> adds the labelled
+          structure's own projected density, blurred to <b>Haze blur σ</b> — a static stand-in for light from
+          far above and below the focal plane. <b>Fade time constant</b> lets the background bleach down to a
+          30% floor over the movie, which is what a temporal-median (FTM) correction exists for.
+          <b>Out-of-focus emitters</b> goes further: a second, blinking population on the same structure,
+          0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so it
+          needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
+          tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the
+          score. A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
+          thresholding — but it costs <i>precision</i>, through the extra shot noise.</p>
+        </div>
         </details>
         <details class="subsim" id="cameraBox">
           <summary>Camera parameters</summary>
@@ -2254,6 +2254,11 @@ thresholding — but it costs <i>precision</i>, through the extra shot noise.</p
           <label class="row">Camera offset (ADU) <input type="number" id="simulation_offset" min="0" max="65535" step="1" value="100" class="num"></label>
           <label class="row">Offset std (ADU, per-pixel) <input type="number" id="simulation_offset_std" min="0" max="200" step="0.5" value="3" class="num"></label>
           <label class="row">Read noise σ (e⁻) <input type="number" id="simulation_readnoise" min="0" max="200" step="0.1" value="2.7" class="num"></label>
+          <label class="row" title="sCMOS: Poisson shot noise + Gaussian read noise (the original model). EMCCD: photoelectrons through an electron-multiplying register, which doubles the pixel variance — the sqrt(2) excess noise factor.">Camera type <select id="simulation_cameraType" class="sel"><option value="scmos">sCMOS / CCD</option><option value="emccd">EMCCD</option></select></label>
+          <label class="row" id="simQeRow" style="display:none;padding-left:40px" title="Fraction of incident photons that become photoelectrons.">Quantum efficiency <input type="number" id="simulation_qe" min="0.05" max="1" step="0.01" value="0.9" class="num"></label>
+          <label class="row" id="simEmGainRow" style="display:none;padding-left:40px" title="Electron-multiplying gain. Here it only sets how far the register pushes read noise below the signal; the excess noise itself comes from the register's own statistics.">EM gain (×) <input type="number" id="simulation_emGain" min="1" max="2000" step="10" value="300" class="num"></label>
+          <label class="row" id="simCicRow" style="display:none;padding-left:40px" title="Spurious electrons generated by clocking the sensor, per pixel per frame — an EMCCD's own noise floor in the dark.">Clock-induced charge (e⁻/px) <input type="number" id="simulation_cic" min="0" max="1" step="0.001" value="0.002" class="num"></label>
+          <label class="row" id="simBitDepthRow" style="display:none;padding-left:40px" title="ADU are rounded to integers and clipped at 2^bits-1 on the EMCCD path.">Bit depth <input type="number" id="simulation_bitDepth" min="8" max="16" step="1" value="16" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-camera"><span class="pill">module: simulation</span>
           <p><b>Gain/offset/offset std/read noise</b> forward-model a real sensor: Gaussian read noise (σ in
@@ -2264,6 +2269,17 @@ thresholding — but it costs <i>precision</i>, through the extra shot noise.</p
           (√(read_noise²+offset_std²), offset std converted to photons via this panel's gain) — a static
           per-pixel offset pattern looks identical to read noise in a single frame's Fourier content, so
           leaving it out biases the fitted offset the same way.</p>
+          <p><b>Camera type</b> picks the sensor model. <code>sCMOS / CCD</code> is the original path above.
+          <code>EMCCD</code> sends photoelectrons (<b>Quantum efficiency</b>, plus <b>Clock-induced
+          charge</b>) through an electron-multiplying register, modelled as a Gamma draw: compounded with the
+          Poisson draw that gives the pixel variance <i>twice</i> its mean, which is the √2 excess noise a
+          real EMCCD has. <b>EM gain</b> only decides how far the register pushes read noise below the
+          signal, and <b>Bit depth</b> rounds ADU to integers and clips at saturation. Measured on a flat
+          field: variance/mean = 2.00 on EMCCD against 1.08 on sCMOS at the same 100 photons/px. On a
+          scored run the cost was 1.34× the lateral error (5.69 vs 4.25 nm per axis) — less than the √2 the
+          excess noise alone would give, because the register also makes read noise negligible: that trade
+          is the reason EMCCDs exist. When you simulate EMCCD data, set <b>Excess noise F²</b> to 2 in
+          Localisation settings, or the fit's own uncertainty will claim a precision it does not have.</p>
         </div>
         </details>
         <details class="subsim" id="psfBox">
@@ -2490,6 +2506,7 @@ thresholding — but it costs <i>precision</i>, through the extra shot noise.</p
         <hr class="sep" style="margin:10px 0 8px">
         <label class="row">Gain (photons/ADU) <input type="number" id="gain" value="1" min="0.001" max="1000" step="0.01" class="num"></label>
         <label class="row">Camera offset (ADU) <input type="number" id="camoffset" value="0" min="0" max="65535" step="1" class="num"></label>
+        <label class="row" title="Variance inflation from an EMCCD's gain register (Var = F²·N). 1 for sCMOS/CCD, 2 for an EMCCD at high gain. Positions do not change; the photon counts and the fit's own uncertainty do.">Excess noise F² (EMCCD = 2) <input type="number" id="cameraExcessNoise" value="1" min="1" max="4" step="0.05" class="num"></label>
         <div class="btnrow" style="margin-top:2px">
           <button id="gainOffsetFromPcfoBtn" disabled style="grid-column:2" title="Fill Gain/Camera offset in from a PCFO estimate (runs Estimate first if it hasn't been computed yet)">Get estimate</button>
         </div>
@@ -2883,6 +2900,12 @@ const PARAMS = {
   gain: { type:'number', id:'gain', label:'Camera gain (photons/ADU)', min:0.001, max:1000, step:0.01, default:1, int:false },
   // camoffset = "camera offset", the camera's baseline ADU level, subtracted before gain conversion
   camoffset: { type:'number', id:'camoffset', label:'Camera offset (ADU)', min:0, max:65535, step:1, default:0, int:false },
+  // cameraExcessNoise = F^2, the variance inflation an EMCCD's gain register adds (Var = F^2*N
+  // instead of N). 1 = sCMOS/CCD, 2 = a real EMCCD at high gain. runCore() feeds the fitter
+  // gain/F^2 and multiplies the returned photon counts back by F^2, so positions are untouched
+  // while the Poisson likelihood and its CRLB (lpx/lpy/lpz) see the true variance — see
+  // MODULE: fit. Leave at 1 unless the data really came off an EM gain register.
+  cameraExcessNoise: { type:'number', id:'cameraExcessNoise', label:'Excess noise factor F² (EMCCD = 2)', min:1, max:4, step:0.05, default:1, int:false },
 
   // ---- PCFO (photon-conversion-factor & offset): estimates gain/camoffset above from the
   // stack itself, via the Rieger–Heintzman high-spatial-frequency noise method (estimateGainOffset)
@@ -3140,6 +3163,22 @@ const PARAMS = {
   // fixed 8 ADU added AFTER the gain conversion, which silently meant a different (and gain-
   // dependent) noise level than whatever a user entered into the PCFO panel's own e⁻ field.
   simulation_readnoise: { type:'number', id:'simulation_readnoise', label:'Simulation read noise σ (e⁻)', min:0, max:200, step:0.1, default:2.7, int:false },
+  // ---- EMCCD sensor model (simulation_cameraType='emccd'; 'scmos', the default, is the original
+  // Poisson + read-noise path, bit-for-bit unchanged). The electron-multiplying register is
+  // modelled as Gamma(shape = photoelectrons, scale = 1): compounding it with the Poisson draw
+  // gives total variance 2*lambda, i.e. the sqrt(2) excess noise factor a real EMCCD has (Hirsch
+  // et al., PLoS ONE 8(1):e53671, 2013). Scale 1 rather than a literal EM gain in electrons keeps
+  // simulation_gain meaning exactly one thing (photons/ADU, end to end) and keeps the ADU scale
+  // comparable with the sCMOS path; simulation_emGain then enters only where it physically
+  // matters at these settings, as the factor by which the register makes read noise negligible.
+  simulation_cameraType: { type:'enum', id:'simulation_cameraType', label:'Simulation camera type', options:['scmos','emccd'], default:'scmos' },
+  simulation_qe: { type:'number', id:'simulation_qe', label:'Quantum efficiency (EMCCD)', min:0.05, max:1, step:0.01, default:0.9, int:false },
+  simulation_emGain: { type:'number', id:'simulation_emGain', label:'EM gain (×, EMCCD)', min:1, max:2000, step:10, default:300, int:false },
+  simulation_cic: { type:'number', id:'simulation_cic', label:'Clock-induced charge (e⁻/px/frame)', min:0, max:1, step:0.001, default:0.002, int:false },
+  // Digitisation, EMCCD path only: ADU are rounded to integers and clipped at 2^bits-1. The sCMOS
+  // path deliberately stays on real-valued ADU (changing it would break byte-identity with every
+  // earlier build, and a simulated sCMOS frame is not the place that needed a saturation model).
+  simulation_bitDepth: { type:'number', id:'simulation_bitDepth', label:'Camera bit depth (EMCCD)', min:8, max:16, step:1, default:16, int:true },
   // driftpx = total simulated sample drift (px) over the whole synthetic stack, for testing drift correction
   driftpx: { type:'number', id:'driftpx', label:'Simulated total drift (px)', min:0, max:30, step:0.5, default:0, int:false },
   // simulation_seed = 0 (default) keeps generateSynthetic()'s original unseeded behaviour (fresh
@@ -4017,6 +4056,21 @@ function gauss(rng=Math.random){ if(_g!==null){const g=_g;_g=null;return g;}
 // per-draw cost scales with l, too slow for a bright simulated pixel).
 function poisson(l, rng=Math.random){ if(l>60) return Math.max(0,Math.round(l+Math.sqrt(l)*gauss(rng)));
   const L=Math.exp(-l); let k=0,p=1; do{k++;p*=rng();}while(p>L); return k-1; }
+// Gamma(shape=k, scale=1) sample, Marsaglia-Tsang (2000) — the EMCCD electron-multiplying
+// register's output for k input electrons. O(1) in k, unlike summing k exponentials (a bright
+// pixel carries hundreds of electrons). Only called on the EMCCD path, and only for k>=1, which
+// is the regime MT's own rejection loop is written for. Draws from the SAME `rng`/gauss() stream
+// as every other per-frame draw, so a seeded movie stays reproducible.
+function gammaSample(k, rng=Math.random){
+  const d=k-1/3, c=1/Math.sqrt(9*d);
+  for(;;){
+    const x=gauss(rng), t=1+c*x;
+    if(t<=0) continue;
+    const v=t*t*t, u=rng();
+    if(u<1-0.0331*x*x*x*x) return d*v;
+    if(Math.log(u)<0.5*x*x+d*(1-v+Math.log(v))) return d*v;
+  }
+}
 
 // Derives a per-FRAME-independent 32-bit seed from generateSynthetic()'s own simulation_seed and
 // a frame index, via a splitmix32-style bit mix — NOT cryptographic, just decorrelated enough
@@ -4402,6 +4456,15 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
   }
   return {img, zClamped, zTotal};
 }
+// The simulated sensor's own model as one bundle, so the three frame-producing paths (serial,
+// worker pool, calibration stack) each carry one object instead of five more positional
+// parameters. type 'scmos' (the default) leaves applySimCameraNoise() on its original
+// expression, which is what keeps a seeded movie byte-identical to every earlier build.
+function readSimCameraModel(){
+  return { type:paramValue('simulation_cameraType'), qe:paramValue('simulation_qe'),
+           emGain:paramValue('simulation_emGain'), cic:paramValue('simulation_cic'),
+           bitDepth:paramValue('simulation_bitDepth') };
+}
 // Shot noise (Poisson) + read noise (Gaussian, electrons) + the fixed per-pixel camera offset,
 // converting a frame's emitter-photon-expectation image to ADU, in place — same physical order
 // (noise combines in the electron domain, THEN gain) as generateCalibrationStack()'s own copy of
@@ -4411,8 +4474,23 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
 // worker-parallel path (simulateFramesParallel) reproduce the exact same pixels as the serial
 // fallback for a given simulation_seed, regardless of which frame either one happens to process
 // first.
-function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng){
+function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng, cam){
   _g=null;
+  // EMCCD: photons -> photoelectrons (QE) + clock-induced charge, Poisson; the gain register as
+  // Gamma(shape=electrons, scale=1) (see PARAMS.simulation_cameraType for why scale 1); read
+  // noise referred back through the register, which is the whole point of an EMCCD; then integer
+  // ADU with saturation. Poisson compounded with Gamma has variance 2*lambda, so the sqrt(2)
+  // excess noise falls out of the model rather than being pasted on afterwards.
+  if(cam && cam.type==='emccd'){
+    const readE=readNoiseE/Math.max(1,cam.emGain), maxAdu=Math.pow(2,cam.bitDepth)-1;
+    for(let i=0;i<img.length;i++){
+      const ne=poisson(cam.qe*img[i]+cam.cic, rng);
+      const out=ne>0 ? gammaSample(ne, rng) : 0;
+      const adu=Math.round(offsetMap[i]+(out+readE*gauss(rng))/simGain);
+      img[i]=adu<0?0:(adu>maxAdu?maxAdu:adu);
+    }
+    return;
+  }
   for(let i=0;i<img.length;i++){
     const adu=offsetMap[i]+(poisson(img[i], rng)+readNoiseE*gauss(rng))/simGain;
     img[i]=adu<0?0:adu;
@@ -4435,7 +4513,7 @@ function splatBeadsFrame(w, h, bg, beadXY, photPerFrame, kernelObj, camRad, inte
 // happened to be available. baseSeed===0 keeps the original unseeded behaviour (each frame just
 // draws from Math.random()).
 async function simulateFramesSerial(ctx){
-  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,onProgress}=ctx;
   const driftAt=fi=> n>1 ? fi/(n-1)*driftPx : 0;
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, lastYield=performance.now();
@@ -4445,7 +4523,7 @@ async function simulateFramesSerial(ctx){
     const {img,zClamped,zTotal}=splatSimFrame(w,h,frameBg,frameEvents[fi],drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
     zClampedCount+=zClamped; zTotalCount+=zTotal;
     const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
-    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng);
+    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng, cam);
     frames[fi]=img;
     if(performance.now()-lastYield>50){ onProgress(100*fi/n); await tick(); lastYield=performance.now(); }
   }
@@ -4458,13 +4536,13 @@ async function simulateFramesSerial(ctx){
 // reproducibility contract to preserve here; each plane just draws from Math.random() same as
 // before, whether this fallback or simulateCalibFramesParallel() below ends up running it.
 async function simulateCalibFramesSerial(ctx){
-  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,onProgress}=ctx;
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,cam,onProgress}=ctx;
   const frames=new Array(nz);
   let lastYield=performance.now();
   for(let z=0; z<nz; z++){
     const kernelObj={kernel:norm[z], nx:kernelNx, ny:kernelNy, oversample};
     const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
-    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random);
+    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random, cam);
     frames[z]=img;
     if(performance.now()-lastYield>50){ onProgress(100*z/nz); await tick(); lastYield=performance.now(); }
   }
@@ -4477,8 +4555,8 @@ async function simulateCalibFramesSerial(ctx){
 // its batch entry instead of a one-time simInit — beadXY/offsetMap/etc are still shared and DO go
 // through calibInit, sent once per worker before any batch).
 async function simulateCalibFramesParallel(pool, ctx){
-  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,onProgress}=ctx;
-  pool.forEach(wk=>wk.postMessage({calibInit:true,w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx:kernelNx,ny:kernelNy,oversample,offsetMap,simGain,readNoiseE}));
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,cam,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({calibInit:true,w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx:kernelNx,ny:kernelNy,oversample,offsetMap,simGain,readNoiseE,cam}));
   const frames=new Array(nz);
   let done=0, err=null;
   const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(nz/(pool.length*paramValue('workerBatchTarget')))));
@@ -4516,6 +4594,11 @@ async function generateSynthetic(){
   const lifetime=paramValue('simlifetime'), bg=paramValue('simbg');
   const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
   const readNoiseE=paramValue('simulation_readnoise');   // electrons, applied before the gain conversion — see PARAMS.simulation_readnoise
+  const cam=readSimCameraModel();
+  if(cam.type==='emccd')
+    log(`Camera: EMCCD — QE ${cam.qe}, EM gain ${cam.emGain}×, clock-induced charge ${cam.cic} e⁻/px/frame, ${cam.bitDepth}-bit. `+
+        `The gain register adds noise of its own: pixel variance is 2× Poisson, so precision is ~√2 worse than the same photon `+
+        `count on an sCMOS. Set Excess noise F² to 2 in Localisation settings so the fit's own uncertainty says so too.`);
   const px=paramValue('simulation_pxnm'), sigma=1.3;
   // simulation_seed=0 (default) keeps the original unseeded Math.random() behaviour; any other
   // value makes every random draw below (site pick, ON timing, drift direction, camera noise)
@@ -4742,7 +4825,7 @@ async function generateSynthetic(){
   // there is exactly one implementation of the actual per-frame math to keep in sync, mirroring
   // the FTM module's own "both paths call the same shared function" convention.
   const simCtx={w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,
-                offsetMap,simGain,readNoiseE,baseSeed:simSeed,onProgress:setProg};
+                offsetMap,simGain,readNoiseE,cam,baseSeed:simSeed,onProgress:setProg};
   const simPool=await getSimWorkerPool();
   const {frames,zClampedCount,zTotalCount} = simPool && simPool.length>1
     ? await simulateFramesParallel(simPool, simCtx)
@@ -4821,6 +4904,7 @@ async function generateCalibrationStack(){
   const photPerFrame=paramValue('phot'), bg=paramValue('simbg');
   const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
   const readNoiseE=paramValue('simulation_readnoise');   // electrons, applied before the gain conversion — see PARAMS.simulation_readnoise
+  const cam=readSimCameraModel();
   const px=paramValue('simulation_pxnm');
   const interpMode=paramValue('simulation_psfInterp');
 
@@ -4865,7 +4949,7 @@ async function generateCalibrationStack(){
   // no seeded-reproducibility scheme to preserve (there never was one here).
   const calibCtx={w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,
                   kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,norm,
-                  offsetMap,simGain,readNoiseE,onProgress:setProg};
+                  offsetMap,simGain,readNoiseE,cam,onProgress:setProg};
   const calibPool=await getSimWorkerPool();
   const {frames} = calibPool && calibPool.length>1
     ? await simulateCalibFramesParallel(calibPool, calibCtx)
@@ -7247,6 +7331,17 @@ function mleNewtonFit(n, th, mstep, clampFn, r, cx, cy, img, w, gain, camoffset,
     if(Math.abs(th[0]-ox)<eps && Math.abs(th[1]-oy)<eps){ converged=true; break; } }
   return { converged, fisher: buildFisher(false) };
 }
+// An EMCCD's gain register makes every pixel's variance F^2 times its mean instead of equal to
+// it (F^2 = 2 at high gain), which a Poisson likelihood cannot express. The standard dodge, and
+// the one used here: fit in units of F^2 photons — hand the fitter gain/F^2, so its "photon"
+// counts are Poisson-distributed again — then scale the photon-like outputs back by F^2. The
+// POSITION is untouched by that affine change, while the CRLB comes out inflated by exactly F,
+// which is the whole point: lpx/lpy/lpz then describe the real spread. Applied at the three fit
+// dispatch sites (worker, runCore, live preview); F^2=1 leaves every number bit-for-bit alone.
+function applyExcessNoise(L, f2){
+  if(L && f2>1){ L.photons*=f2; L.bg*=f2; if(isFinite(L.bgstd)) L.bgstd*=f2; }
+  return L;
+}
 // gain,camoffset convert ADU -> photons before the Poisson likelihood ever sees a
 // pixel — Poisson variance = mean only holds in true photon units, matching
 // Picasso's get_spots()/_to_photons() (applied upstream of its own gaussmle).
@@ -8889,7 +8984,7 @@ function workerSource(){
     mleErf.toString(), mleGInt.toString(), mleModelSpherical.toString(), mleModelElliptical.toString(),
     mleClampSpherical.toString(), mleClampElliptical.toString(), mleNewtonFit.toString(),
     gaussianMLEspheric.toString(), gaussianMLEelliptic.toString(), mleModelRotated.toString(), gaussianMLEellipticangled.toString(),
-    zFromWidths.toString(), phasorFit.toString(), polyEval.toString(),
+    zFromWidths.toString(), phasorFit.toString(), polyEval.toString(), applyExcessNoise.toString(),
     ftmSeriesGlobal.toString(),
     `onmessage=function(e){
       const d=e.data;
@@ -8955,7 +9050,7 @@ function workerSource(){
         postMessage({out:outF},[outF.buffer]);
         return;
       }
-      const {frames,start,w,h,sigma,k,win,method,border,exact,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad}=d;
+      const {frames,start,w,h,sigma,k,win,method,border,exact,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2}=d;
       const out=[]; let tD=0,tF=0,nC=0;
       for(let i=0;i<frames.length;i++){
         const img=frames[i], t0=performance.now();
@@ -8963,11 +9058,11 @@ function workerSource(){
         const t1=performance.now(); tD+=t1-t0; nC+=maxima.length;
         const isPh = method==='phasor'||method==='phasor3d';
         for(const mm of maxima){
-          const L = method==='gaussmle' ? gaussianMLEspheric(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
+          const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
                          : method==='mle3d' ? gaussianMLEelliptic(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps)
                          : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset,eps,sSmlmAngleRad)
                          : isPh ? phasorFit(img,w,h,mm[0],mm[1],win,gain,camoffset)
-                         : gaussianFit(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset);
+                         : gaussianFit(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset), excessF2);
           if(L){
             let z=NaN, cl=0, lpz=NaN;
             if(method==='phasor3d'&&zcal){ const raw=L.pratio; cl=(raw<zcal.rmin||raw>zcal.rmax)?1:0;
@@ -9287,7 +9382,7 @@ async function getPsfWorkerPool(){
 const SIM_WORKER_PRELUDE="let _g=null;\nlet _simCtx=null;\nlet _calibCtx=null;";
 function simWorkerSource(){
   const body=[
-    gauss.toString(), poisson.toString(), mulberry32.toString(), simFrameSeed.toString(), simBgScale.toString(),
+    gauss.toString(), poisson.toString(), gammaSample.toString(), mulberry32.toString(), simFrameSeed.toString(), simBgScale.toString(),
     psfKernelAt.toString(), sampleKernelNearest.toString(), sampleKernelBilinear.toString(),
     catmullRomWeights.toString(), sampleKernelBicubic.toString(), sampleKernelAt.toString(),
     nextPow2.toString(), fft1d.toString(), fft2d.toString(), fftShiftKernelTile.toString(),
@@ -9316,7 +9411,7 @@ function simWorkerSource(){
         return;
       }
       if(d.simBatch){
-        const {w,h,bg,bgMap,bgDecay,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,driftPx,ddx,ddy,n}=_simCtx;
+        const {w,h,bg,bgMap,bgDecay,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,driftPx,ddx,ddy,n}=_simCtx;
         const {start,batch}=d, N=w*h;
         const buf=new Float32Array(batch.length*N);
         let zClamped=0, zTotal=0;
@@ -9326,7 +9421,7 @@ function simWorkerSource(){
           const r=splatSimFrame(w,h, bgMap?{map:bgMap,scale:simBgScale(fi,bgDecay)}:bg, ev,drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
           zClamped+=r.zClamped; zTotal+=r.zTotal;
           const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
-          applySimCameraNoise(r.img, offsetMap, simGain, readNoiseE, rng);
+          applySimCameraNoise(r.img, offsetMap, simGain, readNoiseE, rng, cam);
           buf.set(r.img, i*N);
         }
         postMessage({seq:d.seq,start,count:batch.length,buf,zClamped,zTotal},[buf.buffer]);
@@ -9339,13 +9434,13 @@ function simWorkerSource(){
         return;
       }
       if(d.calibBatch){
-        const {w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx,ny,oversample,offsetMap,simGain,readNoiseE}=_calibCtx;
+        const {w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx,ny,oversample,offsetMap,simGain,readNoiseE,cam}=_calibCtx;
         const {start,batch}=d, N=w*h;
         const buf=new Float32Array(batch.length*N);
         for(let i=0;i<batch.length;i++){
           const kernelObj={kernel:batch[i].kernel, nx, ny, oversample};
           const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
-          applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random);
+          applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random, cam);
           buf.set(img, i*N);
         }
         postMessage({seq:d.seq,start,count:batch.length,buf},[buf.buffer]);
@@ -9391,8 +9486,8 @@ async function getSimWorkerPool(){
 // batch order and worker assignment can't affect which pixels end up where — verified to
 // reproduce the exact same output as simulateFramesSerial() for the same simulation_seed.
 async function simulateFramesParallel(pool, ctx){
-  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,baseSeed,onProgress}=ctx;
-  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,bgMap,bgDecay,offsetMap,simGain,readNoiseE,photPerFrame,sigma,rad,zKernelStack,zKernel,baseSeed,driftPx,ddx,ddy,n}));
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,bgMap,bgDecay,offsetMap,simGain,readNoiseE,cam,photPerFrame,sigma,rad,zKernelStack,zKernel,baseSeed,driftPx,ddx,ddy,n}));
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, done=0, err=null;
   const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(n/(pool.length*paramValue('workerBatchTarget')))));
@@ -11281,6 +11376,11 @@ async function pcfoCore(config, stack, hooks={}){
   const TILES_X=Math.max(1,Math.floor(stack.w/S)), TILES_Y=Math.max(1,Math.floor(stack.h/S));
   const idx=pickSeededFrames(stack.n,NFRAMES,0xC0FFEE);
   onLog(`\nEstimate gain/offset (PCFO): ${idx.length} seeded random frame(s), k_thresh ${K_THRESH}, ${TILES_X}×${TILES_Y} tile(s)/frame @ ${S}px (auto-sized from the ${stack.w}×${stack.h} field of view)…`);
+  // PCFO reads gain off the variance-vs-mean slope, and an EM gain register doubles that
+  // variance — so on EMCCD data the number below is gain × F², not gain. Say so: silently
+  // dividing by the user's own F² would bury an assumption inside a measurement.
+  if((config.cameraExcessNoise||1)>1)
+    onLog(`⚠ Excess noise F² = ${config.cameraExcessNoise} is set: PCFO measures the variance-to-mean slope, which an EM gain register inflates by exactly that factor, so the gain below comes out ~${config.cameraExcessNoise}× too high. Divide it yourself, or estimate gain on data from a camera without a gain register.`);
   const pts=[];
   for(let i=0;i<idx.length;i++){
     const img=(await stack.getFrames(idx[i],idx[i]+1))[0];
@@ -13376,7 +13476,11 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
   const sigma=config.psf, win=2*config.winr+1, method=config.method;
   const k={ wave:config.detection_wavelet_thr, dog:config.detection_DoG_thr, box:config.detection_box_thr }[config.detFilter];
   const exactBP=config.detection_DoG_exactbp, mode=config.detFilter;
-  const gain=config.gain, camoffset=config.camoffset, eps=config.mleEps;
+  const camoffset=config.camoffset, eps=config.mleEps;
+  // EMCCD excess noise (PARAMS.cameraExcessNoise): fit in F^2-photon units, report photons — see
+  // applyExcessNoise(). `gain` from here on is what the FITTER sees, not what the user typed.
+  const excessF2=Math.max(1, config.cameraExcessNoise||1), gain=config.gain/excessF2;
+  if(excessF2>1) onLog(`Excess noise factor F² = ${excessF2}: fitting in F²-photon units, so photon counts stay in real photons while the reported precision (lpx/lpy/lpz) is the √F² = ${Math.sqrt(excessF2).toFixed(2)}× wider one an EM gain register actually gives.`);
   // 'gaussmleEll' rotation angle — see PARAMS.localize3D: checked (default)
   // means FREE angle (null here — gaussianMLEellipticangled fits its own
   // 7th param per emitter), unchecked means FIXED at the sSMLM pairing
@@ -13615,7 +13719,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
             const frames=corrected.slice(s-coreStart, e-coreStart);
             if(frames.length) shown={img:frames[0],fi:s};
             wk._pendImg=frames[0]; wk._pendStart=s;
-            wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad});
+            wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2});
           };
           pool.forEach(wk=>{
             wk.onmessage=ev=>{
@@ -13676,7 +13780,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
         // hits on a real multi-worker run, only by luck on a tiny one.
         wk._pendImg=frames[0]; wk._pendStart=s;
         // no transfer list: frames are cloned, so any RAM cache survives
-        wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad});
+        wk.postMessage({frames,start:s,w,h,sigma,k,win,method,border,exact:exactBP,mode,zcal,wcal,gain,camoffset,eps,sSmlmAngleRad,excessF2});
       };
       pool.forEach(wk=>{
         wk.onmessage=ev=>{
@@ -13741,7 +13845,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
         const tc=performance.now(); tDetect+=tc-tb; nCand+=maxima.length;
         const frameLocs=[];                         // this frame's accepted fits, for the raw-panel overlay below
         for(const [cx,cy] of maxima){
-          const L = method==='gaussmle' ? gaussianMLEspheric(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,w,h,cx,cy,win,gain,camoffset) : gaussianFit(img,w,h,cx,cy,win,sigma,gain,camoffset);
+          const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,w,h,cx,cy,win,gain,camoffset) : gaussianFit(img,w,h,cx,cy,win,sigma,gain,camoffset), excessF2);
           if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
                    const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
                    L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
@@ -14445,6 +14549,13 @@ $('liveStreamScrubNum').addEventListener('change', e=>{ if(!liveStreamState) ret
   f.addEventListener('change', sync); sync();
 })();
 
+// The EMCCD-only camera rows: hidden on the sCMOS path, which is the default and has no
+// quantum efficiency, register or bit depth of its own in this model.
+(function(){
+  const sel=$('simulation_cameraType'), rows=['simQeRow','simEmGainRow','simCicRow','simBitDepthRow'];
+  const sync=()=>{ const on=sel.value==='emccd'; for(const id of rows) $(id).style.display = on ? '' : 'none'; };
+  sel.addEventListener('change', sync); sync();
+})();
 // FTM window-size field and raw/corrected toggle: only relevant once
 // temporal median filtering is on. Unchecking resets the toggle back to
 // raw — rawFtmView shouldn't stay stuck "on" once its own control is hidden.
@@ -14843,7 +14954,8 @@ async function showFrame(i){
       const sigma=paramValue('psf'), k=currentThr(), win=2*paramValue('winr')+1;
       const border=(win-1)/2+1, method=paramValue('method');
       const exactBP=paramValue('detection_DoG_exactbp'), mode=paramValue('detFilter');
-      const gain=paramValue('gain'), camoffset=paramValue('camoffset'), eps=paramValue('mleEps');
+      const camoffset=paramValue('camoffset'), eps=paramValue('mleEps');
+      const excessF2=Math.max(1,paramValue('cameraExcessNoise')), gain=paramValue('gain')/excessF2;   // see applyExcessNoise()
       const localize3D=paramValue('localize3D');
       const zcal = method==='phasor3d' ? cal3d : null;
       const wcal = (method==='mle3d'||method==='gaussmleEll') && localize3D && cal3dW ? {qx:cal3dW.qx,qy:cal3dW.qy,zmin:cal3dW.zmin,zmax:cal3dW.zmax,px:paramValue('pxnm')} : null;
@@ -14858,7 +14970,7 @@ async function showFrame(i){
       const {firstIdx,lastIdx}=fitFrameRange(paramValue('fitFirstFrame'), paramValue('fitLastFrame'), stack.n);
       const inRange = i>=firstIdx && i<lastIdx;
       if(inRange) for(const [cx,cy] of spots){
-        const L = method==='gaussmle' ? gaussianMLEspheric(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,stack.w,stack.h,cx,cy,win,gain,camoffset) : gaussianFit(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset);
+        const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,stack.w,stack.h,cx,cy,win,gain,camoffset) : gaussianFit(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset), excessF2);
         if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
                  const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
                  L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
@@ -15960,7 +16072,13 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-19f — Three fixes found by a test pass.
+log(`webSMLM v0.12.1-dev · build 2026-09-20a — EMCCD camera in the simulator.
+Camera type sCMOS (unchanged, the default) or EMCCD: photoelectrons through an electron-
+multiplying register, modelled as Poisson then Gamma, which is where a real EMCCD’s √2 excess
+noise comes from — plus quantum efficiency, clock-induced charge, integer ADU and saturation.
+On the analysis side, Excess noise F² (Localisation settings) makes the fit account for it: the
+fit runs in F²-photon units so photon counts stay real while lpx/lpy/lpz widen by √F².
+— and from build 2026-09-19f: Three fixes found by a test pass.
 Score vs truth now scores only the frames the Localize run covered: with First/Last frame to fit
 set, every emitter outside that range used to count as missed (measured: 28.8% recall instead of
 81.2%). A blink ending exactly on a frame boundary no longer leaves a 0-photon "missed" emitter

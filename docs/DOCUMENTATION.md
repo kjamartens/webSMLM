@@ -1151,6 +1151,9 @@ actual elapsed time instead.
 | `simulation_offset` | Simulation camera offset (ADU) | number | 0 | 65535 | 1 | 100 |
 | `simulation_offset_std` | Simulation offset std (ADU, per-pixel) | number | 0 | 200 | 0.5 | 3 |
 | `simulation_readnoise` | Simulation read noise σ (e⁻) | number | 0 | 200 | 0.1 | 2.7 |
+| `simulation_psfMaskType` | PSF phase mask | enum | `none`, `doubleHelix` | | | `none` |
+| `simulation_psfMaskModes` | Mask GL modes (double helix) | number | 2 | 8 | 1 | 5 |
+| `simulation_psfMaskWaist` | Mask beam waist (pupil radii) | number | 0.2 | 2 | 0.05 | 1.0 |
 | `simulation_illumProfile` | Illumination profile | enum | `flat`, `gaussian`, `sigmoid` | | | `flat` |
 | `simulation_illumFwhmPct` | Illumination width (% of FOV) | number | 10 | 300 | 5 | 60 |
 | `simulation_cameraType` | Simulation camera type | enum | `scmos`, `emccd` | | | `scmos` |
@@ -1317,6 +1320,43 @@ excess noise alone would give, because the register also makes read noise neglig
 is the reason EMCCDs exist. When you simulate EMCCD data, set <b>Excess noise F²</b> to 2 in
 Localisation settings, or the fit's own uncertainty will claim a precision it does not have.</p>
 <!-- /HINT:simulation-camera -->
+
+**Engineered PSFs and what they buy.** The Zernike basis runs to 28 terms (every mode up to
+n = 6; the first 15 are unchanged, so older presets and settings files mean exactly what they
+did). Three presets put astigmatism at successive orders (primary, secondary, tertiary) to stretch
+the depth over which z is recoverable, and the trade is monotone — measured at 3000 photons,
+5 background photons/px, 100 nm pixels:
+
+| preset | z-CRLB at focus | single-valued z range | lateral CRLB at focus |
+|---|---|---|---|
+| `astigModerate` (for reference) | 10.1 nm | ±500 nm | 2.6 nm |
+| `saddlePoint` | 12.6 nm | ±700 nm | 5.8 nm |
+| `extendedRange` | 23.6 nm | ±1000 nm | 6.3 nm |
+| `extendedRangeStrong` | 23.9 nm | ±1300 nm | 10.3 nm |
+
+They are named for that behaviour and **not** called tetrapods: the published tetrapod and
+saddle-point masks come from numerical optimisation over dozens of modes and show a four-lobed
+shape these do not reproduce (measured: one lobe at focus, three at ±1.5 µm).
+
+**Double helix** is a real phase mask rather than a Zernike sum — `simulation_psfMaskType`, added
+to the pupil on top of whatever Zernike coefficients are set. It is built the way the original is:
+a superposition of Gauss-Laguerre modes along the line l = 2p + 1 in the modal plane, of which
+only the phase is kept (Pavani & Piestun, *Opt. Express* 16, 3484 (2008)). Those modes share a
+Gouy phase that advances linearly with defocus, which is why the two lobes **rotate** with z
+instead of blurring: measured 60° over ±800 nm at the default 5 modes and a waist of 1.0 pupil
+radii, with the sign of z in the direction of rotation. About 11% of the light sits in the two
+lobes, well below a real fabricated mask — the price of a phase-only analytic construction.
+A cheaper first attempt (concentric zones of increasing vortex charge) was built and rejected on
+measurement: one lobe at focus and a 13-peak ring at ±1 µm, no double helix at all.
+
+**The yardstick: `psfZCramerRao()`.** Every PSF build now also reports the Cramér-Rao lower bound
+on x, y and z, computed from the kernel itself under the current photon and background settings,
+with N and background marginalised as nuisance parameters exactly as a real fit must. It asks only
+how much the image changes per nanometre of defocus, so unlike `zUsableNm` — which follows
+σ_y/σ_x and is meaningless for a double helix (it reports 0) — it applies to any PSF shape. No
+estimator can beat it, so it is what a fitter should be judged against: the astigmatic 3D run
+scored an axial median of 23.4 nm against a bound of ~10 nm, i.e. the width-based fit gives away a
+factor of 2.4.
 
 **PSF parameters** (`hint-simulation-psf`):
 

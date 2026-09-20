@@ -21,7 +21,7 @@
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          2791   PARAMS registry, single source of truth for params;
+    params          2802   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMobileViewport() (memgb's own lower default on
                            a narrow viewport); log()/logCmd() — prose gets a
@@ -30,10 +30,10 @@
                            log stretch pastes as valid code; #logText's
                            text-indent:hanging each-line keeps a wrapped
                            line's continuation aligned under the text
-    in/out          3783   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
+    in/out          3800   TIFF/ND2 parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Memory budget (memgb)
-    simulation      4082   synthetic stack generator ("Simulate movie");
+    simulation      4099   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -105,12 +105,12 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      6486   score localizations against the simulator's own
+    validation      6642   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z
-    detect          7110   per-frame band-pass + local-maxima detection
-    fit             7387   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    detect          7266   per-frame band-pass + local-maxima detection
+    fit             7543   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -120,7 +120,7 @@
                            pcfoCore() logCmd()-adjacent config.exportPcfoTiles
                            streams pcfo_tiles records via onRecord (already-
                            in-memory pts, just avoids the CDP return payload)
-    render          7907   accumulate to offscreen buffer; view/colour/blur;
+    render          8063   accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -142,7 +142,7 @@
                            _srRenderSeq token discarding a stale/superseded
                            render (its ~24 call sites are unaffected — it
                            still never rejects, all fire-and-forget as before)
-    workers         9190   frame-parallel detect/fit worker pool; dedicated
+    workers         9346   frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -168,14 +168,14 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    export          9759   ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration 10051   astigmatic sigma_x/sigma_y vs z bead curves;
+    export          9916   ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration 10208   astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
                            point (calibration_beads.ndjson) via onRecord as
                            they're detected, not built up then trimmed
-    drift          10468   AIM drift correction (2D+z); drift-vs-frame or
+    drift          10625   AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -185,16 +185,16 @@
                            segment's own points before the intersection
                            search (subsampleSegments(), AIM_SAMPLE_FLOOR-
                            guarded) — speed vs. estimation precision
-    locprecision   10974   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision   11131   NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           11697  spectrally resolved SMLM pair-finding; merged
+    sSMLM           11854  spectrally resolved SMLM pair-finding; merged
                            Show histograms (sSmlmHistBtn/sSmlmHistModeBtn);
                            Fit angle & tol./Pair share a row, Unpair alone;
                            runSSmlmPair() logCmd()s its own cfg on success;
                            pairCore()'s config.exportSSmlmCandidates streams
                            the wider candidate pool (sSmlm_candidates.ndjson)
                            via onRecord, before the directional accept/reject
-    spt             12167  single particle tracking, trackpy-inspired;
+    spt             12324  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -225,7 +225,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        13669  top-level orchestration, *Core()/wrapper split;
+    pipeline        13826  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; measureHeader()
@@ -236,7 +236,7 @@
                            PARAMS registry) on success — see MODULE: params;
                            viewGtBtn/nupDebugBtn click handlers (MODULE:
                            simulation's own GT-locs/NUP-debug feature)
-    liveStreaming   14297  Micro-Manager/pycromanager camera bridge
+    liveStreaming   14454  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -290,9 +290,9 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           16547  localizations table, filtering, histograms;
+    table           16718  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms)
-    headless API    17135  window.webSMLM.analyze()/analyzeBatch();
+    headless API    17306  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2000,7 +2000,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20d</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.1-dev · build 2026-09-20e</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2318,9 +2318,20 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
               <option value="sphericalStrong">Spherical (strong)</option>
               <option value="trefoilModerate">Trefoil (moderate)</option>
               <option value="mixedRealistic">Mixed (realistic objective)</option>
+              <option value="saddlePoint">Saddle point (±700 nm)</option>
+              <option value="extendedRange">Extended depth (±1 µm)</option>
+              <option value="extendedRangeStrong">Extended depth (±1.3 µm)</option>
             </select>
           </label>
-          <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 comma-separated values, one per OSA Zernike index 0-14, in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
+          <label class="row" id="psfMaskTypeRow" style="display:none" title="A phase mask added to the pupil on top of the Zernike coefficients. The double helix turns two lobes with depth, so z is read from an angle rather than a width.">PSF phase mask
+            <select id="simulation_psfMaskType" class="sel">
+              <option value="none">None</option>
+              <option value="doubleHelix">Double helix</option>
+            </select>
+          </label>
+          <label class="row" id="psfMaskModesRow" style="display:none;padding-left:40px" title="How many Gauss-Laguerre modes make up the mask. More modes give a cleaner two-lobe pattern over a longer depth range, at the cost of light thrown into side lobes.">Mask GL modes <input type="number" id="simulation_psfMaskModes" min="2" max="8" step="1" value="5" class="num"></label>
+          <label class="row" id="psfMaskWaistRow" style="display:none;padding-left:40px" title="Beam waist of those modes, in pupil radii: how much of the pupil the mask pattern fills.">Mask beam waist <input type="number" id="simulation_psfMaskWaist" min="0.2" max="2" step="0.05" value="1.0" class="num"></label>
+          <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 or 28 comma-separated values, one per Zernike index (n<=4 or n<=6), in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15/28 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
           <label class="row" id="psfEvalMethodRow" style="display:none" title="'Direct quadrature' is the original, more field-tested evaluator. 'FFT/chirp-Z' is a mathematically exact reformulation measured 76x-970x faster (kernel-size dependent) in this project's own testing, kept opt-in since it's newer code on a differently-discretized grid.">PSF evaluation method
             <select id="simulation_psfEvalMethod" class="sel">
               <option value="direct">Direct quadrature</option>
@@ -3194,6 +3205,12 @@ const PARAMS = {
   // beam centre and nothing is ever brighter than the number the user typed; the log reports what
   // the profile costs in average signal. 'flat' (default) multiplies by exactly 1 and leaves
   // every pixel bit-identical.
+  // ---- engineered phase mask, alongside the Zernike coefficients (the two add up in the pupil).
+  // Only the double helix is a mask here; the tetrapod/saddle-point family lives in the Zernike
+  // presets instead, being well described by astigmatism at several orders.
+  simulation_psfMaskType: { type:'enum', id:'simulation_psfMaskType', label:'PSF phase mask', options:['none','doubleHelix'], default:'none' },
+  simulation_psfMaskModes: { type:'number', id:'simulation_psfMaskModes', label:'Mask GL modes (double helix)', min:2, max:8, step:1, default:5, int:true },
+  simulation_psfMaskWaist: { type:'number', id:'simulation_psfMaskWaist', label:'Mask beam waist (pupil radii)', min:0.2, max:2, step:0.05, default:1.0, int:false },
   simulation_illumProfile: { type:'enum', id:'simulation_illumProfile', label:'Illumination profile', options:['flat','gaussian','sigmoid'], default:'flat' },
   simulation_illumFwhmPct: { type:'number', id:'simulation_illumFwhmPct', label:'Illumination width (% of FOV)', min:10, max:300, step:5, default:60, int:false },
   simulation_cameraType: { type:'enum', id:'simulation_cameraType', label:'Simulation camera type', options:['scmos','emccd'], default:'scmos' },
@@ -3364,7 +3381,7 @@ const PARAMS = {
   // simulation_psfZernikePreset = curated coefficient-set dropdown (PSF_ZERNIKE_PRESETS) — a
   // deliberately narrow subset of the full 15-coefficient OSA basis; see that constant's own
   // comment for the "order-of-magnitude, not paper-sourced" caveat these presets carry.
-  simulation_psfZernikePreset: { type:'enum', id:'simulation_psfZernikePreset', label:'Zernike aberration preset', options:['none','astigWeak','astigModerate','astigStrong','comaWeak','comaStrong','sphericalWeak','sphericalStrong','trefoilModerate','mixedRealistic'], default:'astigModerate' },
+  simulation_psfZernikePreset: { type:'enum', id:'simulation_psfZernikePreset', label:'Zernike aberration preset', options:['none','astigWeak','astigModerate','astigStrong','comaWeak','comaStrong','sphericalWeak','sphericalStrong','trefoilModerate','mixedRealistic','saddlePoint','extendedRange','extendedRangeStrong'], default:'astigModerate' },
   // simulation_psfEvalMethod = which numerical evaluator turns the pupil phase into an intensity
   // plane — 'direct' is the original polar-quadrature sum; 'fft' (default) is the mathematically-
   // EXACT chirp-Z reformulation (computePsfIntensityPlaneFFT(), 2-3 orders of magnitude faster per
@@ -5108,23 +5125,83 @@ function psfZernikeValue(j,rho,phi){
 // astigmatism, j=6/9 trefoil, j=7/8 coma, j=12 primary spherical (see the OSA table in
 // docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §4.1 — verify via psfIndexToNM(j) before
 // trusting any index by memory, that doc's own table was wrong twice before being checked).
+// 28 terms = every Zernike mode up to n=6. The first 15 (n<=4) are exactly what they were, so
+// every earlier preset, settings file and custom string keeps its meaning — the tail is zero.
+// The extra room is what the engineered presets below need: a tetrapod is built from ASTIGMATISM
+// AT SEVERAL ORDERS, and secondary/tertiary astigmatism are j=13 (n=4,l=+2) and j=25 (n=6,l=+2).
+const PSF_NZERNIKE = 28;
+const zcoef = o => Object.assign(new Array(PSF_NZERNIKE).fill(0), o);
 const PSF_ZERNIKE_PRESETS = {
-  none:             new Array(15).fill(0),
-  astigWeak:        Object.assign(new Array(15).fill(0), {5:0.07}),
-  astigModerate:    Object.assign(new Array(15).fill(0), {5:0.15}),
-  astigStrong:      Object.assign(new Array(15).fill(0), {5:0.3}),
-  comaWeak:         Object.assign(new Array(15).fill(0), {7:0.1}),
-  comaStrong:       Object.assign(new Array(15).fill(0), {7:0.25}),
-  sphericalWeak:    Object.assign(new Array(15).fill(0), {12:0.1}),
-  sphericalStrong:  Object.assign(new Array(15).fill(0), {12:0.25}),
-  trefoilModerate:  Object.assign(new Array(15).fill(0), {6:0.15}),
-  mixedRealistic:   Object.assign(new Array(15).fill(0), {4:0.05, 5:0.08, 7:0.06, 12:0.07}),
+  none:             new Array(PSF_NZERNIKE).fill(0),
+  astigWeak:        zcoef({5:0.07}),
+  astigModerate:    zcoef({5:0.15}),
+  astigStrong:      zcoef({5:0.3}),
+  comaWeak:         zcoef({7:0.1}),
+  comaStrong:       zcoef({7:0.25}),
+  sphericalWeak:    zcoef({12:0.1}),
+  sphericalStrong:  zcoef({12:0.25}),
+  trefoilModerate:  zcoef({6:0.15}),
+  mixedRealistic:   zcoef({4:0.05, 5:0.08, 7:0.06, 12:0.07}),
+  // ---- ENGINEERED depth encoding: aberration put in ON PURPOSE to stretch the range over which
+  // z is recoverable, built from astigmatism at successive orders (j=5, 13, 25 = primary,
+  // secondary, tertiary — verified via psfIndexToNM, not assumed).
+  //
+  // Named for what they measurably DO, not for a paper. The saddle-point and tetrapod masks of
+  // Shechtman et al. (Nano Lett. 15, 4194 (2015); Nat. Photonics 8, 302 (2014)) come from
+  // numerical optimisation over dozens of modes, and their hallmark is a four-lobed shape these
+  // do not reproduce — measured here: one lobe at focus, three at ±1.5 µm. What they DO
+  // reproduce is the trade those masks exist for, and it is monotone (3000 photons, 5 bg/px,
+  // 100 nm pixels, z-CRLB at focus / single-valued range / lateral at focus):
+  //   astigModerate       10.1 nm / ±500 nm  / 2.6 nm
+  //   saddlePoint         12.6 nm / ±700 nm  / 5.8 nm
+  //   extendedRange       23.6 nm / ±1000 nm / 6.3 nm
+  //   extendedRangeStrong 23.9 nm / ±1300 nm / 10.3 nm
+  // Do not rename these back to "tetrapod" without the published coefficients and a four-lobe
+  // shape to show for it. The genuinely different morphology on offer here is the double-helix
+  // MASK (PARAMS.simulation_psfMaskType), which no Zernike sum represents well.
+  saddlePoint:         zcoef({5:0.6,  13:0.2}),
+  extendedRange:       zcoef({5:1.0,  13:0.4}),
+  extendedRangeStrong: zcoef({5:1.8,  13:0.8, 25:0.3}),
 };
+// Generalised Laguerre polynomial L_p^a(x), by the standard three-term recurrence. Small p only
+// (a double-helix mask uses p<=7), so the recurrence's accuracy is not a concern here.
+function laguerreL(p, a, x){
+  let lm1=0, l=1;                                   // L_0^a = 1
+  for(let k=0;k<p;k++){ const next=((2*k+1+a-x)*l-(k+a)*lm1)/(k+1); lm1=l; l=next; }
+  return l;
+}
+// Double-helix phase mask — the real construction, not a stand-in: a superposition of
+// Gauss-Laguerre modes lying on a LINE in the GL modal plane, of which the mask keeps only the
+// phase (Pavani & Piestun, Opt. Express 16, 3484 (2008); PNAS 106, 2995 (2009)). Modes on the
+// line l = 2p+1 share a Gouy phase that advances linearly with defocus, which is exactly why the
+// two-lobed pattern ROTATES with z instead of blurring — so depth is read from an ANGLE, and the
+// encoding survives far past where a width-based one folds back.
+//
+// A cheaper first attempt (concentric zones of increasing vortex charge) is NOT in here: built,
+// measured, and rejected — it produced one lobe at focus and a 13-peak ring at ±1 µm, i.e. no
+// double helix at all. Phase-only keeps the pupil lossless, which is what a real phase plate or
+// SLM does; the amplitude of the GL superposition is discarded.
+//
+// Deliberately a separate term from the Zernike sum: this phase winds in azimuth and no finite
+// Zernike series represents it well. Called from BOTH pupil builders (the polar quadrature one
+// and its Cartesian/FFT twin) — they must stay in step.
+function pupilMaskPhase(maskType, rhoNorm, phi, nModes, waist){
+  if(maskType!=='doubleHelix') return 0;
+  const N=Math.max(2, Math.round(nModes||5)), w=Math.max(0.2, waist||0.8);
+  const u=Math.max(0,Math.min(1,rhoNorm))/w, u2=u*u;
+  let re=0, im=0;
+  for(let p=0;p<N;p++){
+    const l=2*p+1;                                  // the rotating-PSF line in the GL modal plane
+    const amp=Math.pow(u,l)*Math.exp(-u2)*laguerreL(p,l,2*u2);
+    re+=amp*Math.cos(l*phi); im+=amp*Math.sin(l*phi);
+  }
+  return (re===0&&im===0) ? 0 : Math.atan2(im,re);
+}
 // Per-Z-plane pupil precompute: Gibson-Lanni sample/immersion-index OPD (kept in full, not
 // simplified to a bare defocus term — models a real coverslip/medium-mismatch aberration
 // source) plus the Zernike phase, on a polar (rho,phi) quadrature grid.
 function computePsfPupilForZPlane(z, nz, params){
-  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs} = params;
+  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs, maskType, maskModes, maskWaist} = params;
   // Depth-induced "focal shift": expanding opd1/opd3 below to 2nd order in rho shows the
   // rho^2 (defocus-shaped) term vanishes — i.e. the emitter is actually IN FOCUS — at
   // ti = ti0 - particleAxialPosition*(ni/ns), not at ti0 itself (a real, textbook Gibson-Lanni
@@ -5160,7 +5237,7 @@ function computePsfPupilForZPlane(z, nz, params){
       let zernikePhase=0;
       for(let j=0;j<zernikeCoeffs.length;j++){ const c=zernikeCoeffs[j]; if(c!==0) zernikePhase+=c*psfZernikeValue(j, rho/bMax, phi); }
       zernikePhase*=2*Math.PI;
-      const phase=gibsonLanniPhase+zernikePhase;
+      const phase=gibsonLanniPhase+zernikePhase+pupilMaskPhase(maskType, rho/bMax, phi, maskModes, maskWaist);
       pupilRe[rowBase+ip]=rho*Math.cos(phase);
       pupilIm[rowBase+ip]=rho*Math.sin(phase);
     }
@@ -5282,7 +5359,7 @@ function psfCzt1d(inRe, inIm, M, dk, k0, P, dx, x0){
 // integration measure (dA=rho·dRho·dPhi, shrinking toward the center); a Cartesian grid's own
 // cell area (dkx·dky) is uniform everywhere, so no such position-dependent weighting applies.
 function computePsfPupilCartesianForZPlane(z, nz, params, M, dk){
-  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs} = params;
+  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs, maskType, maskModes, maskWaist} = params;
   const focalShift = particleAxialPosition*(ni/ns);
   const ti = (ti0-focalShift) + zStep*(z-(nz-1)/2);
   const k0 = 2*Math.PI/lambda;
@@ -5302,7 +5379,7 @@ function computePsfPupilCartesianForZPlane(z, nz, params, M, dk){
       let zernikePhase=0;
       for(let j=0;j<zernikeCoeffs.length;j++){ const c=zernikeCoeffs[j]; if(c!==0) zernikePhase+=c*psfZernikeValue(j, rho/bMax, phi); }
       zernikePhase*=2*Math.PI;
-      const phase=k0*(opd1+opd3)+zernikePhase, idx=iy*M+ix;
+      const phase=k0*(opd1+opd3)+zernikePhase+pupilMaskPhase(maskType, rho/bMax, phi, maskModes, maskWaist), idx=iy*M+ix;
       re[idx]=Math.cos(phase); im[idx]=Math.sin(phase);
     }
   }
@@ -5361,10 +5438,12 @@ function readPsfConfigFromUI(){
   if(customStr.trim()!==''){
     const parts=customStr.split(',').map(s=>s.trim());
     const nums=parts.map(Number);
-    if(parts.length===15 && nums.every(v=>isFinite(v))){
-      zernikeCoeffs=nums.map(v=>v/1000); zernikeSource='custom';
+    if((parts.length===15 || parts.length===PSF_NZERNIKE) && nums.every(v=>isFinite(v))){
+      // 15 stays valid and is zero-padded to 28: an older settings file describes the same pupil.
+      zernikeCoeffs=nums.map(v=>v/1000); while(zernikeCoeffs.length<PSF_NZERNIKE) zernikeCoeffs.push(0);
+      zernikeSource='custom';
     } else {
-      log(`PSF preview: custom Zernike field must be exactly 15 comma-separated numbers (milliwaves) — got "${customStr}", falling back to the preset.`);
+      log(`PSF preview: custom Zernike field must be 15 or ${PSF_NZERNIKE} comma-separated numbers (milliwaves) — got "${customStr}", falling back to the preset.`);
       zernikeCoeffs=PSF_ZERNIKE_PRESETS[paramValue('simulation_psfZernikePreset')].slice(); zernikeSource='preset-fallback';
     }
   } else {
@@ -5373,7 +5452,9 @@ function readPsfConfigFromUI(){
   const evalMethod=paramValue('simulation_psfEvalMethod');
   const cfg = { NA, lambda, ns, ni, ti0, particleAxialPosition, zStep:zStepNm*1e-9, nz,
                 resLateralM:resLateralNm*1e-9, halfWidthPx, oversample, cameraPxNm, kernelWidthNm,
-                zernikeCoeffs, zernikeSource, evalMethod };
+                zernikeCoeffs, zernikeSource, evalMethod,
+                maskType:paramValue('simulation_psfMaskType'), maskModes:paramValue('simulation_psfMaskModes'),
+                maskWaist:paramValue('simulation_psfMaskWaist') };
   if(evalMethod==='fft') cfg.fftDk=psfFftDkForCfg(cfg);   // Cartesian grid's own k-space spacing — see psfFftDkForCfg()
   return cfg;
 }
@@ -5463,7 +5544,37 @@ async function buildPsfKernelStack(cfg){
     log(`PSF z encoding is single-valued to ±${zUsableNm.toFixed(0)} nm — beyond that σy/σx turns back, so two z values give the same width pair and no width-based 3D fit can tell them apart.`);
   else
     log(`PSF z encoding: σy/σx never separates monotonically around focus — this PSF carries no usable width-based z information (an unaberrated PSF is symmetric by construction; pick an astigmatism preset for 3D).`);
-  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm, focusIndex, globalMax, zUsableNm };
+  // What the PSF can say about depth at all, independent of how z is encoded (see
+  // psfZCramerRao). Reported for every PSF, including the ones zUsableNm cannot describe: a
+  // double helix has no width ratio to follow, and its zUsableNm comes back 0.
+  const crlb=psfZCramerRao(slices, nx, ny, cfg.oversample, focusIndex, zStepNm, cfg.cameraPxNm,
+                           paramValue('phot'), Math.max(0.5,paramValue('simbg')));
+  let zCrlb=null;
+  if(crlb){
+    const fin=crlb.filter(c=>isFinite(c.zSig));
+    if(fin.length){
+      const best=fin.reduce((a,c)=>c.zSig<a.zSig?c:a);
+      const atFocus=fin.reduce((a,c)=>Math.abs(c.z)<Math.abs(a.z)?c:a);
+      // Where depth information survives: the widest contiguous span whose z bound stays within
+      // 3x the best one. Quoting only the best figure would flatter a PSF that is excellent in
+      // one plane and blind everywhere else — which is exactly what an unaberrated PSF is.
+      const lim=3*best.zSig; let run=-1, span=null;
+      for(let i=0;i<=crlb.length;i++){
+        const ok = i<crlb.length && isFinite(crlb[i].zSig) && crlb[i].zSig<=lim;
+        if(ok && run<0) run=i;
+        if(!ok && run>=0){ const w={z0:crlb[run].z, z1:crlb[i-1].z};
+          if(!span || (w.z1-w.z0)>(span.z1-span.z0)) span=w; run=-1; }
+      }
+      zCrlb={ curve:crlb, bestZSig:best.zSig, bestAtNm:best.z, atFocusZSig:atFocus.zSig,
+              atFocusLateralNm:atFocus.x, span };
+      log(`PSF depth information (Cramér-Rao bound at ${paramValue('phot')} photons, `+
+          `${Math.max(0.5,paramValue('simbg')).toFixed(1)} bg photons/px): best σ_z ${best.zSig.toFixed(1)} nm at z=${best.bestAtNm===undefined?best.z.toFixed(0):best.z.toFixed(0)} nm, `+
+          `${atFocus.zSig.toFixed(1)} nm at focus (lateral ${atFocus.x.toFixed(1)} nm)`+
+          (span?`, staying within 3× of best over ${span.z0.toFixed(0)}…${span.z1.toFixed(0)} nm`:'')+
+          `. No fitter can do better than this — it is the yardstick, not a measurement of any fit.`);
+    }
+  }
+  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm, focusIndex, globalMax, zUsableNm, zCrlb };
 }
 
 // How far either side of focus this PSF actually encodes z UNIQUELY, in nm.
@@ -5517,6 +5628,51 @@ function psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, oversample){
   const MIN_LN_RATIO=0.02;
   if(Math.abs(lr[focusIndex+n])<MIN_LN_RATIO || Math.abs(lr[focusIndex-n])<MIN_LN_RATIO) return 0;
   return n*zStepNm;
+}
+// What this PSF can tell you about depth, for ANY PSF shape — the Cramer-Rao lower bound on x, y
+// and z, computed from the kernel stack itself under an assumed photon count and background.
+//
+// psfUsableZRange() above answers a narrower question (where sigma_y/sigma_x stays monotonic) and
+// is meaningless for a double helix, which encodes z in an ANGLE, or a tetrapod, which encodes it
+// in a shape. This bound makes no assumption about how z is encoded: it asks how much the IMAGE
+// changes per nanometre of defocus, which is the only thing any fitter can use. It is also the
+// yardstick a real fitter should be held against — no estimator beats it — and the standard way
+// the engineered-PSF literature compares mask designs.
+//
+// The Fisher matrix is the same 5-parameter one a PSF-model fit would build, [x,y,N,bg,z], so
+// nuisance parameters are marginalised rather than assumed known (fixing N and bg would quote a
+// precision nobody can achieve). Derivatives come from central differences: laterally on the
+// camera-pixel grid, axially between neighbouring z planes — so the z bound is only as good as
+// the kernel's own z step, and the two outermost planes have none.
+function psfZCramerRao(slices, nx, ny, oversample, focusIndex, zStepNm, cameraPxNm, photons, bgPerPx){
+  const bw=Math.floor(nx/oversample), bh=Math.floor(ny/oversample);
+  if(bw<5||bh<5||slices.length<3) return null;
+  const binned=slices.map(s=>{                       // camera-pixel PSF per plane, mass-normalised
+    const img=new Float64Array(bw*bh);
+    for(let y=0;y<bh*oversample;y++){ const row=y*nx, orow=((y/oversample)|0)*bw;
+      for(let x=0;x<bw*oversample;x++) img[orow+((x/oversample)|0)]+=s[row+x]; }
+    let sum=0; for(const v of img) sum+=v;
+    if(sum>0) for(let i=0;i<img.length;i++) img[i]/=sum;
+    return img;
+  });
+  const N=Math.max(1,photons), bg=Math.max(1e-6,bgPerPx), out=[];
+  for(let k=1;k<binned.length-1;k++){
+    const p=binned[k], pz=binned[k+1], pm=binned[k-1];
+    const F=[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]];
+    for(let y=1;y<bh-1;y++) for(let x=1;x<bw-1;x++){
+      const i=y*bw+x, mu=N*p[i]+bg;
+      if(!(mu>0)) continue;
+      // d/dx of the MODEL is -N*dp/dx: moving the emitter right moves the pattern right.
+      const du=[ -N*(p[i+1]-p[i-1])/2, -N*(p[i+bw]-p[i-bw])/2, p[i], 1, N*(pz[i]-pm[i])/(2*zStepNm) ];
+      for(let a=0;a<5;a++) for(let b=a;b<5;b++){ const v=du[a]*du[b]/mu; F[a][b]+=v; if(b!==a) F[b][a]+=v; }
+    }
+    const ex=solveLin(F,[1,0,0,0,0]), ey=solveLin(F,[0,1,0,0,0]), ez=solveLin(F,[0,0,0,0,1]);
+    out.push({ z:(k-focusIndex)*zStepNm,
+               x: ex&&ex[0]>0 ? Math.sqrt(ex[0])*cameraPxNm : NaN,
+               y: ey&&ey[1]>0 ? Math.sqrt(ey[1])*cameraPxNm : NaN,
+               zSig: ez&&ez[4]>0 ? Math.sqrt(ez[4]) : NaN });
+  }
+  return out.length ? out : null;
 }
 let _psfKernelCacheKey=null, _psfKernelCache=null;
 async function getOrBuildPsfKernelStack(cfg){
@@ -9514,6 +9670,7 @@ const PSF_WORKER_PRELUDE="const PSF_N_RHO="+PSF_N_RHO+", PSF_N_PHI="+PSF_N_PHI+"
 function psfWorkerSource(){
   const body=[
     psfIndexToNM.toString(), psfBinomial.toString(), psfZernikeRadial.toString(), psfZernikeValue.toString(),
+    laguerreL.toString(), pupilMaskPhase.toString(),
     computePsfPupilForZPlane.toString(), computePsfIntensityPlane.toString(),
     fft1d.toString(), psfCzt1d.toString(), computePsfPupilCartesianForZPlane.toString(), computePsfIntensityPlaneFFT.toString(),
     `onmessage=function(e){
@@ -14789,6 +14946,13 @@ $('liveStreamScrubNum').addEventListener('change', e=>{ if(!liveStreamState) ret
   f.addEventListener('change', sync); sync();
 })();
 
+// The double-helix sub-rows: only with the Zernike model AND that mask selected.
+(function(){
+  const sync=()=>{ const on = $('simulation_psfModel').value==='zernike' && $('simulation_psfMaskType').value==='doubleHelix';
+    for(const id of ['psfMaskModesRow','psfMaskWaistRow']) $(id).style.display = on ? '' : 'none'; };
+  $('simulation_psfMaskType').addEventListener('change', sync);
+  $('simulation_psfModel').addEventListener('change', sync); sync();
+})();
 // The beam-width field only means something once a profile is selected.
 (function(){
   const sel=$('simulation_illumProfile');
@@ -15382,7 +15546,7 @@ updateMethodUI();
 
 // Simulation PSF model rows (simBox) — same "one selector, a list of rows toggled together"
 // pattern as updateMethodUI() above, just for the Zernike-only fields.
-const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfEvalMethodRow','psfInterpRow','psfPreviewBtnRow','genCalBtnRow'];
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfMaskTypeRow','psfEvalMethodRow','psfInterpRow','psfPreviewBtnRow','genCalBtnRow'];
 function updatePsfModelUI(){
   const on = paramValue('simulation_psfModel')==='zernike';
   for(const id of PSF_ZERNIKE_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
@@ -16339,7 +16503,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.1-dev · build 2026-09-20d — Two more things Score vs truth reports.
+log(`webSMLM v0.12.1-dev · build 2026-09-20e — Engineered PSFs, and a yardstick for them.
+The Zernike basis now runs to 28 terms (n≤6), with three presets that trade focal precision for
+depth range, and a double-helix phase MASK built the real way — a superposition of
+Gauss-Laguerre modes — whose two lobes rotate 60° over ±800 nm, so z is read from an angle.
+Every PSF build now also reports its Cramér-Rao bound on x, y and z: what the PSF can tell you
+about depth regardless of HOW z is encoded, which the old width-ratio measure cannot say for a
+double helix. No fitter can beat it, so it is the number to judge one against.
+— and from build 2026-09-20d: Two more things Score vs truth reports.
 Per molecule: what fraction of molecules were found at least once, how many times each, and how
 far off the AVERAGE of those localizations lands — the gain a user gets from repeat blinks,
 which a per-frame median cannot show. Effective z range: the widest depth span where recall

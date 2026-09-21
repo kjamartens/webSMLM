@@ -2140,21 +2140,19 @@ its own depth-induced focal shift (a real Gibson-Lanni effect: imaging deeper in
 sample through a higher-index immersion medium moves the true focal plane away from the
 microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
 step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
-nominal focus offset by the depth. <b>PSF evaluation method</b> chooses how the pupil phase is
-turned into an intensity image: <code>FFT / chirp-Z</code> (default) is a mathematically exact
-reformulation (Bluestein's algorithm computes the pupil integral via 3 FFTs) on a Cartesian grid,
-measured 76x-970x faster than <code>Direct quadrature</code>, the original polar-grid sum.
-<b>Use FFT / chirp-Z</b>: Direct samples the pupil at only 40 angles, which is valid out to about
-1.6 µm from the PSF centre at 660 nm; on the default 6 µm kernel it puts ~17% of the light into
-spurious energy at the kernel rim (an Airy disk has 0.16% there, FFT 0.17%), so every simulated
-emitter comes out ~17-20% too dim in its core. A warning is logged when Direct is used on a
-kernel wider than its valid radius. <b>Preview PSF</b> builds this (cached,
+nominal focus offset by the depth. The pupil phase is turned into an intensity image with a
+chirp-Z transform (Bluestein's algorithm: the exact pupil integral via 3 FFTs, on a Cartesian
+pupil grid), which matches an ideal Airy disk out to the edge of the kernel. An earlier, slower
+<i>Direct quadrature</i> evaluator was removed: it sampled the pupil at only 40 angles, was valid
+only within ~1.6 µm of the PSF centre, and on the default 6 µm kernel put ~17% of the light into
+spurious energy at the kernel rim, dimming every simulated emitter by ~17-20%. A settings file
+that still names a <code>simulation_psfEvalMethod</code> loads fine; the key is ignored.
+<b>Preview PSF</b> builds this (cached,
 oversampled) kernel and shows it as a z-scrollable slice in the raw panel; with <b>PSF model</b> set
 to Zernike-aberrated, "Simulate movie" splats every emitter from this same kernel.</p>
 <p>With <b>Use GPU acceleration</b> checked (Memory &amp; streaming), the per-frame splat and
 camera noise of "Simulate movie" and "Simulate calib. stack" run on the GPU (4-17x faster than the
-CPU workers on an integrated laptop GPU), as does a <code>Direct quadrature</code> PSF build. The
-GPU draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on
+CPU workers on an integrated laptop GPU). The GPU draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on
 either (up to float rounding). FFT phase-shift placement and the Gaussian PSF model always run on
 the CPU.</p>
 <!-- /HINT:simulation-psf -->
@@ -2732,10 +2730,9 @@ candidates near an MLE fitter's own accept/reject boundary can differ
 slightly (Phasor has no such boundary — it never rejects a candidate, on
 either path).
 
-The simulator has GPU paths too, taken whenever `useGpu` is on: the
-splat + camera-noise stage of Simulate movie and Simulate calib. stack, and
-the `direct` PSF build (which stays the less accurate evaluator on wide
-kernels — see the PSF evaluation method note in §2). Camera noise is drawn from a
+The simulator has a GPU path too, taken whenever `useGpu` is on: the
+splat + camera-noise stage of Simulate movie and Simulate calib. stack.
+Camera noise is drawn from a
 counter-based generator (pcg4d, addressed by seed, frame, pixel and draw
 count) that the CPU and the GPU compute identically, so a seeded movie is
 reproducible on either path and the two agree to float rounding: on 100% of

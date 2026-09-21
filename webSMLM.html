@@ -17,11 +17,11 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21d; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21e; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          3784   PARAMS registry, single source of truth for params;
+    params          3774   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMemoryConstrainedDevice() (worker-pool size cap +
                            MOBILE_MEM_DEFAULTS, a stricter memBudgetGB/memgb/
@@ -49,7 +49,7 @@
                            own blank-line separator — otherwise a command and
                            its own first result line print with a spurious
                            blank line between them
-    in/out          5218   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
+    in/out          5199   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Budget raw movies (memgb);
                            tiffScaleHint()'s pixel-size branch now sanity-
@@ -62,7 +62,7 @@
                            frame-interval estimate (MM_HINT_SAMPLE=25 evenly
                            -spaced frames, not every one) — wired alongside
                            tiffScaleHint() at all 3 load call sites
-    simulation      5517   synthetic stack generator ("Simulate movie");
+    simulation      5498   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -111,13 +111,12 @@
                            when available, falling back to
                            buildPsfPlanesSerial() otherwise (~5x measured
                            speedup at default settings, 8-core test machine);
-                           simulation_psfEvalMethod's opt-in 'fft' path
+                           the PSF is evaluated by chirp-Z only
                            (computePsfPupilCartesianForZPlane()/
                            computePsfIntensityPlaneFFT()/psfCzt1d(), a
-                           Bluestein chirp-Z transform reusing fft1d() from
-                           MODULE: locprecision) is a mathematically-exact
-                           reformulation measured 76x-970x faster than the
-                           default 'direct' path, kernel-size dependent;
+                           Bluestein transform reusing fft1d() from MODULE:
+                           locprecision) — the old 'direct' polar
+                           quadrature was removed (aliased on wide kernels);
                            simulation_seed (0=random, default) seeds every
                            random draw in generateSynthetic() via
                            mulberry32() (gauss()/poisson() now take an
@@ -137,17 +136,17 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      8442   score localizations against the simulator's own
+    validation      8319   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z; controls
                            live in their own sidebar section (validationBox),
                            popup hint-validation
-    detect          9070   per-frame band-pass + local-maxima detection
+    detect          8947   per-frame band-pass + local-maxima detection
                            (detectSpots() and its three filters) — CPU only; a
                            WebGPU port was tried and REMOVED (measured 2x slower
                            than the worker pool), see MODULE: gpu
-    fit             9382   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    fit             9259   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -177,7 +176,7 @@
                            every fit dispatch site incl. the GPU result loop;
                            mergeNearbyMaxima() (detection_mergeRadius, MODULE:
                            detect) reaches every Localize detect site
-    render          10205  accumulate to offscreen buffer; view/colour/blur;
+    render          10082  accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -216,13 +215,13 @@
                            print their own line, several back-to-back in the
                            log for no actionable reason; the final render
                            still logs it
-    workers         11999  frame-parallel detect/fit worker pool; dedicated
+    workers         11876  frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
                            fit pool — never shares it, see that code's own
                            comment for why); dedicated PSF-kernel-build
-                           worker POOL (PSF_WORKER_PRELUDE/psfWorkerSource()/
+                           worker POOL (psfWorkerSource()/
                            getPsfWorkerPool(), a third separate worker
                            family, pool-shaped like the detect/fit pool since
                            z-planes are independent batchable work); dedicated
@@ -241,7 +240,7 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    gpu             12678  shared WebGPU compute engine (experimental,
+    gpu             12539  shared WebGPU compute engine (experimental,
                            opt-in via "Use GPU acceleration"); covers fit (all
                            4 MLE methods plus phasor/phasor3d — the one
                            non-iterative kernel, a closed-form Fourier
@@ -288,11 +287,10 @@
                            Simulation too: simulateFramesGpu()/
                            simulateCalibFramesGpu()/gpuSimFrames() (fused
                            splat + counter-based camera noise,
-                           WGSL_SIM_FRAMES/WGSL_SIM_NOISE_FNS) and
-                           buildPsfPlanesGpu() ('direct' PSF, WGSL_PSF_DIRECT),
-                           taken whenever useGpu is on (no size threshold).
-    export          15508  ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  15860  astigmatic sigma_x/sigma_y vs z bead curves;
+                           WGSL_SIM_FRAMES/WGSL_SIM_NOISE_FNS), taken
+                           whenever useGpu is on (no size threshold).
+    export          15271  ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  15623  astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
@@ -303,7 +301,7 @@
                            parity-strict (step-by-2), never cached in
                            _projCache (that cache is the whole-stack average
                            locateBeadsForCalib() reuses)
-    drift           16342  AIM drift correction (2D+z); drift-vs-frame or
+    drift           16105  AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -327,9 +325,9 @@
                            settings hidden while correlation is selected;
                            smFRET's own new "Apply drift correction?" is a
                            thin caller over whichever method is configured
-    locprecision    17274  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    17037  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           18248  spectrally resolved SMLM pair-finding; renamed
+    sSMLM           18011  spectrally resolved SMLM pair-finding; renamed
                            "Pairing (sSMLM & FRET)"; merged Show
                            histograms (sSmlmHistBtn/sSmlmHistModeBtn); Pair
                            & plot sSMLM/Unpair share a row (Fit dist. &
@@ -539,7 +537,7 @@
                            "E/S histogram" title (button stays the
                            exception); getSmfretTimeTraces() now refreshes
                            an already-showing E/S histogram too
-    spt             22009  single particle tracking, trackpy-inspired;
+    spt             21772  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -570,7 +568,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        23548  top-level orchestration, *Core()/wrapper split;
+    pipeline        23311  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; run() also
@@ -660,7 +658,7 @@
                            never have fit results back in time; the ring lets
                            the preview fall back to the newest frame that IS
                            ready instead
-    liveStreaming   25127  Micro-Manager/pycromanager camera bridge
+    liveStreaming   24890  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -714,14 +712,14 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           28438  localizations table, filtering, histograms;
+    table           28206  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms);
                            tempClusteringMemory (gap-frame tolerance, incl.
                            unlimited/"inf") in clusterEvents(); tableFiltersCore()
                            (config.tableFilters) replays a whole committed-filter
                            session (typed clauses/crop/clustering) headlessly —
                            every commitFilter()/crop logCmd()s the full array
-    headless API    29193  window.webSMLM.analyze()/analyzeBatch();
+    headless API    28961  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2804,7 +2802,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21d</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21e</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3304,12 +3302,6 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="psfMaskModesRow" style="display:none;padding-left:40px" title="How many Gauss-Laguerre modes make up the mask. More modes give a cleaner two-lobe pattern over a longer depth range, at the cost of light thrown into side lobes.">Mask GL modes <input type="number" id="simulation_psfMaskModes" min="2" max="8" step="1" value="5" class="num"></label>
           <label class="row" id="psfMaskWaistRow" style="display:none;padding-left:40px" title="Beam waist of those modes, in pupil radii: how much of the pupil the mask pattern fills.">Mask beam waist <input type="number" id="simulation_psfMaskWaist" min="0.2" max="2" step="0.05" value="1.0" class="num"></label>
           <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 or 28 comma-separated values, one per Zernike index (n<=4 or n<=6), in milliwaves (1000 = one full wave). Leave blank to use the preset above.">Custom Zernike (mWave, 15/28 values) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = use preset" style="width:150px"></label>
-          <label class="row" id="psfEvalMethodRow" style="display:none" title="FFT / chirp-Z (default) is a mathematically exact reformulation, 76x-970x faster, and matches an Airy disk out to the kernel edge. Direct quadrature samples the pupil at only 40 angles and is valid out to ~1.6 µm from the PSF centre; on the default 6 µm kernel it puts ~17% of the light into spurious energy at the rim, dimming every emitter by ~17-20% (a warning is logged). Keep FFT unless the kernel is narrower than ~2.2 µm.">PSF evaluation method
-            <select id="simulation_psfEvalMethod" class="sel">
-              <option value="direct">Direct quadrature</option>
-              <option value="fft" selected>FFT / chirp-Z (faster)</option>
-            </select>
-          </label>
           <label class="row" id="psfInterpRow" style="display:none" title="How an emitter's exact sub-pixel position is sampled from the oversampled kernel before box-downsampling it to the camera pixel grid. Nearest is cheapest/coarsest; linear (bilinear) is a fast middle ground; cubic (bicubic) is the default, matching SMLM-tooling practice; FFT phase-shift is a mathematically-exact Fourier-shift-theorem placement kept opt-in for comparison — much slower, and prone to periodic-boundary ringing on a non-periodic kernel tile.">PSF placement interpolation
             <select id="simulation_psfInterp" class="sel">
               <option value="nearest">Nearest</option>
@@ -3341,21 +3333,19 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           sample through a higher-index immersion medium moves the true focal plane away from the
           microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
           step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
-          nominal focus offset by the depth. <b>PSF evaluation method</b> chooses how the pupil phase is
-          turned into an intensity image: <code>FFT / chirp-Z</code> (default) is a mathematically exact
-          reformulation (Bluestein's algorithm computes the pupil integral via 3 FFTs) on a Cartesian grid,
-          measured 76x-970x faster than <code>Direct quadrature</code>, the original polar-grid sum.
-          <b>Use FFT / chirp-Z</b>: Direct samples the pupil at only 40 angles, which is valid out to about
-          1.6 µm from the PSF centre at 660 nm; on the default 6 µm kernel it puts ~17% of the light into
-          spurious energy at the kernel rim (an Airy disk has 0.16% there, FFT 0.17%), so every simulated
-          emitter comes out ~17-20% too dim in its core. A warning is logged when Direct is used on a
-          kernel wider than its valid radius. <b>Preview PSF</b> builds this (cached,
+          nominal focus offset by the depth. The pupil phase is turned into an intensity image with a
+          chirp-Z transform (Bluestein's algorithm: the exact pupil integral via 3 FFTs, on a Cartesian
+          pupil grid), which matches an ideal Airy disk out to the edge of the kernel. An earlier, slower
+          <i>Direct quadrature</i> evaluator was removed: it sampled the pupil at only 40 angles, was valid
+          only within ~1.6 µm of the PSF centre, and on the default 6 µm kernel put ~17% of the light into
+          spurious energy at the kernel rim, dimming every simulated emitter by ~17-20%. A settings file
+          that still names a <code>simulation_psfEvalMethod</code> loads fine; the key is ignored.
+          <b>Preview PSF</b> builds this (cached,
           oversampled) kernel and shows it as a z-scrollable slice in the raw panel; with <b>PSF model</b> set
           to Zernike-aberrated, "Simulate movie" splats every emitter from this same kernel.</p>
           <p>With <b>Use GPU acceleration</b> checked (Memory &amp; streaming), the per-frame splat and
           camera noise of "Simulate movie" and "Simulate calib. stack" run on the GPU (4-17x faster than the
-          CPU workers on an integrated laptop GPU), as does a <code>Direct quadrature</code> PSF build. The
-          GPU draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on
+          CPU workers on an integrated laptop GPU). The GPU draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on
           either (up to float rounding). FFT phase-shift placement and the Gaussian PSF model always run on
           the CPU.</p>
         </div>
@@ -4559,15 +4549,6 @@ const PARAMS = {
   // deliberately narrow subset of the full 15-coefficient OSA basis; see that constant's own
   // comment for the "order-of-magnitude, not paper-sourced" caveat these presets carry.
   simulation_psfZernikePreset: { type:'enum', id:'simulation_psfZernikePreset', label:'Zernike aberration preset', options:['none','astigWeak','astigModerate','astigStrong','comaWeak','comaStrong','sphericalWeak','sphericalStrong','trefoilModerate','mixedRealistic','saddlePoint','extendedRange','extendedRangeStrong'], default:'astigModerate' },
-  // simulation_psfEvalMethod = which numerical evaluator turns the pupil phase into an intensity
-  // plane — 'direct' is the original polar-quadrature sum; 'fft' (default) is the mathematically-
-  // EXACT chirp-Z reformulation (computePsfIntensityPlaneFFT(), 2-3 orders of magnitude faster per
-  // docs/VECTORIAL_PSF_SIMULATION.md's own cited literature — measured 76x-970x depending on
-  // kernel size in this codebase's own dev testing) — converges to the same PSF as grid resolution
-  // increases (verified), not identical bit-for-bit to 'direct'. Made the default once field use
-  // (including the is3d full z-stack build above, nz times the per-plane cost of the old 2D-only
-  // single-plane path) made that speedup matter for everyday use, not just large sweeps.
-  simulation_psfEvalMethod: { type:'enum', id:'simulation_psfEvalMethod', label:'PSF evaluation method', options:['direct','fft'], default:'fft' },
   // simulation_psfInterp = how splatZernikeEmitter() samples the oversampled kernel at an
   // emitter's exact sub-pixel position before box-averaging it down to the camera pixel grid (see
   // MODULE: simulation's own "oversample once, downsample everywhere" comment) — 'nearest' (cheap
@@ -6570,7 +6551,6 @@ async function generateCalibrationStack(){
    (compare two perpendicular radii, or just look at "Preview PSF" with the
    'none' preset).
    --------------------------------------------------------------------------- */
-const PSF_N_RHO=20, PSF_N_PHI=40;   // fixed pupil-quadrature resolution, not user-configurable — see docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5
 // OSA/ANSI single-index Zernike convention: j = n(n+1)/2 + l, l in [0,n], m = -n+2l.
 function psfIndexToNM(j){
   for(let n=0; ; n++) for(let l=0; l<=n; l++) if(n*(n+1)/2+l===j) return [n, -n+2*l];
@@ -6676,118 +6656,34 @@ function pupilMaskPhase(maskType, rhoNorm, phi, nModes, waist){
   }
   return (re===0&&im===0) ? 0 : Math.atan2(im,re);
 }
-// Per-Z-plane pupil precompute: Gibson-Lanni sample/immersion-index OPD (kept in full, not
-// simplified to a bare defocus term — models a real coverslip/medium-mismatch aberration
-// source) plus the Zernike phase, on a polar (rho,phi) quadrature grid.
-function computePsfPupilForZPlane(z, nz, params){
-  const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs, maskType, maskModes, maskWaist} = params;
-  // Depth-induced "focal shift": expanding opd1/opd3 below to 2nd order in rho shows the
-  // rho^2 (defocus-shaped) term vanishes — i.e. the emitter is actually IN FOCUS — at
-  // ti = ti0 - particleAxialPosition*(ni/ns), not at ti0 itself (a real, textbook Gibson-Lanni
-  // effect: imaging deeper into a lower-index sample through a higher-index immersion medium
-  // shifts the true focal plane away from the microscope's own nominal working distance).
-  // Centering the z-sweep on that shifted plane (subtracting it here) rather than on bare ti0
-  // is what makes "z range ± nm"/"z step" probe symmetrically AROUND the emitter, matching what
-  // a user actually does at the microscope (refocus on the emitter, then scan around that) —
-  // without this, a real, reported bug: at particleAxialPosition=500nm (ns=1.33, ni=1.518) the
-  // emitter's own sharpest plane sits ~571nm away from the sweep's center, so a ±500nm sweep
-  // never actually reaches it at all, and the visible-in-range PSF only gets sharper toward one
-  // edge instead of peaking in the middle. Verified via a standalone Node harness
-  // (computePsfIntensityPlane's own peak-intensity plane index) before/after this fix.
-  const focalShift = particleAxialPosition*(ni/ns);
-  const ti = (ti0-focalShift) + zStep*(z-(nz-1)/2);
-  const k0 = 2*Math.PI/lambda;
-  const bMax = Math.min(1, ns/NA);
-  const dRho = bMax/PSF_N_RHO, dPhi = 2*Math.PI/PSF_N_PHI;
-  const cosPhiAt=new Float64Array(PSF_N_PHI), sinPhiAt=new Float64Array(PSF_N_PHI);
-  for(let ip=0; ip<PSF_N_PHI; ip++){ const phi=(ip+0.5)*dPhi; cosPhiAt[ip]=Math.cos(phi); sinPhiAt[ip]=Math.sin(phi); }
-  const krAt=new Float64Array(PSF_N_RHO);
-  const pupilRe=new Float64Array(PSF_N_RHO*PSF_N_PHI), pupilIm=new Float64Array(PSF_N_RHO*PSF_N_PHI);
-  for(let ir=0; ir<PSF_N_RHO; ir++){
-    const rho=(ir+0.5)*dRho;
-    krAt[ir]=k0*NA*rho;
-    const s1=NA*rho/ns, s3=NA*rho/ni;
-    const opd1=ns*particleAxialPosition*Math.sqrt(Math.max(0,1-s1*s1));
-    const opd3=ni*(ti-ti0)*Math.sqrt(Math.max(0,1-s3*s3));
-    const gibsonLanniPhase=k0*(opd1+opd3);
-    const rowBase=ir*PSF_N_PHI;
-    for(let ip=0; ip<PSF_N_PHI; ip++){
-      const phi=(ip+0.5)*dPhi;
-      let zernikePhase=0;
-      for(let j=0;j<zernikeCoeffs.length;j++){ const c=zernikeCoeffs[j]; if(c!==0) zernikePhase+=c*psfZernikeValue(j, rho/bMax, phi); }
-      zernikePhase*=2*Math.PI;
-      const phase=gibsonLanniPhase+zernikePhase+pupilMaskPhase(maskType, rho/bMax, phi, maskModes, maskWaist);
-      pupilRe[rowBase+ip]=rho*Math.cos(phase);
-      pupilIm[rowBase+ip]=rho*Math.sin(phase);
-    }
-  }
-  return {pupilRe, pupilIm, krAt, cosPhiAt, sinPhiAt};
-}
-// Pupil -> image-plane intensity via direct 2D quadrature (no FFT — see
-// docs/VECTORIAL_PSF_SIMULATION.md for why an FFT-shift approach was NOT chosen).
-function computePsfIntensityPlane(nx, ny, resLateralM, pupil){
-  const {pupilRe, pupilIm, krAt, cosPhiAt, sinPhiAt} = pupil;
-  const x0=(nx-1)/2, y0=(ny-1)/2;
-  const slice=new Float64Array(nx*ny);
-  for(let y=0;y<ny;y++){
-    const dyM=(y-y0)*resLateralM, rowOut=nx*y;
-    for(let x=0;x<nx;x++){
-      const dxM=(x-x0)*resLateralM;
-      let sumRe=0, sumIm=0;
-      for(let ir=0; ir<PSF_N_RHO; ir++){
-        const kr=krAt[ir], rowBase=ir*PSF_N_PHI;
-        for(let ip=0; ip<PSF_N_PHI; ip++){
-          const sp=kr*(dxM*cosPhiAt[ip]+dyM*sinPhiAt[ip]);
-          const cosSp=Math.cos(sp), sinSp=Math.sin(sp);
-          const pr=pupilRe[rowBase+ip], pi=pupilIm[rowBase+ip];
-          sumRe+=pr*cosSp-pi*sinSp; sumIm+=pr*sinSp+pi*cosSp;
-        }
-      }
-      slice[rowOut+x]=sumRe*sumRe+sumIm*sumIm;
-    }
-  }
-  return slice;
-}
 
 /* ---------------------------------------------------------------------------
-   FFT/chirp-Z evaluation path — an alternative, OPT-IN evaluator for the same
-   physics as computePsfPupilForZPlane()/computePsfIntensityPlane() above,
-   selected via simulation_psfEvalMethod ('direct', the default/unchanged
-   path, vs 'fft'). Per docs/VECTORIAL_PSF_SIMULATION.md/
-   VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md's own citation (Sedukhin 2024):
-   reformulating the diffraction integral as a Fourier transform of the pupil
-   function and evaluating it via FFT is 2-3 orders of magnitude faster than
-   the direct quadrature above, for a mathematically EXACT reformulation, not
-   an approximation trading accuracy for speed.
+   PSF evaluation: pupil -> image-plane intensity via the chirp-Z transform. Per
+   docs/VECTORIAL_PSF_SIMULATION.md / VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md's own citation
+   (Sedukhin 2024): reformulating the diffraction integral as a Fourier transform of the pupil
+   function and evaluating it via FFT is exact, not an approximation, and 2-3 orders of
+   magnitude faster than a direct quadrature.
 
-   Why a SEPARATE pupil grid is needed: the direct path's pupil lives on a
-   POLAR (rho,phi) grid, and its phase term kr*(dxM*cosPhi+dyM*sinPhi) mixes
-   the radial and angular indices together — there is no way to FFT that
-   directly, since a 2D FFT is only separable over a CARTESIAN (kx,ky) grid.
-   This mirrors a real gotcha already flagged in
-   docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §2: EPFL psf_generator's own
-   "spherical" propagator (polar-like) can't do this either — only its
-   CARTESIAN propagator is FFT-amenable. computePsfPupilCartesianForZPlane()
-   below evaluates the SAME Gibson-Lanni + Zernike phase model
-   (computePsfPupilForZPlane()'s own physics, including the depth-focal-shift
-   fix) but on a Cartesian (kx,ky) grid instead — kept as a genuinely
-   separate function (not a refactor of the polar one) so the direct path,
-   the presumed-correct reference every regression check compares against,
-   is never put at risk by this addition.
+   The pupil lives on a CARTESIAN (kx,ky) grid because a 2D FFT is only separable there (EPFL
+   psf_generator's "spherical" propagator can't be FFT'd either — only its Cartesian one).
 
-   PSF_FFT_M (64) is the Cartesian pupil grid's own fixed resolution — like
-   PSF_N_RHO/PSF_N_PHI, not user-configurable. Chosen from a convergence
-   sweep (standalone Node harness, not checked in): the FFT path's output
-   shape converges toward the direct path's own output as M grows (0.88%
-   RMS relative difference at M=16, down to 0.18% at M=96); 64 sits past the
-   point of real returns (0.25% at 64 vs 0.18% at 96) while keeping the
-   per-plane cost low. The residual few-tenths-of-a-percent gap at M=64
-   reflects the two paths using genuinely different quadrature schemes for
-   the same continuous integral (polar vs Cartesian grids), not a bug in
-   either — both were checked to reduce to an EXACT, floating-point-identical
-   radially symmetric PSF (x-axis vs y-axis intensity, at every radius
-   tested) in the zero-Zernike case, and to agree on the depth-focal-shift-
-   corrected best-focus plane exactly.
+   There used to be a second evaluator, 'direct' polar quadrature (PSF_N_RHO=20 x PSF_N_PHI=40
+   samples), and it was REMOVED in build 2026-09-21e because it was wrong on the kernels this
+   simulator uses. 40 angles resolve exp(i k r cos phi) only while k*NA_eff*r stays below ~20,
+   i.e. out to ~1.6 um at 660 nm / NA_eff 1.33; past that the sum aliases. On the default 6 um
+   kernel it put 17% of the light beyond 3 um (the square's corners), against 0.17% here and
+   0.157% for an exact Airy disk on the same grid (beyond 1 um: 20% vs 3.44% vs 3.39%) — so
+   every emitter's core came out ~17-20% dim after normalization. The cores agreed (FWHM
+   255.6 vs 255.7 nm, Airy 255.1). The ~0.25% agreement quoted for years had been measured on a
+   1.6 um kernel, inside its valid radius. Don't bring a polar quadrature back without an
+   angular sample count that grows with the kernel radius (~128 at 6 um).
+
+   PSF_FFT_M (64) is the Cartesian pupil grid's fixed resolution. Chosen from a convergence
+   sweep (standalone Node harness, not checked in): 0.88% RMS relative change at M=16, 0.25% at
+   64, 0.18% at 96 — 64 sits past the point of real returns. Checked to reduce to an exactly
+   radially symmetric PSF in the zero-Zernike case, and (2026-09-21) against the Airy disk:
+   first zero and FWHM within 0.5%, and the tail to the kernel edge (tests/gpu/test-sim-gpu.mjs
+   keeps that tail pinned).
    --------------------------------------------------------------------------- */
 const PSF_FFT_M=64;
 // Chirp-Z transform (Bluestein's algorithm): computes, for M uniformly-spaced complex input
@@ -6829,16 +6725,24 @@ function psfCzt1d(inRe, inIm, M, dk, k0, P, dx, x0){
   }
   return {re:outRe, im:outIm};
 }
-// Same physics as computePsfPupilForZPlane() (including its depth-focal-shift fix), evaluated on
-// a Cartesian (kx,ky) grid instead of polar (rho,phi) — see this section's own banner comment for
-// why a Cartesian grid is required for the FFT/CZT path. M is the grid's own side length
+// Per-Z-plane pupil: Gibson-Lanni sample/immersion-index OPD (kept in full, not simplified to a
+// bare defocus term — models a real coverslip/medium-mismatch aberration source) plus the Zernike
+// phase and the optional phase mask, on a Cartesian (kx,ky) grid. M is the grid's own side length
 // (PSF_FFT_M), dk its k-space sample spacing; the caller (buildPsfKernelStack()) derives dk from
 // the pupil's physical radius (k0*NA*bMax) with a small margin, so the disk fits inside the M×M
-// square. No `rho*` amplitude weighting the way the polar path has — there, rho was the polar
-// integration measure (dA=rho·dRho·dPhi, shrinking toward the center); a Cartesian grid's own
-// cell area (dkx·dky) is uniform everywhere, so no such position-dependent weighting applies.
+// square. The grid's cell area (dkx·dky) is uniform, so no position-dependent amplitude weight.
 function computePsfPupilCartesianForZPlane(z, nz, params, M, dk){
   const {NA, lambda, ns, ni, ti0, particleAxialPosition, zStep, zernikeCoeffs, maskType, maskModes, maskWaist} = params;
+  // Depth-induced "focal shift": expanding the two OPD terms to 2nd order in rho shows the
+  // rho^2 (defocus-shaped) term vanishes — i.e. the emitter is actually IN FOCUS — at
+  // ti = ti0 - particleAxialPosition*(ni/ns), not at ti0 itself (a real, textbook Gibson-Lanni
+  // effect: imaging deeper into a lower-index sample through a higher-index immersion medium
+  // shifts the true focal plane away from the microscope's own nominal working distance).
+  // Centering the z-sweep on that shifted plane rather than on bare ti0 is what makes
+  // "z range ± nm"/"z step" probe symmetrically AROUND the emitter, matching what a user does at
+  // the microscope (refocus on the emitter, then scan around it) — without it, a real, reported
+  // bug: at particleAxialPosition=500nm (ns=1.33, ni=1.518) the emitter's sharpest plane sat
+  // ~571nm from the sweep's centre, so a ±500nm sweep never reached it at all.
   const focalShift = particleAxialPosition*(ni/ns);
   const ti = (ti0-focalShift) + zStep*(z-(nz-1)/2);
   const k0 = 2*Math.PI/lambda;
@@ -6868,9 +6772,8 @@ function computePsfPupilCartesianForZPlane(z, nz, params, M, dk){
 // psfCzt1d() pass over ky for each of the M rows (kx fixed) producing an M×ny intermediate, then
 // one psfCzt1d() pass over kx for each of the ny columns producing the final nx×ny field — valid
 // because the transform's phase exp(i*(kx*x+ky*y)) factors exactly as exp(i*kx*x)*exp(i*ky*y).
-// Same x0/y0 pixel-center convention as computePsfIntensityPlane() ((nx-1)/2, so index x's
-// physical coordinate is (x-(nx-1)/2)*resLateralM), so the two paths' output grids line up
-// exactly for comparison/regression purposes.
+// Pixel centres: index x's physical coordinate is (x-(nx-1)/2)*resLateralM, the same centring
+// splatZernikeEmitter() assumes (kcx=(nx-1)/2).
 function computePsfIntensityPlaneFFT(nx, ny, resLateralM, cart, M, dk){
   const kMin=-Math.floor(M/2)*dk;
   const x0=-((nx-1)/2)*resLateralM, y0=-((ny-1)/2)*resLateralM;
@@ -6928,31 +6831,23 @@ function readPsfConfigFromUI(){
   } else {
     zernikeCoeffs=PSF_ZERNIKE_PRESETS[paramValue('simulation_psfZernikePreset')].slice(); zernikeSource='preset';
   }
-  const evalMethod=paramValue('simulation_psfEvalMethod');
   const cfg = { NA, lambda, ns, ni, ti0, particleAxialPosition, zStep:zStepNm*1e-9, nz,
                 resLateralM:resLateralNm*1e-9, halfWidthPx, oversample, cameraPxNm, kernelWidthNm,
-                zernikeCoeffs, zernikeSource, evalMethod,
+                zernikeCoeffs, zernikeSource,
                 maskType:paramValue('simulation_psfMaskType'), maskModes:paramValue('simulation_psfMaskModes'),
                 maskWaist:paramValue('simulation_psfMaskWaist') };
-  if(evalMethod==='fft') cfg.fftDk=psfFftDkForCfg(cfg);   // Cartesian grid's own k-space spacing — see psfFftDkForCfg()
+  cfg.fftDk=psfFftDkForCfg(cfg);   // Cartesian grid's own k-space spacing — see psfFftDkForCfg()
   return cfg;
 }
 // Serial fallback — the original main-thread loop, used whenever the dedicated PSF worker pool
 // (getPsfWorkerPool(), below) isn't available. Still yields periodically on a time budget exactly
 // like generateSynthetic()'s own frame loop does, so the UI stays responsive either way.
 async function buildPsfPlanesSerial(cfg, nx, ny){
-  const useFFT=cfg.evalMethod==='fft';
   const slices=new Array(cfg.nz);
   let globalMax=0, lastYield=performance.now();
   for(let z=0; z<cfg.nz; z++){
-    let slice;
-    if(useFFT){
-      const cart=computePsfPupilCartesianForZPlane(z, cfg.nz, cfg, PSF_FFT_M, cfg.fftDk);
-      slice=computePsfIntensityPlaneFFT(nx, ny, cfg.resLateralM, cart, PSF_FFT_M, cfg.fftDk);
-    } else {
-      const pupil=computePsfPupilForZPlane(z, cfg.nz, cfg);
-      slice=computePsfIntensityPlane(nx, ny, cfg.resLateralM, pupil);
-    }
+    const cart=computePsfPupilCartesianForZPlane(z, cfg.nz, cfg, PSF_FFT_M, cfg.fftDk);
+    const slice=computePsfIntensityPlaneFFT(nx, ny, cfg.resLateralM, cart, PSF_FFT_M, cfg.fftDk);
     let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
     if(planeMax>globalMax) globalMax=planeMax;
     slices[z]=slice;
@@ -6963,8 +6858,8 @@ async function buildPsfPlanesSerial(cfg, nx, ny){
 // Worker-parallel path: z-planes are fully independent (each rebuilt from scratch from cfg, no
 // shared state), so this is a simple "pull the next plane" queue spread across the whole pool —
 // every worker races to grab planes as fast as it finishes the last one, which load-balances
-// naturally even if per-plane cost ever stops being uniform (it currently is: same nx/ny/N_RHO/
-// N_PHI every plane). No batching/chunking needed at only ~dozens of planes — one postMessage per
+// naturally even if per-plane cost ever stops being uniform (it currently is: same nx/ny/grid
+// every plane). No batching/chunking needed at only ~dozens of planes — one postMessage per
 // plane keeps per-worker idle time low without meaningful message-passing overhead.
 async function buildPsfPlanesParallel(cfg, nx, ny, pool){
   const slices=new Array(cfg.nz);
@@ -6981,7 +6876,7 @@ async function buildPsfPlanesParallel(cfg, nx, ny, pool){
         NA:cfg.NA, lambda:cfg.lambda, ns:cfg.ns, ni:cfg.ni, ti0:cfg.ti0,
         particleAxialPosition:cfg.particleAxialPosition, zStep:cfg.zStep, zernikeCoeffs:cfg.zernikeCoeffs,
         maskType:cfg.maskType, maskModes:cfg.maskModes, maskWaist:cfg.maskWaist,
-        evalMethod:cfg.evalMethod, fftM:PSF_FFT_M, fftDk:cfg.fftDk});
+        fftM:PSF_FFT_M, fftDk:cfg.fftDk});
       if(resp.err) throw new Error(`PSF worker failed on plane ${z+1}/${cfg.nz}: ${resp.err}`);
       slices[z]=resp.slice;
       if(resp.planeMax>globalMax) globalMax=resp.planeMax;
@@ -7013,36 +6908,18 @@ async function buildPsfKernelStack(cfg){
       `kernel ${nx}×${ny}px (oversample ${cfg.oversample}×, res=${(cfg.resLateralM*1e9).toFixed(1)}nm/px), `+
       `${cfg.nz} z-planes × ${cfg.zStep*1e9}nm (focus @ plane ${focusIndex}), `+
       `Zernike[${cfg.zernikeSource}]=[${cfg.zernikeCoeffs.map(v=>v.toFixed(3)).join(',')}], `+
-      `eval=${cfg.evalMethod}${cfg.evalMethod==='fft'?` (Cartesian grid ${PSF_FFT_M}×${PSF_FFT_M}, dk=${cfg.fftDk.toExponential(3)})`:''}`+
+      `chirp-Z on a ${PSF_FFT_M}×${PSF_FFT_M} Cartesian pupil (dk=${cfg.fftDk.toExponential(3)})`+
       (pool?`, using ${pool.length} PSF worker(s)`:', running single-threaded (no worker pool available)'));
   const t0=performance.now();
-  // 'direct' can run on the GPU instead (buildPsfPlanesGpu(), MODULE: gpu); 'fft' has no kernel.
-  const psfStage=newStageTimings(), gpuDirect=cfg.evalMethod==='direct', gpuWasCold=_gpuEngine===undefined;
-  const {slices, globalMax} = await runStage('simPsf', {useGpu:simGpuWanted(), stageTimings:psfStage, onLog:log},
-    () => pool ? buildPsfPlanesParallel(cfg, nx, ny, pool) : buildPsfPlanesSerial(cfg, nx, ny),
-    gpuDirect ? async () => buildPsfPlanesGpu(await getGpuEngine(), cfg, nx, ny) : null,
-    gpuDirect ? simGpuEligibility : null);
+  const {slices, globalMax} = pool ? await buildPsfPlanesParallel(cfg, nx, ny, pool)
+                                    : await buildPsfPlanesSerial(cfg, nx, ny);
   setProg(null);
-  const totalMs=performance.now()-t0, onGpu=psfStage.simPsf.path==='gpu';
-  lastPsfBuildTimings={ms:totalMs, path:psfStage.simPsf.path, nz:cfg.nz, evalMethod:cfg.evalMethod};
+  const totalMs=performance.now()-t0;
+  lastPsfBuildTimings={ms:totalMs, nz:cfg.nz};
   log(`PSF build done: ${cfg.nz} planes in ${totalMs.toFixed(0)}ms (${(totalMs/cfg.nz).toFixed(1)}ms/plane`+
-      (onGpu?(gpuWasCold?', GPU, including its one-time start-up':', GPU'):pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
+      (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
   if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
-  if(cfg.evalMethod==='direct'){
-    // The polar quadrature samples the pupil at PSF_N_PHI angles, which resolves exp(i k r cos φ)
-    // only while k·NA_eff·r stays below ~PSF_N_PHI/2; past that radius the sum aliases. Measured at
-    // the defaults (660 nm, NA_eff 1.33, unaberrated, 6 µm kernel): 17% of the kernel's light sat
-    // beyond 3 µm (the square's corners), against 0.17% for FFT / chirp-Z and 0.157% for an exact
-    // Airy disk sampled on the same grid (3.44% / 3.39% beyond 1 µm; Direct: 20%) — so FFT is the
-    // physical one, and Direct dims every emitter's core by ~17-20% after normalization. The two
-    // agree on the core itself (FWHM 255.7 vs 255.6 nm, Airy 255.1; first zero within 1 nm).
-    const kNA=2*Math.PI/cfg.lambda*cfg.NA*Math.min(1, cfg.ns/cfg.NA);
-    const rSafeNm=PSF_N_PHI/2/kNA*1e9, rKernelNm=cfg.halfWidthPx*Math.SQRT2*cfg.resLateralM*1e9;
-    if(rKernelNm>rSafeNm)
-      log(`⚠ PSF evaluation method Direct quadrature samples the pupil at ${PSF_N_PHI} angles, which is only valid out to about ${(rSafeNm/1000).toFixed(1)} µm from the centre here; `+
-          `this kernel reaches ${(rKernelNm/1000).toFixed(1)} µm (corners), and beyond the valid radius the sum aliases into spurious light at the kernel rim `+
-          `(~17% of the total at the default 6 µm width), dimming every emitter. Use FFT / chirp-Z, or a PSF kernel width under ${(2*rSafeNm/Math.SQRT2/1000).toFixed(1)} µm.`);
-  }
+
   const zStepNm=cfg.zStep*1e9;
   const zUsableNm=psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, cfg.oversample);
   if(zUsableNm>0)
@@ -7180,8 +7057,8 @@ function psfZCramerRao(slices, nx, ny, oversample, focusIndex, zStepNm, cameraPx
   return out.length ? out : null;
 }
 let _psfKernelCacheKey=null, _psfKernelCache=null;
-// Last Simulate movie / calibration stack frame-stage and PSF-build timings, with the path that
-// ran — read by tests/gpu/bench-simulation.mjs and handy from the log terminal.
+// Last Simulate movie / calibration stack frame-stage timing (with the path that ran — read by
+// tests/gpu/bench-simulation.mjs) and last PSF-build timing, both handy from the log terminal.
 let lastSimTimings=null, lastPsfBuildTimings=null;
 async function getOrBuildPsfKernelStack(cfg){
   const key=JSON.stringify(cfg);
@@ -12423,19 +12300,14 @@ async function getRenderWorker(){
    (dozens), the same shape as detect/fit's frame batches — one worker would
    leave every other core idle for no reason.
    --------------------------------------------------------------------------- */
-// Only two constants, both declared literally right here (not derived from a
-// generic missing-identifier scan like WORKER_PRELUDE/RENDER_WORKER_PRELUDE
-// above) — computePsfPupilForZPlane/computePsfIntensityPlane touch no other
-// module-level state, so there's nothing else this prelude could omit today.
-// If a future edit gives either function a new module-level dependency, add
-// it here too, or the worker throws a ReferenceError and silently falls back
-// to the serial path (buildPsfKernelStack()'s own try/catch around getPsfWorkerPool()).
-const PSF_WORKER_PRELUDE="const PSF_N_RHO="+PSF_N_RHO+", PSF_N_PHI="+PSF_N_PHI+";";
+// No prelude: the PSF functions below read no module-level state (the grid size travels in each
+// message as fftM). If a future edit gives one a module-level dependency, declare it at the top of
+// this body, or the worker throws a ReferenceError and silently falls back to the serial path
+// (buildPsfKernelStack()'s own try/catch around getPsfWorkerPool()).
 function psfWorkerSource(){
   const body=[
     psfIndexToNM.toString(), psfBinomial.toString(), psfZernikeRadial.toString(), psfZernikeValue.toString(),
     laguerreL.toString(), pupilMaskPhase.toString(),
-    computePsfPupilForZPlane.toString(), computePsfIntensityPlane.toString(),
     fft1d.toString(), psfCzt1d.toString(), computePsfPupilCartesianForZPlane.toString(), computePsfIntensityPlaneFFT.toString(),
     `onmessage=function(e){
       const d=e.data;
@@ -12443,40 +12315,29 @@ function psfWorkerSource(){
         // Self-test the whole numeric path (not just the message channel) with a tiny
         // unaberrated plane, and confirm it isn't silently all-zero — the exact worker-init
         // gotcha docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5 warns about (a skipped
-        // init step upstream producing all-zero output with no exception at all). Covers
-        // BOTH evaluation paths, since either can be dispatched to this same worker.
+        // init step upstream producing all-zero output with no exception at all).
         try{
           const cfg={NA:1.4, lambda:660e-9, ns:1.33, ni:1.518, ti0:150e-6, particleAxialPosition:0, zStep:20e-9, zernikeCoeffs:new Array(15).fill(0)};
-          const pupil=computePsfPupilForZPlane(0,1,cfg);
-          const slice=computePsfIntensityPlane(9,9,25e-9,pupil);
-          let mx=0; for(let i=0;i<slice.length;i++) if(slice[i]>mx) mx=slice[i];
-          if(!(mx>0)) throw new Error('self-test produced all-zero output (direct)');
           const dk=(2*(2*Math.PI/cfg.lambda*cfg.NA*Math.min(1,cfg.ns/cfg.NA)))/(16-4);
           const cart=computePsfPupilCartesianForZPlane(0,1,cfg,16,dk);
           const fftSlice=computePsfIntensityPlaneFFT(9,9,25e-9,cart,16,dk);
           let mx2=0; for(let i=0;i<fftSlice.length;i++) if(fftSlice[i]>mx2) mx2=fftSlice[i];
-          if(!(mx2>0)) throw new Error('self-test produced all-zero output (fft)');
+          if(!(mx2>0)) throw new Error('self-test produced all-zero output');
           postMessage({pong:1});
         }catch(err){ postMessage({pong:0,err:String(err&&err.message||err)}); }
         return;
       }
-      const {seq,z,nz,nx,ny,resLateralM,NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist,evalMethod,fftM,fftDk}=d;
+      const {seq,z,nz,nx,ny,resLateralM,NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist,fftM,fftDk}=d;
       try{
         const t0=performance.now();
-        let slice;
-        if(evalMethod==='fft'){
-          const cart=computePsfPupilCartesianForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist}, fftM, fftDk);
-          slice=computePsfIntensityPlaneFFT(nx, ny, resLateralM, cart, fftM, fftDk);
-        } else {
-          const pupil=computePsfPupilForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist});
-          slice=computePsfIntensityPlane(nx, ny, resLateralM, pupil);
-        }
+        const cart=computePsfPupilCartesianForZPlane(z, nz, {NA,lambda,ns,ni,ti0,particleAxialPosition,zStep,zernikeCoeffs,maskType,maskModes,maskWaist}, fftM, fftDk);
+        const slice=computePsfIntensityPlaneFFT(nx, ny, resLateralM, cart, fftM, fftDk);
         let planeMax=0; for(let i=0;i<slice.length;i++) if(slice[i]>planeMax) planeMax=slice[i];
         postMessage({seq,z,slice,planeMax,ms:performance.now()-t0},[slice.buffer]);
       }catch(err){ postMessage({seq,z,err:String(err&&err.message||err)}); }
     };`
   ].join('\n');
-  return PSF_WORKER_PRELUDE+'\n'+body;
+  return body;
 }
 // Persistent onmessage/seq-map dispatch, same shape as wireRenderWorker()/dispatchRenderWorker()
 // above — but shared across the WHOLE pool via one Map (seq is a single global counter, unique
@@ -12747,7 +12608,6 @@ const STAGE_META = {
   ssmlm:     {label:'sSMLM pairing',       lane:'main'},
   spt:       {label:'SPT linking',         lane:'main'},
   exportCsv: {label:'Table / export',      lane:'main'},
-  simPsf:    {label:'Sim PSF build',       lane:'worker'},
   simFrames: {label:'Sim splat + noise',   lane:'worker'},
 };
 
@@ -15139,8 +14999,8 @@ async function fitBatchGpuFlatRotFree(engine, seedsA, seedsB, windows, frameIdx,
   return out;
 }
 
-/* ---- Simulation on the GPU: the movie/calibration frame stage and the 'direct' PSF build ----
-   Two stages of MODULE: simulation have a device path, each chosen through runStage() like
+/* ---- Simulation on the GPU: the movie/calibration frame stage ----
+   The frame stage of MODULE: simulation has a device path, chosen through runStage() like
    every other stage here and taken whenever Use GPU acceleration (useGpu) is on — see
    simGpuWanted() for why there is no size threshold.
 
@@ -15155,14 +15015,6 @@ async function fitBatchGpuFlatRotFree(engine, seedsA, seedsB, windows, frameIdx,
    a line-for-line port and produces the same u32s (tests/gpu/test-sim-gpu.mjs checks it).
    'fft' placement and the Gaussian PSF model have no kernel and stay on the CPU.
 
-   simPsf — computePsfIntensityPlane() (the polar-quadrature 'direct' evaluator) as one thread
-   per kernel pixel per plane. The pupil is still built on the CPU (cheap, and it is where all
-   the physics lives); only the nx*ny*800 sin/cos reduction moves. The default 'fft' evaluator
-   is already worker-parallel and has no GPU path — and should stay the default: 'direct'
-   under-samples the pupil in angle (PSF_N_PHI=40) and aliases beyond r ~ N_PHI/(2 k NA_eff),
-   ~1.6 µm at 660 nm, so on the default 6 µm kernel it puts ~17% of the light into ghost energy at
-   the kernel's rim where an Airy disk has 0.16% (buildPsfKernelStack() warns). The GPU makes it
-   fast, not right.
    --------------------------------------------------------------------------- */
 const WGSL_SIM_NOISE_FNS=`
 var<private> rseed:vec3u;
@@ -15259,37 +15111,6 @@ fn main(@builtin(global_invocation_id) id:vec3u){
     }
   }
   outF[g]=v;
-}`;
-const WGSL_PSF_DIRECT=`
-struct PP { nx:u32, ny:u32, nPlanes:u32, strideX:u32, x0:f32, y0:f32, resUm:f32, pad:f32 }
-@group(0) @binding(0) var<uniform> p:PP;
-@group(0) @binding(1) var<storage,read> pupil:array<vec2f>;
-@group(0) @binding(2) var<storage,read> kr:array<f32>;
-@group(0) @binding(3) var<storage,read> cs:array<vec2f>;
-@group(0) @binding(4) var<storage,read_write> outI:array<f32>;
-override WG:u32=64u;
-override NRHO:u32=20u;
-override NPHI:u32=40u;
-@compute @workgroup_size(WG)
-fn main(@builtin(global_invocation_id) id:vec3u){
-  let N=p.nx*p.ny;
-  let g=id.x+id.y*p.strideX;
-  if(g>=N*p.nPlanes){ return; }
-  let pl=g/N; let pix=g-pl*N;
-  let dx=(f32(pix%p.nx)-p.x0)*p.resUm; let dy=(f32(pix/p.nx)-p.y0)*p.resUm;
-  let base=pl*NRHO*NPHI;
-  var sr=0.0; var si=0.0;
-  for(var ir=0u; ir<NRHO; ir++){
-    let k=kr[ir];
-    for(var ip=0u; ip<NPHI; ip++){
-      let t=cs[ip];
-      let sp=k*(dx*t.x+dy*t.y);
-      let c=cos(sp); let s=sin(sp);
-      let q=pupil[base+ir*NPHI+ip];
-      sr+=q.x*c-q.y*s; si+=q.x*s+q.y*c;
-    }
-  }
-  outI[g]=sr*sr+si*si;
 }`;
 // 2D dispatch for `threads` invocations: WebGPU caps each dimension at
 // maxComputeWorkgroupsPerDimension (65535 at the spec minimum), which a 512² x 16-frame batch
@@ -15444,64 +15265,6 @@ function simulateCalibFramesGpu(engine, ctx){
   return gpuSimFrames(engine, { w, h, n:nz, nx:kernelNx, ny:kernelNy, os:oversample, camRad, interpMode,
     planes, bgMap:null, offsetMap, simGain, readNoiseE, cam, noiseSeed, onProgress, bgOf:()=>bg,
     emitters: z => ({list: beadXY.map(([x,y])=>[x,y,photPerFrame,z]), clamped:0, counted:0}) });
-}
-// computePsfIntensityPlane() for every plane of cfg, on the device. Returns {slices, globalMax}
-// like buildPsfPlanesParallel(). Planes go in small dispatches (~1.5e8 sin/cos each): one long
-// dispatch can trip the OS GPU watchdog (Windows TDR, ~2 s) on an integrated GPU, which loses
-// the device for the whole session.
-function buildPsfPlanesGpu(engine, cfg, nx, ny){
-  return runGpuExclusive(()=>withGpuErrorScopes(engine.device,'GPU PSF build',()=>buildPsfPlanesGpuNow(engine, cfg, nx, ny)));
-}
-async function buildPsfPlanesGpuNow(engine, cfg, nx, ny){
-  const device=engine.device, U=GPUBufferUsage, N=nx*ny, NQ=PSF_N_RHO*PSF_N_PHI;
-  const per=Math.max(1, Math.min(cfg.nz, Math.floor(1.5e8/(N*NQ)), Math.floor(Math.min(64*1024*1024, engine.limits.maxStorageBufferBindingSize)/(N*4))));
-  const created=[];
-  const mk=(size,usage,label)=>{ const b=engine.mkBuf(size,usage,label); created.push(b); return b; };
-  const slices=new Array(cfg.nz); let globalMax=0;
-  try{
-    const pipe=await engine.compilePipeline('psf-direct', WGSL_PSF_DIRECT, 'main', {WG:engine.wg1D, NRHO:PSF_N_RHO, NPHI:PSF_N_PHI});
-    const p0=computePsfPupilForZPlane(0, cfg.nz, cfg);
-    // Micrometres rather than metres: k·r is the same number, the operands are nearer 1.
-    const kr=new Float32Array(PSF_N_RHO); for(let i=0;i<PSF_N_RHO;i++) kr[i]=p0.krAt[i]*1e-6;
-    const cs=new Float32Array(2*PSF_N_PHI); for(let i=0;i<PSF_N_PHI;i++){ cs[2*i]=p0.cosPhiAt[i]; cs[2*i+1]=p0.sinPhiAt[i]; }
-    const krBuf=mk(kr.byteLength, U.STORAGE|U.COPY_DST, 'psf:kr'); engine.write(krBuf,0,kr);
-    const csBuf=mk(cs.byteLength, U.STORAGE|U.COPY_DST, 'psf:cos-sin'); engine.write(csBuf,0,cs);
-    const pupilBuf=mk(per*NQ*8, U.STORAGE|U.COPY_DST, 'psf:pupil');
-    const outBuf=mk(per*N*4, U.STORAGE|U.COPY_SRC, 'psf:planes');
-    const staging=mk(per*N*4, U.MAP_READ|U.COPY_DST, 'psf:planes-readback');
-    const pBuf=mk(32, U.UNIFORM|U.COPY_DST, 'psf:params');
-    const bg=engine.bindGroup({label:'psf:direct-bg', layout:pipe.getBindGroupLayout(0),
-      entries:[pBuf,pupilBuf,krBuf,csBuf,outBuf].map((buffer,binding)=>({binding,resource:{buffer}}))});
-    for(let z0=0; z0<cfg.nz; z0+=per){
-      const nb=Math.min(per, cfg.nz-z0), pupil=new Float32Array(nb*NQ*2);
-      for(let k=0;k<nb;k++){
-        const pp = z0+k===0 ? p0 : computePsfPupilForZPlane(z0+k, cfg.nz, cfg);
-        for(let q=0;q<NQ;q++){ pupil[(k*NQ+q)*2]=pp.pupilRe[q]; pupil[(k*NQ+q)*2+1]=pp.pupilIm[q]; }
-      }
-      engine.write(pupilBuf,0,pupil);
-      const d=gpuDispatch2D(engine, nb*N);
-      const raw=new ArrayBuffer(32), pu=new Uint32Array(raw), pf=new Float32Array(raw);
-      pu[0]=nx; pu[1]=ny; pu[2]=nb; pu[3]=d.strideX; pf[4]=(nx-1)/2; pf[5]=(ny-1)/2; pf[6]=cfg.resLateralM*1e6;
-      engine.write(pBuf,0,new Uint8Array(raw));
-      const enc=device.createCommandEncoder({label:'psf:direct'});
-      const pass=enc.beginComputePass({label:'psf:direct'});
-      pass.setPipeline(pipe); pass.setBindGroup(0,bg); pass.dispatchWorkgroups(d.gx,d.gy); pass.end();
-      enc.copyBufferToBuffer(outBuf,0,staging,0,nb*N*4);
-      engine.submit([enc.finish()]);
-      await staging.mapAsync(GPUMapMode.READ);
-      const all=new Float32Array(staging.getMappedRange().slice(0,nb*N*4));
-      staging.unmap();
-      for(let k=0;k<nb;k++){
-        const sl=new Float64Array(N); let mx=0;
-        for(let i=0;i<N;i++){ const v=all[k*N+i]; sl[i]=v; if(v>mx) mx=v; }
-        slices[z0+k]=sl; if(mx>globalMax) globalMax=mx;
-      }
-      setProg(100*(z0+nb)/cfg.nz); await tick();
-    }
-    return {slices, globalMax};
-  } finally {
-    created.forEach(b=>{ try{ b.destroy(); }catch(_){} });
-  }
 }
 
 /* ===========================================================================
@@ -26504,7 +26267,7 @@ updateMethodUI();
 
 // Simulation PSF model rows (simBox) — same "one selector, a list of rows toggled together"
 // pattern as updateMethodUI() above, just for the Zernike-only fields.
-const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfMaskTypeRow','psfEvalMethodRow','psfInterpRow','psfPreviewBtnRow','genCalBtnRow'];
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfMaskTypeRow','psfInterpRow','psfPreviewBtnRow','genCalBtnRow'];
 function updatePsfModelUI(){
   const on = paramValue('simulation_psfModel')==='zernike';
   for(const id of PSF_ZERNIKE_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
@@ -28176,7 +27939,12 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21d — With Use GPU acceleration on, the simulator now always
+log(`webSMLM v0.12.8-dev · build 2026-09-21e — The Direct quadrature PSF evaluator is gone, and with
+it the PSF evaluation method setting: every PSF is now built with the chirp-Z transform, which
+matches an ideal Airy disk to the kernel edge. Direct aliased beyond ~1.6 µm and dimmed every
+simulated emitter by ~17-20% on the default kernel. A settings file that still names
+simulation_psfEvalMethod loads fine; that key is ignored.
+— and from build 2026-09-21d: With Use GPU acceleration on, the simulator now always
 uses the GPU (the GPU for simulation setting is gone: the GPU won every case measured). PSF
 evaluation: keep FFT / chirp-Z. Direct quadrature turned out to alias beyond ~1.6 µm from the
 PSF centre, putting ~17% of the light into the rim of the default 6 µm kernel (FFT: 0.17%, an

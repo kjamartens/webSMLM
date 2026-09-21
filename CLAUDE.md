@@ -343,8 +343,8 @@ in a module.
   scale comparable across sensor types. The whole sensor model travels as ONE `cam` bundle
   (`readSimCameraModel()`) through `simCtx`/`calibCtx`, both init messages and the GPU spec.
 
-  **Simulation on the GPU (2026-09-21).** Two stages have a device path, each through
-  `runStage()` (`STAGE_META` `simFrames`/`simPsf`) and taken whenever `useGpu` is on and the
+  **Simulation on the GPU (2026-09-21).** The frame stage has a device path, through
+  `runStage()` (`STAGE_META` `simFrames`), taken whenever `useGpu` is on and the
   engine is up — no size threshold and no separate setting (an `auto`/`always`/`off` option and a
   crossover existed for one build and were removed: the GPU won every case measured, and the
   smallest jobs lose only tens of ms of dispatch overhead; unchecking Use GPU acceleration is the
@@ -355,16 +355,13 @@ in a module.
   interpolates the same Float32 block sums with the same weights. Batches keep each output
   ≤64 MB, and batch k+1 is packed and submitted before k is read back. `simulateFramesGpu()` and
   `simulateCalibFramesGpu()` are thin spec builders over one `gpuSimFrames()`. 'fft' placement
-  and the Gaussian model have no kernel. **PSF**: `WGSL_PSF_DIRECT` is
-  `computePsfIntensityPlane()` (the 'direct' polar quadrature) per kernel pixel per plane, the
-  pupil still built on the CPU; dispatches are capped at ~1.5e8 sin/cos, since one long dispatch
-  can trip the Windows GPU watchdog and lose the device. The default 'fft' evaluator has no GPU
-  path. **Agreement** (`tests/gpu/test-sim-gpu.mjs`): pcg4d and the uniforms bit-exact over 393k
+  and the Gaussian model have no kernel. The PSF build (chirp-Z, already worker-parallel) has no
+  GPU path. **Agreement** (`tests/gpu/test-sim-gpu.mjs`): pcg4d and the uniforms bit-exact over 393k
   values; GPU splat = CPU to 1.3e-7 of peak; GPU noise = CPU noise on 100% of pixels within
   1e-3 ADU (sCMOS: f32 read noise, ≤1.7e-4 ADU; EMCCD: identical); the same seeded 3D movie with
   haze and a structured background generated on the CPU pool and on the GPU agrees on 100%
-  (sCMOS) / 99.999% (EMCCD: one pixel one count apart, an f32/f64 Poisson boundary) of pixels;
-  GPU direct PSF = CPU direct to 5e-6. **Measured** (`tests/gpu/bench-simulation.mjs`, i7-1355U +
+  (sCMOS) / 99.999% (EMCCD: one pixel one count apart, an f32/f64 Poisson boundary) of pixels.
+  **Measured** (`tests/gpu/bench-simulation.mjs`, i7-1355U +
   Intel Iris Xe, warm, median of 3, against the NEW CPU splat on 8 workers):
 
   | Case | CPU ms | GPU ms | Speedup |
@@ -376,17 +373,14 @@ in a module.
   | 2D 256² × 50, bg 20 | 1155 | 67 | 17.1× |
   | EMCCD 128² × 100 | 435 | 35 | 12.6× |
   | Calibration stack 128², 41 planes | 152 | 34 | 4.4× |
-  | PSF direct, 121² kernel, 11 planes | 5543 | 129 | 43× (1.9× vs CPU 'fft') |
-  | PSF direct, 241² kernel, 41 planes | — | 1182 | 1.5× vs CPU 'fft' (1779) |
 
   Cold (first use per page session) adds the pipeline compile, ~60–100 ms here, plus, once, the
   engine's own start-up (~1–2 s, shared by every GPU stage; the log line says when a stage paid
   it). A dedicated GPU should gain more, and the headroom is in the heavy cases (`--full`: default
-  300-frame movies, dense, 512², the 401-plane PSF) this laptop was not run on. A GPU 'direct'
-  PSF build is faster than the CPU 'fft' default, but see the next paragraph for why that does not
-  make it the better evaluator.
+  300-frame movies, dense, 512²) this laptop was not run on.
 
-  **'direct' is wrong on wide kernels — keep 'fft' the default (2026-09-21d).** The polar
+  **The PSF has one evaluator, chirp-Z; the 'direct' polar quadrature was removed (2026-09-21e)
+  because it was wrong.** It had a GPU port for one build, which is how this came up. The polar
   quadrature samples the pupil at `PSF_N_PHI`=40 angles, which resolves exp(i·k·r·cos φ) only while
   k·NA_eff·r stays below ~N_PHI/2, i.e. out to ~1.6 µm at 660 nm / NA_eff 1.33; past that the sum
   aliases. On the default 6 µm kernel (unaberrated, one plane) 'direct' puts **17%** of the light
@@ -395,10 +389,13 @@ in a module.
   'direct' vs 255.1 Airy, first zero within 1 nm), so the error only shows after normalization:
   every emitter splatted from a 'direct' kernel is ~17–20% too dim in its core, over a faint ghost
   pedestal. The 0.22–0.29% agreement PARITY.md recorded was measured on a 1.6 µm kernel, inside
-  the valid radius — which is why it went unnoticed. `buildPsfKernelStack()` now warns when a
-  'direct' kernel reaches past that radius, and `tests/gpu/test-sim-gpu.mjs` pins 'fft''s tail to
-  the Airy value. The GPU makes 'direct' fast, not right; the proper fix (N_PHI scaled with the
-  kernel radius, ~128 at the default) has not been made.
+  the valid radius — which is why it went unnoticed. `simulation_psfEvalMethod`, its dropdown,
+  `computePsfPupilForZPlane()`/`computePsfIntensityPlane()`, `PSF_N_RHO`/`PSF_N_PHI`, the worker
+  branch and the GPU kernel are all gone; the focal-shift explanation moved onto
+  `computePsfPupilCartesianForZPlane()`. An old settings file naming the key loads with the usual
+  "not recognised" note. `tests/gpu/test-sim-gpu.mjs` pins chirp-Z's tail to the Airy value.
+  **Don't reintroduce a polar quadrature** without an angular sample count that grows with the
+  kernel radius (~128 at the default 6 µm).
 
   **The analysis-side companion is `PARAMS.cameraExcessNoise` (F², MODULE: fit)**: a Poisson
   likelihood cannot express Var = F²·N, so `runCore()` hands the fitters `gain/F²` (fitting in

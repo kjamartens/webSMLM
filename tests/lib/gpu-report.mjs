@@ -192,8 +192,7 @@ function frcTable(files) {
   return sectionTable('FRC CPU vs GPU', ['Source', 'FFT N', 'CPU median', 'GPU median', 'Speedup', 'Pass'], rows);
 }
 
-// bench-simulation.mjs: movie/calibration rows time the splat+noise stage, PSF rows the plane
-// build; 'vs fft' compares a GPU 'direct' build against the default CPU 'fft' evaluator.
+// bench-simulation.mjs: each row times the splat+noise stage of a movie or calibration stack.
 function simulationTable(files) {
   const rows = [];
   for (const file of files) {
@@ -205,12 +204,10 @@ function simulationTable(files) {
       ms(r.gpuMs),
       ms(r.gpuColdMs),
       speed(r.speedup),
-      ms(r.cpuFftMs),
-      speed(r.speedupVsFft),
       escapeHtml(r.gpuPath || ''),
     ]);
   }
-  return sectionTable('Simulation CPU vs GPU', ['Source', 'Case', 'CPU ms', 'GPU warm ms', 'GPU cold ms', 'Speedup', 'CPU fft ms', 'vs fft', 'GPU path'], rows);
+  return sectionTable('Simulation CPU vs GPU', ['Source', 'Case', 'CPU ms', 'GPU warm ms', 'GPU cold ms', 'Speedup', 'GPU path'], rows);
 }
 
 function realDataTable(files) {

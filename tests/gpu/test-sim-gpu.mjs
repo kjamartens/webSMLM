@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Correctness gate for the simulator's summed-kernel splat, its counter-based camera-noise RNG, and
-// (when WebGPU is available) the GPU frame stage and GPU PSF build that mirror them.
+// (when WebGPU is available) the GPU frame stage that mirrors them.
 // Deliberately SMALL (64 px frames, a 41-plane PSF, a few dozen emitters) so it runs in seconds on a
 // laptop; bench-simulation.mjs is where the sizes that matter for speed live.
 //
@@ -12,7 +12,6 @@
 //  (c) GPU splat against CPU splat, noise-free.
 //  (d) GPU camera noise against CPU camera noise on the same expectation image (sCMOS and EMCCD),
 //      plus the noise statistics themselves.
-//  (e) GPU PSF planes (direct evaluator) against CPU direct planes.
 //  (f) End to end: the same seeded Simulate movie (3D, haze, structured background, EMCCD and
 //      sCMOS) generated on the CPU worker pool and on the GPU — events, splat and noise all agree,
 //      so the two movies should match pixel for pixel up to f32 rounding.
@@ -137,10 +136,10 @@ try {
   check('noise reproducible from (seed, frame)', st.repeat);
 
   // ---- which PSF evaluator is physically right on a wide kernel -----------------------------------
-  // Direct quadrature samples the pupil at 40 angles and aliases beyond ~1.6 µm (660 nm, NA_eff
+  // The removed 'direct' polar quadrature sampled the pupil at 40 angles and aliased beyond ~1.6 µm (660 nm, NA_eff
   // 1.33); on the default 6 µm kernel it put 17% of the light past 3 µm (the square's corners). An
   // exact Airy disk sampled on the same grid has 0.157% there.
-  // FFT / chirp-Z must stay physical — this guards the default evaluator.
+  // Chirp-Z, now the only evaluator, must stay physical.
   const tail = await page.evaluate(async () => {
     const cfg = readPsfConfigFromUI(); cfg.nz = 1; cfg.zernikeCoeffs = cfg.zernikeCoeffs.map(() => 0);
     const nx = 2 * cfg.halfWidthPx + 1, c = (nx - 1) / 2, res = cfg.resLateralM * 1e6;
@@ -149,8 +148,8 @@ try {
     for (let y = 0; y < nx; y++) for (let x = 0; x < nx; x++) { tot += s[y * nx + x]; if (Math.hypot(x - c, y - c) * res > 3) out3 += s[y * nx + x]; }
     return { frac: out3 / tot, halfUm: cfg.halfWidthPx * res };
   });
-  check('FFT / chirp-Z PSF tail is physical (light beyond 3 µm < 1%)', tail.frac < 0.01,
-    `${(100 * tail.frac).toFixed(2)}% on a ±${tail.halfUm.toFixed(1)} µm kernel (exact Airy on the same grid: 0.157%; Direct quadrature gives ~17%)`);
+  check('chirp-Z PSF tail is physical (light beyond 3 µm < 1%)', tail.frac < 0.01,
+    `${(100 * tail.frac).toFixed(2)}% on a ±${tail.halfUm.toFixed(1)} µm kernel (exact Airy on the same grid: 0.157%; the removed Direct quadrature gave ~17%)`);
 
   const gpu = await checkGpu(page);
   if (!gpu.available) console.log('GPU checks: SKIP (WebGPU unavailable)');
@@ -237,19 +236,6 @@ try {
       check(`(d) GPU noise = CPU noise  ${r.label}`, r.fracClose >= 0.999,
         `${(100 * r.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${r.maxAbs.toExponential(2)}`);
 
-    // ---- (e) GPU PSF (direct) = CPU direct, 3 planes ----
-    const e = await page.evaluate(async () => {
-      const engine = await getGpuEngine(), cfg = readPsfConfigFromUI();
-      cfg.evalMethod = 'direct'; cfg.nz = 2; cfg.halfWidthPx = 60; delete cfg.fftDk;   // 121² kernel: ~1 s of single-thread CPU
-      const nx = 2 * cfg.halfWidthPx + 1;
-      let t = performance.now(); const cpu = await buildPsfPlanesSerial(cfg, nx, nx); const tCpu = performance.now() - t;
-      t = performance.now(); const gpu = await buildPsfPlanesGpu(engine, cfg, nx, nx); const tGpu = performance.now() - t;
-      let rel = 0;
-      for (let z = 0; z < cfg.nz; z++) { let pk = 0, d = 0;
-        for (let i = 0; i < cpu.slices[z].length; i++) { pk = Math.max(pk, cpu.slices[z][i]); d = Math.max(d, Math.abs(cpu.slices[z][i] - gpu.slices[z][i])); }
-        rel = Math.max(rel, d / pk); }
-      return { relMax: rel, nz: cfg.nz, tCpu, tGpu };
-    });
     const f = await page.evaluate(async () => {
       const set = (id, v) => { const el = document.getElementById(id); if (el.type === 'checkbox') el.checked = !!v; else el.value = v; el.dispatchEvent(new Event('change')); };
       set('simulation_seed', 31); set('simulation_fov', 64); set('frames', 20); set('simulation_3d', true); set('simulation_zRange', 300);
@@ -275,8 +261,6 @@ try {
       check(`(f) seeded movie CPU = GPU  ${r.camType} (3D, haze, bg field)`, r.paths === 'cpu/gpu' && r.fracClose >= 0.999,
         `paths ${r.paths}, ${(100 * r.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${r.maxAbs.toExponential(2)}`);
 
-    check('(e) GPU direct PSF = CPU direct PSF', e.relMax < 1e-4,
-      `max|Δ|/peak ${e.relMax.toExponential(2)} over ${e.nz} planes (single-thread CPU ${e.tCpu.toFixed(0)} ms, GPU ${e.tGpu.toFixed(0)} ms incl. compile)`);
   }
 } finally {
   await browser.close();

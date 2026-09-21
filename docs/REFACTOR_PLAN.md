@@ -60,6 +60,15 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
   worker through a one-time init message and sequencing it against the frame-batch protocol the
   pool already has; see the Web Worker gotcha in CLAUDE.md before starting.
 
+- **WebGPU follow-ups** — the shipped path is opt-in and CPU-fallback safe, but a few GPU-specific
+  limits remain worth revisiting:
+  - Candidate acceptance differs slightly near the CPU f64 / GPU f32 boundary; current tests guard
+    exact detection count and bounded accepted-set drift, not bit-identical accepted sets.
+  - Detection was tried on WebGPU and removed after measuring slower than the worker-pool CPU path;
+    only revisit with a different algorithm, not a straight port.
+  - GPU batch sizing (`gpuBatchMb`/`gpuInflight`/`gpuFlushMs`) is settings-JSON/headless tunable for
+    benchmarking, but intentionally has no sidebar UI until real users need it.
+
 - **Cubic-spline PSF fitting** (`picasso/fitting/splinefit.py`) for PSFs that deviate from
   Gaussian — meaningfully bigger scope than the rotated-elliptical MLE fitter (shipped): its own
   3D calibration volume and PSF-model representation, not just another free parameter. Key
@@ -121,89 +130,92 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
   - A minimum-neighbour-count spatial consistency filter (reject sparse false pairs with too few
     nearby confirmed pairs) — `sSMLMAnalyzer` has one, webSMLM doesn't.
 
-- **smFRET/ALEX integration** — a genuinely new analysis MODALITY, not a small addition; sketched
-  here per discussion, not scoped in detail yet. References: Kapanidis, Lee, Laurence, Doose,
-  Margeat & Weiss, "Fluorescence-aided molecule sorting: Analysis of structure and interactions by
+- **smFRET/ALEX integration** — the sSMLM-style acquisition mode (one movie, a diffraction grating,
+  prism/polychroic splitter, or dual-view/image-splitter giving a donor/acceptor pair per emitter)
+  now has a complete, real-data-verified v1 pipeline: SOI detection (**Localize SOI**),
+  donor/acceptor pairing via either of two methods (**Pair DD + DA**, **Via distances and angles**
+  reusing **Pairing (sSMLM & FRET)**'s own distance+bearing-angle matching, or **Via channel
+  matching** for a spatially-separated dual-view setup — a from-scratch point-registration/affine-
+  transform approach with its own **Alignment overlay** visual QA), role disambiguation
+  (**Position donor?**), ALEX-aware DD/DA/AA time traces with a per-site E/S-vs-time subplot and
+  inset ROI thumbnails, and a pooled population-level **E(S) histogram** (1D or, with ALEX+AA, a 2D
+  E-vs-S density plot) — all under **Get traces & E/S**, whose own **Export traces & E/S**/**Load
+  traces & E/S** round-trip both the raw per-frame traces and the pooled E(S) histogram data. See
+  **Single-molecule FRET** in `CLAUDE.md` for the full implementation history — this file only
+  tracks what's still genuinely open. References: Kapanidis, Lee, Laurence, Doose, Margeat & Weiss,
+  "Fluorescence-aided molecule sorting: Analysis of structure and interactions by
   alternating-laser excitation of single molecules," *PNAS* **101**(24), 8936–8941 (2004),
   https://doi.org/10.1073/pnas.0401690101 (introduces ALEX); Hohlbein, Craggs & Cordes,
   "Alternating-laser excitation: single-molecule FRET and beyond," *Chem. Soc. Rev.* **43**(4),
   1156–1171 (2014), https://doi.org/10.1039/c3cs60233h (review).
 
-  **The measurement**: molecules immobilised on a surface, imaged in two spectrally separated
-  detection channels — donor channel (DD, donor excitation → donor emission) and acceptor channel
-  (DA, donor excitation → acceptor emission via FRET). With ALEX, donor-excitation frames alternate
-  with acceptor-excitation frames, adding AA (acceptor excitation → acceptor emission, probing
-  acceptor existence directly) and AD (acceptor excitation → donor channel, ideally ~0). Per-frame
-  intensities at a molecule's fixed position give E_raw = DA/(DA+DD) and, with ALEX, S_raw =
-  (DD+DA)/(DD+DA+AA) — a stoichiometry that separates donor-only/acceptor-only/both-present
-  populations on a 2D E–S histogram. **Accurate FRET** (correcting E_raw/S_raw for leakage/
-  crosstalk, direct excitation, and the γ-factor derived from that same population structure) is
-  explicitly a later step, not v1.
+  **"Link DD/DA/AA"/"Filter SOIs" were built, then dropped entirely** (an independent
+  acceptor-channel verification pass and a DD+DA-vs-DD+DA+AA channel-selection setting) — direct
+  request, on the reasoning that **Pair DD + DA** already establishes the acceptor position, and
+  AA should simply always be sampled there once paired, no separate confirmation step or opt-in
+  needed. Not a gap; don't re-add without a fresh, specific reason.
 
-  **Mapped onto webSMLM's own building blocks** — surprisingly little is genuinely new:
-  - **sSMLM's grating-dispersed 0th/1st order IS already a virtual donor/acceptor channel setup —
-    not just the pairing math below.** A diffraction grating spectrally splits each emitter's own
-    emission into an 0th-order (undispersed) and 1st-order (dispersed) spot on ONE frame; with the
-    right grating/filter choice, that split can separate donor vs. acceptor emission directly — the
-    same physical trick an image splitter does spatially, just done spectrally instead. For THIS
-    acquisition mode specifically, no new dual-channel loading infrastructure is needed at all (see
-    "Genuinely new infrastructure" below, which is scoped to the image-splitter/two-camera cases
-    only) — one movie, the existing detect/fit pipeline, `pairCore()`'s existing pairing, all
-    already built and tested. Likely the cheapest real path to a working v1 prototype, ahead of the
-    harder image-splitter/two-camera cases that need genuinely new loading code first.
-  - **"Determine positions of interest" = the existing "Fix bead x,y" pattern.** Averaging a
-    user-selected frame range into one stable composite, detecting once, and fitting each detected
-    maximum is already implemented (`averageFrames()`/`locateBeadsForCalib()`, 3D calibration
-    module) for exactly the same reason it's needed here: real blinking/bleaching between frames
-    makes per-frame detection jump around, so localise once from a stable average instead. The only
-    new piece is letting the user pick WHICH frames feed that average — DD, DA, or DD+DA (and, if
-    ALEX is on, scoping to donor-excitation frames only, vs. also including AA/acceptor-excitation
-    frames) — rather than always the whole loaded range.
-  - **Linking a DD candidate to its DA partner = sSMLM's own pairing.** `pairCore()`'s directional
-    distance+bearing-angle matching (built for 0th/1st-order diffraction-grating pairs) assumes a
-    roughly CONSTANT offset vector between two related spots — exactly what a well-aligned dual-view
-    image splitter gives between donor and acceptor sub-images (translation-dominated, unlike a
-    diffraction grating's dispersion, but the same "search a fixed distance/angle window" math).
-    Reusing it sidesteps needing a full affine channel-registration transform for a first pass —
-    IF channel misalignment really is translation-dominated on real data. Working assumption (per
-    discussion): translation (distance + angle, sSMLM's own pairing as-is) is likely sufficient for
-    the hardware in question — but this is a guess, not a measurement, and needs checking against
-    real dual-channel raw data before committing to it; a splitter/setup with meaningful rotation or
-    magnification mismatch between channels would need a proper affine map instead (fit from a
-    bead/fiducial image visible in both channels).
-  - **Building the DD(t)/DA(t)/(AA(t)) trace = the calibration module's own "fit at fixed x,y."**
-    Once a molecule's position is fixed (composite + link step above), the 3D calibration module
-    already fits amplitude/σx/σy/background PER FRAME at a fixed x,y without re-detecting — the same
-    operation needed here, just reading out amplitude/photons over time instead of width over a
-    z-scan. **Run smFRET** would do this for every linked position across every frame (bucketed into
-    DD/DA/AA by ALEX frame role), building one row per molecule per frame.
-  - **Output = the existing streaming-NDJSON precedent**, not a new mechanism — `spt_tracks.ndjson`
-    (`makeRecordEmitter()`, v0.11.10) is the same shape of problem (many molecules × many
-    frames, too large for `analyze()`'s own return value), so a `smfret_traces.ndjson` stream (one
-    record per molecule with its own DD/DA/AA-vs-frame arrays, or one record per molecule-frame —
-    TBD) is a natural reuse rather than a new export mechanism. E_raw/S_raw are then trivial derived
-    columns from DD/DA/AA, no new algorithm.
-  - Molecules that aren't perfectly immobilised (tethered particle motion) could reuse **spt**'s own
-    `linkTracks()` instead of a fixed-xy assumption — a distinct, later option, not needed for a
-    genuinely immobilised-molecule v1.
-
-  **Genuinely new infrastructure, not a reuse of anything existing** — none of this applies to the
-  sSMLM-style acquisition mode above, only to the alternative hardware setups:
-  - **Dual-channel input for an image-splitter or two-camera setup.** Today one frame = one
-    full-FOV image with one meaning. A single-camera image-splitter setup needs a frame-region
-    split (two sub-rectangles of the SAME frame, donor + acceptor) — structurally like the
-    raw-panel crop tool's `makeCroppedStack()`, but producing TWO frame-synchronised sub-stacks
-    from one crop step instead of one. A two-camera setup (separate donor/acceptor cameras) needs
-    genuinely new frame-synchronised dual-stack loading — no existing precedent to lean on there.
-  - **ALEX frame-role bookkeeping.** Which frames are donor-excitation vs. acceptor-excitation is
-    new state nothing in webSMLM tracks today (a period/pattern control, or explicit frame-index
-    lists) — needed before any DD/DA/AA/AD sorting can happen.
-
-  Not scoped: whether this becomes its own sidebar module (most likely, given the size — a new
-  "smFRET (ALEX)" section, not squeezed into sSMLM or 3D calibration) vs. a mode of an existing one;
-  headless/CLI support (should follow the same `analyze()`/PARAMS pattern as everything else, once
-  the interactive shape is settled); and the accurate-FRET correction-factor step, deliberately
-  deferred per the references above.
+  **Still open**:
+  - **Accurate/corrected FRET.** RAW E (= DA/(DD+DA)) and S (= (DD+DA)/(AA+DD+DA)) are already
+    computed and shown — per-sample in the pooled **E(S) histogram**, per-site-per-time in the Time
+    trace plot's own E/S-vs-time subplot, and now saved directly in **Export traces & E/S**'s own
+    `pooled_E`/`pooled_S` arrays. What's still missing is the FULL correction on top of these raw
+    values — leakage/crosstalk, direct excitation, and a γ-factor derived from the population
+    structure on the 2D E–S histogram — a distinct, later step, deliberately deferred per the
+    references above.
+  - **Headless/NDJSON export for Get traces & E/S.** `config.smfretLocateSOI` covers SOI detection
+    headlessly; the time-trace extraction itself (`getSmfretTimeTraces()`) has no headless path yet.
+    The existing streaming-NDJSON precedent (`spt_tracks.ndjson` via `makeRecordEmitter()`) is the
+    natural shape to reuse — many molecules × many frames is too large for `analyze()`'s own return
+    value — one record per molecule with its own DD/DA/AA-vs-frame arrays (or one record per
+    molecule-frame — TBD).
+  - **A "Donor vs acceptor" control** exposing `pairCore()`'s own existing directional 0th/1st-order
+    role classification under smFRET's own donor/acceptor terminology, rather than silently assuming
+    the convention `pairCore()` already uses (0th = donor-side) is the physically correct one for
+    every setup. Only applies to **Via distances and angles**; **Via channel matching** has its own,
+    separate **Position donor?** disambiguation already.
+  - **Per-localization ALEX frame-role tagging on a GENERAL, non-smFRET-SOI localization set.**
+    Today's DD/DA/AA sorting only ever applies to `smfretSOI` sites via **Get traces & E/S**; an
+    ordinary Localize run's own output has no per-loc frame-role tag at all. Also still open: a
+    genuine period/pattern control for ALEX cycles longer than a simple 1st-frame + period-2
+    alternation, or explicit frame-index lists.
+  - **Whether Localize SOI should gain a second averaging mode.** An ordinary Localize over the same
+    frame range, then `tempClusteringXY < N` with `tempClusteringMemory <= inf` (table module,
+    shipped), collapses every recurrence of the same physical site into one event with a real
+    photon-weighted position and an `nMerged` blink count, instead of a heuristic centroid on a
+    smoothed average image — usable manually today via the table's own filter box, no smFRET-specific
+    code needed. Composite-averaging keeps a real, distinct advantage (it can find sites too faint to
+    cross the per-frame detection threshold in any single frame), so this isn't a strict replacement;
+    revisit once someone's actually compared the two on real smFRET data.
+  - **Embed the SOI composite image(s) in the "Export traces & E/S"/"Load traces & E/S" JSON.**
+    Right now the round trip carries fitted positions, raw per-frame intensities, and the pooled
+    E(S) histogram data, but no pixel data at all — a loaded-traces-only session (no movie loaded)
+    can show the Time trace/E(S) plots but never the SOI composite or real ROI-thumbnail pixel crops
+    (`loadSmfretTraces()`, MODULE: smFRET). Raised and considered when building Load traces —
+    deliberately NOT done then: a full composite is a w×h float array (over a million values on a
+    real 1024×1024 test file), and as plain JSON text that's easily 10+ MB per composite, doubled
+    for donor+acceptor — a 100×+ size jump over a traces-only file (~150 KB on the same real test)
+    for a feature that's a visual sanity check, not analysis data. If built, do it as an opt-in
+    checkbox at export time (default OFF) rather than baking it in unconditionally, and store it
+    base64-encoded binary (Float32Array bytes) rather than a raw JSON number array to keep the size
+    hit down.
+  - **Molecules that aren't perfectly immobilised** (tethered particle motion, or genuinely freely
+    diffusing molecules) could reuse **spt**'s own `linkTracks()` instead of a fixed-xy assumption —
+    a distinct, later option, not needed for a genuinely immobilised-molecule dataset. Reiterated
+    directly ("FRET calculation can and should be available for freely diffusing molecules, but that
+    is another can of worms") alongside the FRET?/module-rename round (v0.12.5-dev, see **Single-
+    molecule FRET** in `CLAUDE.md`) — still just a "keep in mind for later" note, not scoped further.
+  - **Dual-channel PIXEL input for an image-splitter or two-camera setup** — narrower than it used
+    to be: **Via channel matching** (`alignSmfretChannels()`) already solves the single-camera
+    dual-view/image-splitter PAIRING problem directly on the one already-loaded movie (splitting
+    sites of interest by their own x-position gap, then registering the two point sets with a fitted
+    affine transform) — no separate frame-region split or synchronised sub-stacks needed for that.
+    What's still genuinely open is lower-level: an actual PIXEL-level split of a dual-view frame into
+    two independent sub-stacks (so e.g. Localize itself, not just smFRET's own SOI/pairing path,
+    could run on either half separately) — structurally like the raw-panel crop tool's
+    `makeCroppedStack()`, but producing TWO frame-synchronised sub-stacks from one crop step instead
+    of one — and, separately, genuinely new frame-synchronised DUAL-STACK loading for a real
+    two-camera setup (no existing precedent to lean on there at all).
 
 - **Single particle tracking (spt)** — deliberately deferred, not forgotten:
   - **Length-resolved D histogram** (the reference pipeline's `D_track_length_matrix`, one
@@ -220,15 +232,6 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     `HUNGARIAN_MAX` (120 points) fall back to greedy nearest-neighbor rather than trackpy's own
     recursive exact-subnetwork solver — real single-molecule (PALM-style, sparse) SPT data isn't
     expected to produce components that large; no reports of it mattering yet.
-
-- **`tempClusteringMemory`** — gap-frame tolerance for temporal clustering. `clusterEvents()`
-  (table module) currently requires strictly consecutive frame numbers to chain detections into
-  one event (memory=0, hardcoded) — a molecule that blinks off for even one frame starts a new
-  chain instead of extending the old one. `tempClusteringMemory = N` would allow up to N missed
-  frames between detections of the same chain. Needs a decision on how a gap should weight into the
-  position average (still "on" for the photon-weighted mean, or purely bridge the chain without
-  contributing) before implementing. Already flagged in-app as "planned" (see `webSMLM.html` near
-  `clusterEvents()`).
 
 - **Let a settings JSON override a parameter's `min`/`max`/`step`, not just its value.** Today
   Save/Load Settings only round-trips `{id: value}` pairs — the bounds themselves live solely in
@@ -272,6 +275,24 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
   of the filtered image instead. Also: threshold statistics currently include border pixels never
   searched for maxima; and plateau handling needs a look — the local-maximum test uses strict `>`,
   so two equal adjacent pixels can both survive as separate localizations from one emitter.
+
+  **Feasibility check (2026-09-13), real GATTA-PAINT data + a line-for-line port of Picasso's own
+  `identify_in_image`/net-gradient detector for comparison:** a naive MAD (sort a copy of the frame,
+  twice) is 10-33x slower than the current threshold and gets worse with size — not shippable. MAD
+  via quickselect (median + MAD-of-deviations, two O(n)-average selections, no full sort) is the only
+  realistic version: ~2x the current threshold's cost at 1024×1024 (the current mean+k·σ is
+  essentially free, ~O(n), next to the band-pass itself). A single percentile via quickselect is
+  cheaper still (~1.2x) but has no size/density-stable default the way `k` does. Picasso's own
+  single-parameter net-gradient detector was, surprisingly, the SLOWEST option tested — 6-7x the
+  current cost at every size and worsening with frame size — because its local-maxima test is a
+  naive box×box window scan with no separable acceleration (numba JIT buys it a constant factor, not
+  a change in that O(box²·w·h) scaling); "one parameter" isn't "cheap" here. **Open question, not yet
+  tested**: could just lowering `k` in the current formula recover the same dim localizations MAD
+  does, without the cost? Likely not robustly — MAD's real benefit is that its noise estimate stays
+  roughly constant as density varies *within* one movie (high breakdown point), while a single fixed,
+  manually-lowered `k` has no such adaptivity: tuned low enough to help on a dense frame, it would be
+  too permissive (more noise false-positives) on a sparser frame from the same movie. Needs a
+  synthetic density-sweep check before treating either claim as settled.
 - **σ_PSF estimation from the data**, instead of a fixed, user-supplied value.
 - **Photon calibration beyond a single scalar gain/offset.** Single-image gain/offset estimation
   from the data itself (PCFO, a photon-transfer-curve variant) shipped in 0.10.2. A scalar still

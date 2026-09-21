@@ -2,16 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This file describes the **current** state of the codebase and standing conventions — not a
+chronological history of how it got there. Shipped-feature history (specific bug reports, rejected
+approaches, exact before/after numbers) lives in [`CHANGELOG.md`](CHANGELOG.md), which is the place
+to check "why did we do X" for anything not covered below; forward-looking ideas live in
+[`docs/REFACTOR_PLAN.md`](docs/REFACTOR_PLAN.md). Keep this file that way: when you fix something,
+update the relevant paragraph below to reflect the new *current* behavior rather than appending a new
+"reported... fixed..." entry — the report itself belongs in the commit message and CHANGELOG.md.
+
 ## What this is
 
 webSMLM is a **single-file** browser tool for single-molecule localization microscopy (SMLM):
 the entire application — HTML, CSS, all JavaScript, and the two bundled decoders (pako, UTIF) —
-lives in `webSMLM.html` (growing past 10400 lines; the file's own top-of-file **MODULE INDEX**
-comment gives current per-module line numbers — re-`grep -n "MODULE:"` if it looks stale, and
-refresh it alongside a build-letter bump when a change has moved things by more than a few
-lines). It loads a raw TIFF stack, detects/localizes emitters, and renders a super-resolution
-image, **entirely client-side** (no upload, no server, no network calls at runtime). `index.html`
-is just a redirect to `webSMLM.html` for the bare Pages URL.
+lives in `webSMLM.html` (~20,800 lines; the file's own top-of-file **MODULE INDEX** comment gives
+current per-module line numbers — re-`grep -n "MODULE:"` if it looks stale, and refresh it alongside
+a build-letter bump when a change has moved things by more than a few lines). It loads a raw TIFF
+stack, detects/localizes emitters, and renders a super-resolution image, **entirely client-side** (no
+upload, no server, no network calls at runtime). `index.html` is just a redirect to `webSMLM.html`
+for the bare Pages URL.
 
 `webSMLM.html` itself has **no build system, no package.json, no dependency install, and no test
 runner.** "Running" the app = opening `webSMLM.html` in a browser (double-click, or the hosted
@@ -24,173 +32,98 @@ Node+Playwright CLI for headless/scripting use — see **pipeline** below — wi
 ## Editing model
 
 All work happens inside `webSMLM.html`. It is organized into commented `MODULE:` banners; find the
-relevant one before editing rather than scrolling:
+relevant one before editing rather than scrolling. The code itself carries extensive inline "why"
+comments at nearly every non-obvious decision — the summaries below are a map to get oriented and a
+place to record cross-cutting facts, not a substitute for reading the code's own comments once you're
+in a module.
 
 - **params** — the `PARAMS` registry: single source of truth for every analysis/render/export
-  parameter (name → `{label, min, max, step, default, int}`), read via `paramValue(id)`. Drives
-  the HTML controls' min/max/default (`syncParamControls()`), Save/Load Settings, and — for
-  parameters with no page control yet (worker-dispatch thresholds, preview timing, etc.) —
-  `paramOverrides`, settable only via a loaded settings JSON. This is also the shape
-  `window.webSMLM.analyze(config)`'s headless config takes (see **pipeline** below) — a new
-  `PARAMS` entry is automatically available to both without extra wiring. Deliberately excludes
-  pure display/layout (CSS) and per-dataset working state (`calFirst`/`calLast`/`zmin`/`zmax`).
+  parameter (`name → {label, min, max, step, default, int}`), read via `paramValue(id)`. Drives the
+  HTML controls' min/max/default (`syncParamControls()`), Save/Load Settings, and the headless
+  `window.webSMLM.analyze(config)` config — a new `PARAMS` entry is automatically available to both
+  with no extra wiring. Deliberately excludes pure display/layout (CSS) and per-dataset working state
+  (`calFirst`/`calLast`/`zmin`/`zmax`).
 
-  `addNumberSteppers()` (runs once, right after `syncParamControls()`) wraps every `input.num` in a
-  `.numstep` span with an appended `.numstep-btns` −/+ pair — Inkscape-style, always visible, not
-  the browser's native number-input spinner (tried first; reverted — look varies across engines,
-  and it's hover-reveal only, unreachable on a touchscreen). Reads each input's already-present
-  `min`/`max`/`step` (set by `syncParamControls()` for `PARAMS`-mapped fields, or static HTML
-  attributes for the ones `PARAMS` excludes), so any current or future `.num` field gets steppers
-  for free with no per-input wiring. Clicking dispatches real `input`/`change` events, so every
-  existing listener reacts exactly as it would to typing. `input.num` is left-aligned (not right)
-  and narrower (64px) — value first, then the control that changes it.
+  `addNumberSteppers()` wraps every `input.num` in a `.numstep` span with an always-visible
+  Inkscape-style `.numstep-btns` −/+ pair (not the browser's native spinner — inconsistent look
+  across engines, hover-reveal only, unreachable on touch). Reads each input's already-present
+  `min`/`max`/`step`, so any current or future `.num` field gets steppers for free. Clicking
+  dispatches real `input`/`change` events.
 
-  **Trailing "/N" text next to a numstep-wrapped field needs its own `vertical-align:middle`.**
-  `.numstep` is `display:inline-flex;align-items:stretch;vertical-align:middle`, so it renders
-  TALLER than a plain text baseline — a plain `<span>` right after it (e.g. the Frame scrubber's
-  `#scrubTotal`, "/ total frames" next to `#scrubNum`) inherits ordinary baseline alignment and
-  renders visibly lower than the numstep group's own vertical centre unless it also gets
-  `vertical-align:middle`. That span also carries a space on each side of the `/` (` / 20000`) —
-  safe since the parent already has `white-space:nowrap`.
+  `pxnm` ("Pixel size (nm)") and `frametime` ("Frame time (s)") are pinned always-visible near the
+  top of the sidebar, outside any collapsible section — both are per-dataset acquisition properties
+  several modules (spt, smFRET) depend on, not settings local to one module. `gain`/`camoffset`/**Get
+  estimate** sit at the top of **Localisation settings**, right below **Real-time update**.
 
-- **in/out** — TIFF parsing; in-memory vs. streamed loading; contiguous ImageJ stacks are indexed
-  arithmetically, multi-IFD (Micro-Manager MMStack) stacks by walking the IFD chain. Handles
-  multi-GB files via `File.slice()` (never fully loaded). `loadTiffFile()`'s choice between the
-  whole-file (`file.arrayBuffer()`) and streamed (`loadMultiIfdStreaming()`) path is gated on
-  `effSliceMin = Math.min(SLICE_MIN, readBudget())` — `SLICE_MIN` (~1.5 GB) alone used to be the
-  ONLY gate, disconnected from `readBudget()`/`memgb` (the SAME "Memory budget (GB)" control that
-  gates decoded-frame caching further downstream). **Fixed a real bug**: a moderate file (147 MB
-  bundled sample; a 680 MB real-world one) stayed under 1.5 GB and always took the whole-file path
-  (reading the entire raw file AND indexing every frame's IFD up front, before any budget check),
-  while a much larger file (4.9 GB) was always forced onto the chunked streaming path regardless of
-  its own size — on memory-constrained mobile Safari (no JS-visible OOM signal, see FTM's memory
-  note below) this made the SMALLER file the riskier load. Tying the threshold to `readBudget()`
-  lets a user lower **Memory budget (GB)** and have it apply here too; unchanged at the 3 GB
-  default (`min(1.5GB,3GB)=1.5GB`) so desktop behaviour is untouched. Verified via Playwright: a
-  forced-low budget routes the same 147 MB sample through `loadMultiIfdStreaming()` instead,
-  producing byte-identical pixel data. Both call sites log a one-line advisory —
-  `"Streaming instead of loading whole: X file exceeds the Y Memory budget…"` — but ONLY when the
-  tightened budget (not a file genuinely over the fixed 1.5 GB ceiling) is what forced streaming,
-  so it doesn't fire redundantly alongside the other path's own message.
+  **No checkbox or control label ends in "?"** — a plain house-style convention (e.g. **Apply
+  segmentation**, **3D localisation**, **Analyse FRET**, **Position donor**). `select.sel:disabled`
+  needs its own explicit `{opacity:.45;cursor:not-allowed}` rule — its `color:var(--fg)` defeats a
+  browser's native disabled-dimming, so `.disabled=true` alone is invisible without it.
 
-  **`memgb`'s own DEFAULT is also lowered on mobile** (`syncParamControls()`, MODULE: params) — the
-  fix above only helps once a user has actually lowered **Memory budget (GB)**; at the unchanged
-  3 GB default the 680 MB mobile-sized file still crashed silently. `syncParamControls()`
-  special-cases `memgb`: on a narrow viewport (`isMobileViewport()`, `window.innerWidth<=860` — the
-  same signal the mobile sidebar drawer uses) it defaults to `0.5` (its UI-allowed minimum) instead
-  of `3`. **1 GB was tried first and is wrong** — `680 MB<1 GB` still doesn't clear the threshold,
-  only `0.5` (512 MB) does; re-verify against a real number if this default is ever revisited.
-  Deliberately a LOCAL override inside the sync loop (`const def = ... ? 0.5 : spec.default`), NOT
-  `spec.default=0.5` — the latter would permanently mutate the shared `PARAMS.memgb` object
-  (`PARAMS[id]` is a reference, not a copy). Only the INITIAL default changes; a loaded settings
-  JSON's own `memgb` still overrides it as always.
+- **in/out** — TIFF/ND2/FITS parsing; in-memory vs. streamed loading; handles multi-GB files via
+  `File.slice()` (never fully loaded). `loadTiffFile()`'s dispatch chain: FITS (`isFitsFile()`, magic
+  byte) → ND2 (`isNd2File()`, magic `0x0ABECEDA`) → TIFF-in-disguise (`t256`/`t257` sanity-checked —
+  UTIF returns one EMPTY ifd object, no exception, on non-TIFF bytes) → whole-file
+  (`file.arrayBuffer()`) vs. streamed (`loadMultiIfdStreaming()`), gated by
+  `effSliceMin=min(SLICE_MIN≈1.5GB, readBudget())` — ties the streaming threshold to **Budget raw
+  movies (GB)** (`memgb`), which defaults to `0` (not `3`) on a memory-constrained device
+  (`isMemoryConstrainedDevice()`, `MOBILE_MEM_DEFAULTS`/`syncParamControls()`, MODULE: params) — a
+  `0` budget floors `effSliceMin` at `0`, so EVERY movie load on such a device takes the streamed
+  path regardless of file size, never the whole-file-cached one. **`isMemoryConstrainedDevice()`
+  deliberately checks the SMALLER of `window.innerWidth`/`innerHeight`, not width alone** — a phone
+  held in landscape swaps its two CSS dimensions, so its WIDTH commonly exceeds the 860px threshold
+  even though the device itself hasn't changed (a large iPhone's landscape viewport is ~926px wide) —
+  exactly backwards for a device-class check, which should be orientation-independent.
+  `isMobileViewport()` (width alone) is a SEPARATE function, still correct for its own purpose — the
+  sidebar-drawer layout decision, which only cares about available horizontal space, not device
+  class. See **pipeline**'s own paragraph below for the full `memBudgetGB`/`memgb`/`chunkmb` picture
+  and the one-time mobile memory warning pop-up.
 
-  A multi-file selection (Ctrl/Cmd+click) goes through `loadTiffFilesAuto()`, which auto-detects
-  which of two combining strategies applies from `files[0]`'s own frame count (same "file[0] sets
-  the rules" convention used for width/height): exactly 1 frame → `loadTiffSequence()`
-  (natural-sorted, one file = one frame — e.g. a per-frame camera dump); more than 1 →
-  `makeConcatStack()` (each file loaded normally via `loadTiffFile()`, keeping whichever loading
-  strategy its own size calls for, then concatenated end-to-end) — for one continuous acquisition
-  split across several files purely by size, a different scenario from the per-frame case.
-  `makeConcatStack()` only implements `getFrames()` (never `getFrame()`, same convention as
-  `makeCroppedStack()`/`makeFtmStack()`), routing a requested range across component stacks via a
-  prefix-sum frame-count table. The same `loadTiffFilesAuto()` entry point backs the interactive
-  file input, calibration loading, and the headless `cfg.files`/`cfg.calibrationFiles` config (see
-  **pipeline**) — one detection path, three callers. Multi-file selection filters candidates by
-  SNIFFING the real TIFF magic bytes (`isTiffFile()`, "II*\0"/"MM\0*") rather than trusting the
-  filename extension; the `#file` input's `accept` lists `.nd2` alongside `.tif`/`.tiff` for
-  exactly this.
+  A multi-file selection (`loadTiffFilesAuto()`) auto-detects strategy from `files[0]`'s own frame
+  count: exactly 1 frame/file → `loadTiffSequence()` (file-per-frame, natural-sorted); more than 1 →
+  `makeConcatStack()` (one acquisition split across files by size). Candidates are filtered by
+  sniffing real magic bytes, never by extension. One detection path (`loadTiffFilesAuto()`) backs the
+  interactive file input, calibration loading, and the headless `cfg.files`/`cfg.calibrationFiles`.
 
-  `loadTiff()`/`loadTiffFile()`'s fast path and `loadTiffSequence()`'s `decodeOne()` all validate
-  the raw ImageWidth/ImageLength tags (`t256`/`t257`) are present and positive before trusting a
-  `UTIF.decode()` result — UTIF returns one EMPTY ifd object (no exception) for non-TIFF bytes, so
-  without this an unsupported binary would silently produce `NaN` dimensions instead of a clean
-  error. **Check `t256`/`t257`, not `.width`/`.height`** — those are only set as a side effect of
-  `UTIF.decodeImage()`, so checking them beforehand silently checks `undefined>0` and rejects every
-  file, valid or not (a real regression caught before shipping).
+  `tiffScaleHint(ifd0, desc)` reads `finterval=`/pixel size from the `t270` description text (only
+  when `unit=` says micrometers); it sanity-checks the FINAL resolved nm value (1–100000), not just
+  the raw tag `>0` — a `0xFFFFFFFF` "unset" XResolution sentinel some writers emit otherwise produces
+  a fabricated "≈0.0 nm/px" line. `mmMetadataHint(ifds)` separately reads Micro-Manager's own
+  per-frame JSON metadata (tag 51123, `ifd.t51123.join('')` — UTIF stores an ASCII tag's value as an
+  array holding the whole string) for camera identity/exposure/pixel-size, and estimates frame
+  interval from a `MM_HINT_SAMPLE=25`-frame evenly-spaced sample's median inter-frame gap (not every
+  frame — 40,000 `JSON.parse()` calls would measurably slow a large-stack load for no real gain).
 
-  **Native Nikon ND2** (distinct from the TIFF-in-disguise case above), shipped v0.11.2,
-  **experimental** — `isNd2File()` sniffs the real magic (`0x0ABECEDA` LE u32 at byte 0) and
-  `loadTiffFile()`'s first line dispatches to `loadNd2File()`, reaching all three existing callers
-  (interactive, calibration, headless) with no caller-side changes; `loadTiffFilesAuto()` also
-  special-cases a lone `.nd2` selection (multi-file ND2 concatenation isn't supported yet).
-  Reverse-engineered directly from real sample bytes, not ported from any GPL reader (see also the
-  independent BSD-3-Clause `tlambert03/nd2` reference). The file is a flat run of 16-byte-header
-  chunks (`magic+dataOffset+dataLen+4 reserved`, then a `!`-terminated name, then payload), each
-  padded to the next 4096-byte boundary; `readNd2ChunkHeader()` walks the WHOLE chain from byte 0
-  to index every `ImageDataSeq|N!` frame offset — no shortcut, since the required
-  `ImageAttributesLV!` metadata chunk sits near EOF, after all frame data. Each `ImageDataSeq|N!`
-  payload is a 24-byte (`ND2_FRAME_HEADER_BYTES`) per-frame sub-header (unidentified, never parsed)
-  then the pixel array. `parseNd2LvField()` recursively decodes Nikon's binary key-value ("LV")
-  format for `ImageAttributesLV!`/`ImageCalibrationLV|0!`: a container (type `0x0b`) holds
-  `childCount(u32)+byteLen(u64)` then recurses exactly `childCount` times — **`byteLen` must never
-  be used as the parse boundary**, it can include trailing padding and produce a bogus extra read
-  with a garbage type byte. String fields (type `8`) are **null-terminated UTF-16LE with no length
-  prefix**, unlike field names (explicit `nameLen`). `getFrames(s,e)` decodes each frame at its own
-  explicit stored offset (never back-to-back). Pixel calibration (`ImageCalibrationLV|0!`'s
-  `dCalibration`) and two bonus metadata chunks — `CustomData|AcqTimesCache!` (per-frame
-  timestamps → a MEDIAN-of-diffs frame-interval estimate, robust to near-zero leading placeholders
-  seen in real files) and `CustomData|STORM_CAM_DATA_SHEET_XML-V1!` (camera datasheet info, NOT
-  wired to `gain`/`camoffset`) — are also parsed. TIFF gets the analogous treatment via
-  `tiffScaleHint(ifd0, desc)`: reads `finterval=` from the `t270` description text, and — only when
-  `unit=` says micrometers — `t282`/`t283` (XResolution/YResolution) for a pixel-size estimate;
-  `t296` (ResolutionUnit) is deliberately never consulted.
+  **Native ND2** (experimental): reverse-engineered directly from real sample bytes (not ported from
+  a GPL reader) — a flat run of 16-byte-header chunks (`magic+dataOffset+dataLen+4 reserved`, then a
+  `!`-terminated name, then payload, each padded to the next 4096-byte boundary);
+  `readNd2ChunkHeader()` walks the whole chain (the required `ImageAttributesLV!` metadata sits near
+  EOF, after all frame data). `parseNd2LvField()` recursively decodes Nikon's binary key-value
+  format — a container's own `byteLen` must never be used as the parse boundary (it can include
+  trailing padding); string fields are null-terminated UTF-16LE with no length prefix.
 
-  `makeCroppedStack()` (raw-panel crop tool, `rawCropBtn`) is the simplest stack wrapper: slices
-  every fetched frame to a fixed `[x0,x1)×[y0,y1)` sub-rectangle and REPLACES the module-level
-  `stack` with it (kept in `originalStack` while active, restored on "uncrop") — a full stack swap
-  rather than a search-region restriction threaded through detect/fit, so no downstream consumer
-  needs a coordinate offset added back. Deselecting `rawCropBtn` while `lastResult` exists confirms
-  first — `resetAfterCropChange()` erases `lastResult` (and sSMLM pairing state) unconditionally,
-  no undo.
+  **Native FITS** (experimental, camera-movie subset only — a single primary HDU, 2D image or
+  2D+frame-axis cube, `BITPIX` ∈ {8,16,32,-32,-64}, general `BZERO`/`BSCALE`). **Row orientation**:
+  FITS stores row 1 at the BOTTOM with index increasing upward (Pence et al. 2010, *A&A* 524, A42
+  §5.1) — the opposite of TIFF/canvas's top-down convention — so `decodeOne()` reads output row `y`
+  from source row `h-1-y` directly. `fitsParseHeader()` walks 80-byte cards until `END`, growing its
+  read by one 2880-byte block at a time.
 
-  **FTM** (`ftmEnabled`/`ftmWindow`, controls in the **fit** module's `PARAMS`/sidebar despite the
-  functions living here) is a per-pixel sliding-window temporal median subtraction — floored at
-  `camoffset` and added back, not floored at zero, see **fit** for why — used in two places sharing
-  the same math but otherwise independent:
-  - **Scrubbing preview** — `ftmFrame()`/`ftmFrameParallel()`, one frame at a time, fetching only
-    that frame's own `ftmWindow`-wide context. Parallelizes across the worker pool spatially (row
-    bands, no overlap margin needed — each pixel needs no neighbouring-pixel context). The
-    raw-panel toggle (`rawFtmBtn`, shown only while `ftmEnabled` is checked) drives `rawFtmView`;
-    `showFrame()` swaps in the corrected frame before running the usual detect/live-preview logic.
-    The raw panel title stays fixed at "Raw frame" always — only `rawFtmBtn`'s own label changes
-    (a dynamic title was tried and reverted: visual noise for no information gain).
-  - **Localize** — processes the stack in chunks sized from half the `chunkmb` budget (headroom
-    for raw context + corrected output coexisting), using the sliding-window median algorithm
-    (`ftmSeriesGlobal`, O(window) per step). Two implementations, chosen by whether `runCore()`
-    uses the worker pool this Run:
-    - **No pool**: `makeFtmStack()` wraps the loaded stack so `runCore()`'s serial `getFrames()`
-      calls receive FTM-corrected data transparently, caching each chunk. Main-thread, with a
-      single-flight lock.
-    - **Pool in use**: a **barrier-phased loop** inside `runCore()` (search `fetchStack!==stack`)
-      processes chunk by chunk — each chunk runs a full-pool-parallel FTM-correction phase
-      (`ftmChunkParallel()`, row-band split) to completion, THEN a full-pool-parallel detect/fit
-      phase (duplicated rather than shared, to keep the non-FTM path provably untouched) to
-      completion, before the next chunk's FTM phase — never both job types on the pool at once.
-      **Required, not just faster**: each worker has exactly one `onmessage` property, not a
-      queue, so without the barrier an FTM-correction reply and a detect/fit reply could clobber
-      each other's handler mid-flight. The timing log's `↑ N workers · X% utilisation` line covers
-      the detect/fit phase only, excluding the separately-reported FTM phase. Each chunk's
-      detect/fit phase's `finishChunk()` MUST check `shouldStop()` itself, not just rely on
-      `dispatchChunk()`'s own bail-out.
+  `makeCroppedStack()` (raw-panel crop tool) slices every fetched frame to a fixed rectangle and
+  REPLACES the module-level `stack` (kept in `originalStack` while active) — a full stack swap, not a
+  search-region restriction threaded through detect/fit, so no downstream consumer needs a coordinate
+  offset added back.
 
-    Both implementations must widen a chunk's context fetch beyond naive `coreStart±window/2`
-    whenever the chunk's core range comes close enough to either end of the **whole stack** (not
-    the Run's own `fitFirstFrame`/`fitLastFrame`) that a frame's window gets clamped further than
-    that padding accounts for — same clamp `ftmSeriesGlobal` applies per frame internally
-    (`ftmFrame()`'s single-frame path already had this right; the chunked functions didn't, until a
-    worker-vs-serial A/B test caught a ~5%-photon-count-bias for a stack's tail frames).
-
-    **Memory**: the barrier-phased loop's `ctxFrames` (raw context, dead once `ftmChunkParallel`
-    returns `corrected`) must be explicitly dropped (`ctxFrames=null`, hence `let` not `const`)
-    right after that call, not left reachable through the following dispatch phase's own
-    allocations in the same closure — `chunkmb`'s `/2` split only budgets for context+corrected
-    coexisting, not context+corrected+in-flight batch clones too. `runCore()` also logs an
-    estimated peak-MB figure (chunk working set plus the already-cached stack's size, a *separate*
-    budget stacking on top of `chunkmb`) right after the chunk-size line, advisory above ~800 MB —
-    gated on `memgb<=8` (max is now 64, for workstation-scale caching) so a desktop user who's
-    deliberately raised it isn't nagged every Run. Visibility only: a mobile tab killed for memory
-    pressure gets no JS-visible error at all — nothing here can detect or prevent that.
+  **FTM** (`ftmEnabled`/`ftmWindow`, controls live in **fit**'s sidebar despite the functions living
+  here) is a per-pixel sliding-window temporal median subtraction, floored at `camoffset` (not zero
+  — see **fit**). Two independent uses: (1) scrubbing preview (`ftmFrame()`/`ftmFrameParallel()`, one
+  frame at a time, row-band parallelized); (2) Localize — either `makeFtmStack()` (main-thread,
+  single-flight, when no worker pool) or a **barrier-phased loop** inside `runCore()` (a full
+  FTM-correction phase over the WHOLE worker pool, then a full detect/fit phase, per chunk — never
+  both job types on the pool at once, since each worker has exactly one `onmessage` property, not a
+  queue). Both context-fetch paths must widen beyond naive `coreStart±window/2` near either end of
+  the WHOLE stack (not just the Run's own frame range), matching `ftmSeriesGlobal`'s own per-frame
+  clamp — a stack's tail frames otherwise get a biased, too-narrow window.
 
 - **simulation** — the built-in synthetic stack generator ("Simulate movie"): demo/validation/
   teaching data, not a core analysis path. Split out from in/out since it doesn't load anything.
@@ -394,8 +327,12 @@ relevant one before editing rather than scrolling:
   F²-photon units, where the data IS Poisson again) and `applyExcessNoise()` scales
   photons/bg/bgstd back by F². Positions are untouched; the CRLB comes out inflated by exactly F.
   Measured: CRLB coverage of the real scatter 0.66 at F²=1 → 0.93 at F²=2 on EMCCD data. Applied
-  at three of the four fit dispatch sites (worker, `runCore()`, live preview — the worker self-test
-  doesn't fit real data). `photons` can shift ~0.25% between F²=1 and 2 on the same movie because
+  at every fit dispatch site that fits real data: the worker, `runCore()`'s serial loop, the live
+  preview, and — since the upstream v0.12.7 merge — the GPU fit path's result loop in
+  `makeGpuFitAccumulator()`. The GPU needs no kernel change for it: its seeds and windows are packed
+  with `runCore()`'s own `gain`, which is already `gain/F²`, so only the photon-like outputs need
+  scaling back, same as everywhere else. **Any new fit dispatch path must do the same**, or F²
+  silently stops applying there. `photons` can shift ~0.25% between F²=1 and 2 on the same movie because
   `mstep`'s absolute floors (`Math.max(100,0.3*N)`) are not scale-invariant — expected, not a bug.
   PCFO measures gain·F² on EMCCD data and says so rather than silently dividing.
 
@@ -468,56 +405,39 @@ relevant one before editing rather than scrolling:
   `scoreTruthCore()` stays global-free: frame size, the Run's detection border and the Run's own
   frame range (`firstIdx`/`lastIdx`/`stopped`, so a restricted or stopped Run is not scored as
   missing everything it never looked at) come in through `truthScoreConfig(cfg, det, run)`, the
-  one helper both the button and `analyze()` use.
+  one helper both the button and `analyze()` use. Its controls have their own sidebar section,
+  `validationBox` ("Score vs truth", right after Drift correction & precision), since upstream
+  v0.12.7 folded the Localization precision box they used to live in into the Drift box.
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
-  B-spline **wavelet** (default) or **DoG** (both thresholded by local maxima above `mean + k·σ`),
-  or **uniform box filter** (difference of two box averages, thresholded by a plain intensity
-  value + a σ_PSF-sized square dilation, per Huang et al. 2011). `detectSpots()` is the single
-  dispatch point (used by both the main thread and workers) that picks the right band-pass +
-  maxima function for the selected mode. Each filter's UI parameters are separate fields named
-  `detection_<method>_<setting>` (e.g. `detection_DoG_thr`, `detection_box_thr`) shown/hidden by
-  the sync IIFE keyed off `#detFilter` — don't reintroduce a single shared field across methods,
-  their thresholds mean different things (k·σ multiplier vs. raw intensity).
+  B-spline **wavelet** (default), **DoG** (both thresholded by local maxima above `mean+k·σ`), or a
+  **uniform box filter** (difference of two box averages, thresholded by a plain intensity value plus
+  a σ_PSF-sized square dilation, per Huang et al. 2011). `detectSpots()` is the single dispatch point
+  (main thread and workers) that picks the right band-pass + maxima function. Each filter's own
+  threshold field (`detection_<method>_<setting>`) is separate by design — the thresholds mean
+  different things (k·σ multiplier vs. raw intensity), don't unify them.
 
 - **fit** — phasor (fast, non-iterative), least-squares 2D-Gaussian, and Poisson-MLE 2D/3D/
   Elliptical (`gaussianMLEspheric`/`gaussianMLEelliptic`/`gaussianMLEellipticangled`;
-  `gaussianMLEspheric` is the default) localization. All fitters take `gain,camoff` and convert
-  every pixel to true photon units — `(raw-camoff)*gain` — before fitting, matching Picasso's
-  architecture; position/width/ratio outputs are provably invariant to this affine transform
-  (LS/phasor), while MLE's Poisson likelihood and CRLB (`lpx`/`lpy`) are only statistically correct
-  when fit in photon units, so this is the one place gain/offset actually change a result rather
-  than just rescaling it.
+  `gaussianMLEspheric` is the default) localization. All fitters take `gain,camoff` and convert every
+  pixel to true photon units — `(raw-camoff)*gain` — before fitting, matching Picasso's architecture;
+  MLE's Poisson likelihood and CRLB (`lpx`/`lpy`) are only statistically correct fit in photon units.
 
-  **Shared MLE accumulator**: `gaussianMLEspheric`/`gaussianMLEelliptic`/`gaussianMLEellipticangled`
-  all run on ONE Fisher-scoring Newton driver, `mleNewtonFit(n, th, mstep, clampFn, ..., modelFn)` —
-  checked directly against Picasso 0.11.0's `picasso/fitting/gaussfit.py`, whose
-  `_estimator_terms(mle, value, data, var)` dispatch is the same Fisher-scoring shell
-  (`inv=1/model; cf=data*inv-1; hess+=du·du·inv`) webSMLM already implemented. `modelFn(px,py,th,
-  duOut)` returns the per-pixel model value and writes its Jacobian into a reused scratch array —
-  `mleModelSpherical`/`mleModelElliptical` are erf-pixel-integrated (unchanged math, just
-  extracted); the driver never needs to know what a parameter MEANS, only how the model responds to
-  it, so a third/fourth model plugs in without touching the driver. `gaussianFit` (LSQ, Gauss-Newton
-  + backtracking line search) is deliberately NOT part of this unification — different per-pixel
-  weighting (plain squared residual, no `1/model` term) and a different outer solver.
+  **Shared MLE accumulator**: the 3 MLE fitters run on one Fisher-scoring Newton driver
+  (`mleNewtonFit(n, th, mstep, clampFn, ..., modelFn)`), the same shell Picasso 0.11.0's
+  `_estimator_terms` uses; `gaussianFit` (LSQ, Gauss-Newton + backtracking) is deliberately separate
+  (different per-pixel weighting, different solver). `gaussianMLEellipticangled` ("Gauss MLE rotated
+  elliptical") adds a real new model — `[x,y,N,bg,σx,σy]` plus a rotation angle, fixed (from
+  `sSmlmAngleCenter`, when **3D localisation** is unchecked) or free (when checked; the seed
+  deliberately breaks σx==σy symmetry to avoid a singular angle Hessian) — motivated by sSMLM, which
+  needed a real directional PSF-width measurement, not a symmetric-fit proxy. Point-sampled, not
+  pixel-integrated, matching Picasso's own `_accumulate_rotated`.
 
-  **`gaussianMLEellipticangled`** (`'gaussmleEll'`, "Gauss MLE 3D rotated elliptical" in the UI)
-  adds a genuinely new model: `[x,y,N,bg,σx,σy]` plus a rotation angle, either FIXED (6 free params,
-  reusing `mleModelElliptical` with pixel offsets pre-rotated by the constant once — same
-  size/stability class as `gaussianMLEelliptic`, no angle Hessian row) or FREE (7 free params, angle
-  is θ[6]). Motivated by sSMLM: every other 2D method fits one symmetric σ, so `sigma1st` (see
-  **sSMLM**) was never a real directional measurement of the spectrally-smeared 1st order, just the
-  closest available proxy. POINT-SAMPLED (`value=amp·exp(-½(arga²/σx²+argb²/σy²))+bg` at the pixel
-  CENTER), not pixel-integrated like the other two models — a rotated Gaussian doesn't factor into
-  closed-form per-axis erf integrals the way an axis-aligned one does; matches Picasso's own
-  `_accumulate_rotated` formula exactly. `photons` is the amplitude converted to a true integrated
-  photon count (`amp*2π·σx·σy`, same relation `gaussianFitElliptical` uses) — NOT the raw θ[2]
-  amplitude the point-sampled model actually optimizes internally (`amp` reported separately).
-  **Free-angle gotcha** carried over from Picasso: the angle derivative vanishes identically when
-  σx==σy, singularising the Hessian — the seed deliberately breaks that symmetry
-  (`σx0=1.05·σ0, σy0=0.95·σ0`) whenever angle is free; a fixed angle never enters the optimisation,
-  so this doesn't apply there. An unconstrained (σx,σy,angle) fit also has a real, expected 4-way
-  degeneracy (swapping σx↔σy and adding ±90°/±180° to the angle describes the identical physical
-  ellipse) — not a bug, confirmed against all 4 equivalent parameterisations of a synthetic fit.
+  **Accept/reject drift gate** for all 5 fitters is bounded by `FIT_MAX_DRIFT_SIGMA_MULT`(2)×the SEED
+  σ_PSF (`sigma0`, never the fit's own output — that would be circular), not by Fit radius (`winr`)
+  — coupling the two gave different accepted counts at `winr` 3 vs 4 on identical, real crowded data.
+  `MLE_MIN_SIGMA`/`MLE_MAX_SIGMA` (0.5/6, same bound as the LSQ fitters) reject any MLE result pinned
+  at either σ bound. Both constants are stringified into the detect/fit worker via `WORKER_PRELUDE` —
+  see the Web Worker gotcha below.
 
   **`psfmle` — PSF-model ("vector") fitting (2026-09-20).** `psfModelMLE()` fits the modelled PSF
   itself rather than a Gaussian: `buildPsfFitModel()` box-filters each kernel plane by one camera
@@ -533,7 +453,8 @@ relevant one before editing rather than scrolling:
   Measured against `mle3d` on one astigmatic 3D movie: axial median 16.9 vs 22.6 nm, equal
   recall and lateral, 1.8× the time (0.5 ms/spot for the fit itself vs 0.086).
   **Single-threaded on purpose for now** (`useWorkers` excludes it): the model is megabytes and
-  the pool's single `onmessage` makes a second message type a scheduling hazard.
+  the pool's single `onmessage` makes a second message type a scheduling hazard. It is also not in
+  `GPU_FIT_METHODS` (MODULE: gpu), so **Use GPU acceleration** leaves it on the CPU.
   **Double helix — and the bug that faked a physics conclusion (2026-09-20g).** `psfmle` first
   recovered |z| but not its sign on a DH PSF; a z rescan-and-restart changed nothing, lobe
   pairing merged nothing, and the failure reproduced on data generated from the fitter's own
@@ -554,6 +475,10 @@ relevant one before editing rather than scrolling:
   cluster's centroid; measured trade at 6 px precision 30%/slope 0.71, at 10 px precision
   47%/slope 1.04 with no gross failures but recall down to 26%. Default 0 = off. Clustering, not
   pairwise pairing: a real engineered PSF also has satellites whose count changes with depth.
+  `mergeRadius` is threaded through EVERY Localize detect site — the worker's frame-batch and
+  `gpuDetect` branches (both message shapes carry it), `runCore()`'s serial and GPU-serial loops,
+  the raw-panel previews, `showFrame()` and live streaming; calibration and smFRET SOI detection
+  deliberately stay at 0. A new detect call inside `runCore()` needs it too.
 
   **`PARAMS.localize3D`** ("3D localisation?", default checked) is the switch between the two angle
   modes for `'gaussmleEll'` — no separate per-method setting. `updateMethodUI()` only shows the
@@ -575,790 +500,816 @@ relevant one before editing rather than scrolling:
   warn (`onLog`, once per Run, gated on `!config.localize3D`), not refuse, when
   `config.sSmlmAngleCenter` is still exactly its default.
 
-  `mle3d` itself also respects `localize3D`: unchecked, it's an axis-aligned elliptical 2D fit
-  (`gaussianMLEelliptic`, angle implicitly 0) with no calibration requirement and no z — useful on
-  its own now that **export**'s `sigma_x`/`sigma_y [nm]` columns expose per-axis widths directly.
-  Checked (default), behavior is unchanged from before this control existed: calibration required
-  (`run()`'s `needCal` guard, mirrored in `analyze()`), z via `zFromWidths()`. `run()`'s `wcal` (and
-  `analyze()`'s `wcalForRun`) are only built when `localize3D` is checked AND a `gaussian_width`
-  calibration is present; `wcal`'s mere presence (not a second flag) decides whether
-  `runCore()`/the worker/`showFrame()` call `zFromWidths()` at all, for both methods alike.
+  `apertureGeometry(win)`/`percentile(sortedVals,p)` are a shared aperture-photometry helper: a
+  circular signal disk (`r=(win-1)/2`) plus a separate background annulus (`r < distance <= r+2.5`),
+  background estimated via that annulus's 56th percentile — published method (Martens et al., *J.
+  Chem. Phys.* 148, 123311 (2018), SI §S11, "Aperture photometry to assess intensity and background
+  levels," adapting Preus, Hildebrandt & Birkedal, *Biophys. J.* 111, 1278 (2016)), and this IS the
+  paper's own intended background/intensity method for phasor's own values, not a separate
+  smFRET-only technique (SI §S10 covers the phasor DFT itself; §S11 immediately follows it for
+  exactly this purpose) — confirmed directly by the paper's co-author, resolving an earlier round's
+  mistaken back-and-forth over whether phasor's own background should instead be some other,
+  narrower, ROI-only estimate. The SI's own prose ("pixels with distance to the ROI center smaller
+  than the ROI radius minus 2" = signal, "between [ROI radius minus 2] and [ROI radius plus 0.5]" =
+  background, else excluded) uses "ROI radius" to mean `r+2`, NOT this codebase's own `r` — solving
+  for `r` directly reproduces `apertureGeometry()`'s exact geometry (signal ≤ `r`, background out to
+  `r+2.5`), independently cross-checked against the SI's own Figure S11: only its 15×15-pixel panel
+  shows any EXCLUDED (black) corner pixels, which only happens when the background cutoff is `r+2.5`
+  (a 15×15 box's own corner distance, 7·√2≈9.90, just exceeds `r+2.5=9.5` at that one size — every
+  smaller panel's own corner distance stays under its own `r+2.5`, matching zero exclusions there).
+  Used by both `phasorFit()` and smFRET's `apertureIntensity()` — one implementation, not two.
+  `phasorApertureIntensity(img,w,h,cx,cy,win,gain,camoffset)` is this piece extracted out of
+  `phasorFit()` (pure refactor, behavior unchanged) so the GPU-fit seed builder below can call it
+  directly.
 
-  The `cal3dRow` "Load calibration…" control sits directly under `localize3DRow`, showing only
-  while BOTH `localize3D` is checked (or method is `phasor3d`) AND no calibration is active yet
-  (`cal3d||cal3dW`) — `updateMethodUI()` re-runs after every calibration load/compute so the box
-  disappears the moment one lands. No in-page "replace calibration" affordance yet; a fresh page
-  load or Load-settings round-trip is the reset path.
+  **Phasor/Phasor 3D are GPU-accelerated** (`WGSL_FIT_PHASOR`, MODULE: gpu) — a real gap closed, not a
+  deliberate exclusion (`GPU_FIT_METHODS` was just missing `'phasor'`/`'phasor3d'`). Unlike the
+  Newton-iterated MLE kernels, Phasor is the one CLOSED-FORM fit here: no iteration, no Fisher matrix,
+  and — since `phasorFit()` never returns `null` — no accept/reject gate at all, so CPU and GPU produce
+  IDENTICAL candidate counts by construction (verified: `tests/gpu/bench-fit.mjs` shows exact zero
+  discordance across every phasor case, unlike every MLE method's own inherent f32/f64 boundary
+  noise). The row/col Fourier sums `phasorFit()` builds via two intermediate K-length arrays are
+  algebraically equivalent to one direct double sum over the K×K window with per-pixel trig weights
+  (swapping summation order, Σ_dx Σ_dy = Σ_dy Σ_dx — verified numerically to ~1e-14) — this removes the
+  need for ANY per-candidate temporary array in the WGSL kernel, so it needs no per-Run kernel
+  regeneration the way `wgslGaussJordan(n)` genuinely does for its own matrix size. Photons/bg/bgstd
+  are NOT computed on the GPU at all: `phasorApertureIntensity()`'s own background annulus reaches
+  `r+2.5` px, WIDER than the K×K fit window this kernel (or any other GPU-fit kernel) ever sees, so
+  they're computed once per candidate on the CPU/worker side during seed-building
+  (`buildFitSeedRowPhasor()`) and passed straight through as plain numbers — no new GPU buffer type
+  needed. `tests/gpu/bench-fit.mjs` reports a large (1.5×–35×) speedup for this ISOLATED fit sub-stage
+  alone — but that number is misleading as a headline: asked directly to compare it against Gauss MLE
+  spherical's own overall Run time, a controlled A/B (same synthetic data, same page, pipeline already
+  warmed so no one-time compile cost skews it) showed TOTAL Run wall time within ~3–8% between the two
+  methods, even though the isolated fit sub-timer itself differs ~6× (e.g. 9ms vs 60ms out of a ~130ms
+  total). The fit stage was never the bottleneck for Phasor to begin with — CPU-side detection (8
+  worker threads, identical regardless of fit method) dominates a Run's wall time, so cutting an
+  already-small slice by 6× barely moves the total. Phasor's GPU path is still a real, non-negative
+  improvement (never slower once warmed up, see the cold-start note below), just not the dramatic
+  practical win the isolated benchmark number alone suggests — report the OVERALL Run time difference,
+  not the isolated fit-stage speedup, when asked how much Phasor's own GPU support actually helps.
+  Separately, the very FIRST phasor GPU dispatch in a page session pays a one-time WGSL pipeline-compile
+  cost gaussmle's own kernel doesn't pay at that point (`tuneGpuWorkgroup()`'s own startup auto-tune
+  already exercises and compiles the spherical kernel, not phasor's) — a single, one-off Localize click
+  can show phasor's Run as flat or even slightly SLOWER than gaussmle for exactly this reason, not a
+  real per-dispatch cost.
+
+  `winr2d`/`winr3d` are the fields actually shown in the sidebar; the underlying `winr` (still what
+  every `$('winr')`-based mechanism — PARAMS, live-preview listeners, worker dispatch — reads) is
+  hidden but kept mirroring whichever context is active by `applyWinrDefault()`
+  (`currentIs3d()`-driven), which is non-clobbering once `winr` has been hand-edited away from its
+  last auto-set value, and only dispatches a `change` event when the value is genuinely changing (a
+  spurious `change` here used to re-trigger `locateBeadsForCalib()` while **Fix bead x,y** was
+  checked, silently reverting the calibration graph back to the bead composite).
 
 - **render** — accumulates localizations into an offscreen buffer `srFull`; a `view` (zoom/pan)
   transform draws the visible region + scale bar. Colour maps, blur, and display scaling apply
-  without refitting. `LUT_CPS` control-point maps: `fire`/`inferno`/`viridis`/`turbo` are smooth
-  hue ramps for continuously-varying data (intensity, real 3D depth); `hsvBlue` is a closed-loop
-  full hue cycle (240°→cyan→green→yellow→red→magenta→violet→240°, saturation/value pinned to 1) —
-  unlike every other map here it's cyclic, so BOTH ends of the mapped range land on the same hue
-  (blue) by design, not an artifact; **Pair** auto-selects it. `drawDepthBar()` (the on-canvas
-  colour-scale strip) anchors to the actual DATA's own right edge and vertical centre
-  (`srFull._locMaxXpx`/`_locMidYpx`, cached once per `rerender()` in native px, converted through
-  the current `view`/zoom on each draw), falling back to the bare top-right canvas corner only if
-  there's no cached extent — a fixed corner alone looked disconnected, since sSMLM's paired
-  reconstruction is often a subset of a larger FOV. Ticks/labels extend left (into the panel) so
-  they're never clipped by the canvas edge.
+  without refitting. `LUT_CPS` maps: `fire`/`inferno`/`viridis`/`turbo` are smooth ramps for
+  continuous data; `hsvBlue` is a cyclic full hue loop (**Pair** auto-selects it).
 
-  `renderSuperRes()`'s accumulator buffers are DENSE, not sparse — one value per super-resolution
-  pixel across the WHOLE `(w×mag)×(h×mag)` grid regardless of localization count, so memory scales
-  as O(w·h·mag²), completely decoupled from data volume. `checkRenderSize()` runs before any
-  allocation: refuses (throws) if either side would exceed `CANVAS_MAX_DIM` (16384, a hard
-  per-browser canvas-creation wall) or if the estimated concurrent footprint (count/z accumulators,
-  `blur()`'s scratch, the final `ImageData`, the canvas backing store) exceeds `memgb` — the SAME
-  "Memory budget (GB)" setting stack loading uses. `rerender()` catches the throw, logs what to
-  change, and leaves the PREVIOUS `srFull` on screen rather than blanking; the headless `analyze()`
-  path lets it propagate. The count accumulator (`acc`) is `Uint16Array`, not `Float32Array` (a hit
-  count is always non-negative, halving the footprint); `zacc` (summed z, fractional) stays
-  `Float32Array`. `Uint16Array` WRAPS silently past 65535 on a naive `+=1`, so the increment is
-  guarded explicitly (`if(acc[idx]<65535) acc[idx]++`) with a one-line saturation warning.
+  `renderSuperRes()`'s accumulator buffers are DENSE (O(w·h·mag²), independent of localization
+  count). `estimateRenderBytes(W,H,zColor,blurPx,renderMode)` is the pure, no-throw formula behind
+  this — callable from `runCore()` (MODULE: pipeline) too, so a Run can reserve room for the render
+  that will follow it BEFORE it happens, not just guess. `checkRenderSize()` is the thin wrapper that
+  actually throws: refuses before any allocation if either side would exceed `CANVAS_MAX_DIM`(16384),
+  or if `estimateRenderBytes(...) + reserveBytes` exceeds `memBudgetGB` — the opt-in TOTAL memory
+  ceiling (default `Infinity`/unset on desktop, `0.5` on a memory-constrained device — see
+  **pipeline**'s own paragraph for the full picture), a no-op until one is actually set on desktop.
+  `reserveBytes` (default 0) is
+  memory ALREADY committed elsewhere that this render has to coexist with (see below); `rerender()`
+  leaves the PREVIOUS `srFull` on screen on failure rather than blanking. `LOC_ROW_BYTES` (right
+  above `estimateRenderBytes()`) is the ONE shared per-localization-object byte estimate every memory
+  guard in the app uses (`checkTableSize()`, MODULE: table; `checkLocsMemory()`, MODULE: pipeline;
+  `renderSuperRes()` below) — not independently-typed copies that could drift apart.
 
-  **`renderMode`** (`PARAMS.renderMode`, default `'precision'`) picks how `renderSuperResPixels()`
-  turns locs into pixels: `'precision'` splats each loc as its own bounded (±3σ) Gaussian sized by
-  its real CRLB (`lpx`/`lpy`; `rblur` is the fallback width for a method with none, e.g. phasor) —
-  Picasso's own default convention — with σ additionally capped at `MAX_SPLAT_SIGMA_PX` (6 SR-px)
-  since the ±3σ bound alone doesn't stop σ itself (∝ precision×mag) from growing unbounded for a
-  badly-localized outlier or high mag, which otherwise dominates render cost out of proportion to
-  its share of the dataset (measured on a real 4.2M-loc dataset). `'fixed'` is the original
-  behaviour: bin then apply one uniform blur (`rblur`) to the whole buffer — cost ∝ buffer area, not
-  loc count. `'dither'` is a stochastic alternative to `'precision'` for large/dense datasets:
-  jitters each loc by one seeded draw from N(0, its own σ) and bins — O(1)/loc instead of O(σ²)/loc,
-  10-24x faster on real dense data (Average-Shifted-Histogram/Monte-Carlo-KDE argument: each loc is
-  one sample from its own posterior, converging to the true density once many overlap) — but grainy
-  on sparse data, so not the default. Buffer dtype/allocation (`renderSuperRes()`'s main-thread
-  fallback AND the render worker's own copy) key off `renderMode` too: `Uint16Array` for
-  `'fixed'`/`'dither'` (integer hit count), `Float32Array` for `'precision'` (fractional Gaussian
-  mass); a mode switch must reallocate, never reuse the other dtype.
+  **`renderSuperRes()` passes its own `locs.length*LOC_ROW_BYTES + stackResidentBytes` into
+  `checkRenderSize()` as `reserveBytes`, and separately skips the render worker (falls back to the
+  single-threaded path) whenever dispatching would exceed budget ONLY because of the worker's own
+  clone** — real, calculated combined accounting, not a device-class guess. A real, reported crash:
+  an auto-stopped mobile Run (`checkLocsMemory()`) still sometimes crashed right AFTER its own
+  graceful "Stopping now, N localizations kept" message, exactly when the panel's own reconstruction
+  re-render ran next. Three compounding root causes: (1) `checkRenderSize()` used to compare the
+  render buffer's own cost ALONE against `memBudgetGB`, with no idea a large, already-resident `locs`
+  array existed at all — fixed by threading `reserveBytes` through it. (2) `dispatchRenderWorker()`
+  sends `locs` to the render worker via plain `postMessage` — a STRUCTURED CLONE, no transfer list —
+  so EVERY render (every throttled live preview during a Run, and the final one) transiently holds
+  BOTH the original locs array AND a freshly-cloned copy at once, a SECOND, temporary `locsBytes` on
+  top of whatever the first fix already confirmed fits — fixed by comparing `renderBytes +
+  2*locsBytes + stackResidentBytes` against `budget` to decide worker-vs-single-threaded (the
+  single-threaded fallback reads `locs` BY REFERENCE, no clone, at the cost of blocking the main
+  thread a little longer for that one render; the loaded stack's own cache is never cloned for this
+  dispatch, so it's added only once, not doubled). (3) asked about directly ("if a 3GB file is
+  loaded, does memory consumption increase well above 3GB depending on loc count, or is 3GB only the
+  file-size limit?") — a large whole-file-cached movie can itself already consume most of `memgb`
+  (MODULE: in/out's own `loadTiff()` caching decision), invisible to BOTH checks above until
+  `stackResidentBytes` (`stack.residentBytes||0`) was threaded through as an explicit parameter (NOT
+  read from the module-level `stack` global — this function is also called headlessly from
+  `analyze()`, whose own `stack` is a function-local variable shadowing the module-level one; reading
+  the global here would silently use the wrong stack in that context, the exact gotcha
+  `smfretSOICore()`'s own `checkStack` fix already ran into elsewhere). Every comparison uses
+  whatever `memBudgetGB` is ACTUALLY set to — this naturally never triggers on a desktop-sized (or
+  unset) budget and correctly does on a small one, on ANY device, with no `isMemoryConstrainedDevice()`
+  heuristic needed for THIS specific decision at all (that check still drives `memBudgetGB`'s own
+  device-specific default, and is used elsewhere too — see **workers**).
 
-  `setupPlot(cv, isPlot=false)` (shared by every draw function on the raw/sr canvases) letterboxes
-  a fixed 4/3 sub-rectangle, centred within the panel's own box, for plots — rather than changing
-  the canvas's own size (a CSS-`aspect-ratio` approach was tried first and rejected: CSS Grid
-  stretches both cards in a row to match whichever sibling is taller, so a panel's height ended up
-  depending on the OTHER panel's content). The canvas's own CSS box always tracks `--frame-ar` (the
-  loaded movie's own w/h); `isPlot=true` fills the whole canvas with `plotColors().bg`, computes a
-  centred 4/3 sub-rect, stashes the offset in `_plotLetterboxOx/Oy`, and `ctx.translate()`s to it
-  before returning the sub-rect's own W/H as if it were the whole canvas — so every plot-drawing
-  function's own `{ctx,W,H}`-from-`(0,0)` code needed zero changes. `registerPlotHover()` folds the
-  same offset into the `mL`/`mT` a caller hands it, since `drawPlotHover()`'s hit-testing reads
-  real, untranslated `clientX`/`Y`. `drawRawView()`/`drawView()` never pass `isPlot`.
+  `renderMode` (default `'fixed'`): `'fixed'` bins then applies one uniform blur (`rblur`, cost ∝
+  buffer area); `'precision'` splats each loc as its own CRLB-sized Gaussian (`lpx`/`lpy`, capped at
+  `MAX_SPLAT_SIGMA_PX`) — Live streaming's own starting default, since a live acquisition benefits
+  from precision-aware splatting; `'dither'` stochastically jitters+bins for large/dense datasets.
+  `splatGaussianLoc()` integrates the Gaussian's true probability mass over each pixel's footprint via
+  `mleGInt()` (MODULE: fit) rather than point-sampling the PDF — point-sampling can lose almost an
+  entire dataset's mass once σ<<1 SR-px (an uncalibrated `gain=1` sample can produce this). It's also
+  SEPARABLE: per-row/per-column weight arrays (`gx[]`/`gy[]`, `O(nx+ny)` erf calls) are precomputed
+  once, then the `O(nx·ny)` inner loop is a cheap multiply, not a repeated transcendental call.
 
-  `.panel-body` (wrapping a canvas with its trailing controls — `#scrubRow`/`#srFilterNote`/
-  `#calViewRow`) is top-aligned, NOT centred, since raw/sr canvases are always the same height
-  (both track `--frame-ar` unconditionally) — centring each panel's canvas+controls group
-  independently shifted the two canvases out of vertical alignment by roughly half of whichever
-  trailing control only one panel has. Top-aligning puts both canvases flush against their own
-  `h4`, so any leftover height difference lands invisibly at the bottom of the shorter card.
+  **`WGSL_RENDER_PRECISION`** (the GPU path for `'precision'` mode) had BOTH of these bugs until a
+  real, reported "reconstruction looks washed out compared to a past run" investigation found it had
+  silently diverged from the CPU `splatGaussianLoc()` it's supposed to mirror: (1) **correctness** —
+  it point-sampled the Gaussian PDF (`exp(-(dx)²/2σ²)`) per pixel instead of integrating pixel mass,
+  measured to capture only 66.4% of true mass at σ=0.3 SR-px (a common regime for real, well-focused
+  data) vs. the CPU path's 100% — the exact bug the CPU path's own `mleGInt()` comment already
+  documents as fixed, just never ported to the WGSL kernel; (2) **performance** — it recomputed a full
+  `exp()` for both x and y on EVERY inner-loop pixel (true `O(nx·ny)` transcendental calls, up to
+  ~1369 at the `MAX_SPLAT_SIGMA_PX`(6) cap) instead of the CPU path's separable precomputed rows/
+  columns. Fixed by porting the same `gInt()` (erf-based pixel-integrated mass, reusing the same
+  `erfApprox()` already duplicated into `WGSL_FIT_SPHERICAL` — WGSL kernel strings can't share
+  functions across separately-compiled sources) and the same separable `gx[]`/`gy[]` precompute
+  pattern into the WGSL kernel, bounded by a fixed-size `array<f32,40>` local (`MAX_WIN`, matching
+  `MAX_SPLAT_SIGMA_PX`'s own derived worst case, `2·3·6+2=38` window cells/side). Verified via
+  `tests/gpu/bench-render.mjs`: all 14 cases now pass pixel-exact (previously several MISMATCHed),
+  precision-mode GPU speedup over CPU improved to 1.66×–4.32× across realistic cases (mean 4.77×; the
+  smallest synthetic case, mag 5, still shows GPU dispatch overhead dominating at real scale — 0.37×,
+  expected and unrelated to this fix). The CAS-loop float-atomic accumulation itself (`addAcc()`/
+  `addZacc()` via `atomicCompareExchangeWeak`) was deliberately left UNCHANGED — a fixed-point `i32`
+  alternative was already tried and found to introduce a real 6.5–7.1% pixel-value rounding bias, so
+  the more expensive but exact CAS loop is a documented, necessary trade-off, not something this fix
+  should touch.
 
-  Every plot function reads colours from `plotColors()` (`{bg,grid,text,axis,bar}`) rather than a
-  hardcoded hex value, driven by a module-level `_plotExportMode` flag. `false` (normal, on-screen)
-  reads the values LIVE via `getComputedStyle(document.documentElement)` for
-  `--panel`/`--line`/`--muted`/`--fg`/`--accent`, so plots automatically track whichever of the
-  app's three UI themes (dark/light/contrast, see **params**' `applyTheme()`) is active. `true` — a
-  completely separate, FIXED light palette, independent of the UI theme — only inside
-  `exportPanel()`'s "plot" branch, which flips the flag, redraws once via the panel's
-  `_replotRaw`/`_replotSr`, snapshots via `cv.toBlob()`, then flips back and redraws again: a saved
-  PNG reads better on a white background regardless of which theme is active on screen. A few
-  accent colours (fit-line green/red/magenta, the exponential-fit orange, marker red) stay
-  hardcoded across every theme AND the export palette, chosen to read clearly against any of them.
-  Raw-frame/reconstruction overlays (ROI boxes, fit crosshairs, the scale bar, the depth-colour bar)
-  and the `LUT_CPS` colour-map dropdown are deliberately UNTOUCHED by the UI theme — they sit on
-  top of arbitrary image/data pixels, not a themeable panel background; `drawPlotHover()`'s tooltip
-  is the same way on purpose, since it's the SAME function used for the raw-frame pixel-value hover
-  readout (`fmtRawPixel`), which does sit on arbitrary image content.
+  **`rerenderNow()`'s own `"SR render ... s"` timing log line is gated on `!isPreview`** — a real,
+  reported complaint: a long Run fires this same render path many times over for its own periodic
+  mid-Run preview (`run()`'s `onSrPreview` hook, `isPreview:true` there), so each one used to print its
+  own line — several showing up back-to-back in the log for no actionable reason (the number itself
+  was never wrong, it's just noise nobody needs a timing history of throwaway preview renders for).
+  `isPreview` already existed as a parameter (used to gate the zmin/zmax auto-fill a few lines above,
+  see that code's own comment) but this specific log line wasn't gated on it. The final render — a
+  plain interactive Localize/settings-change/Run-completion `rerender()`, `isPreview` unset/false —
+  still logs it; that one number is the real, load-bearing diagnostic.
 
-  **"Save plot/image"** (`saveImgBtn`, export module) offers SVG as well as PNG, but ONLY for the
-  7 genuinely plot-shaped panels (calibration, drift, NeNA, FRC, PCFO, line-profile, the shared
-  histogram) — never the raw frame or SR reconstruction, real pixel-density data with no
-  meaningful vector form at real localization counts. No separate SVG button or in-page format
-  picker: for a plot, `exportPanel()` delegates to `exportPlotEither()`, which renders BOTH a PNG
-  blob and an SVG string ahead of time and hands them to `savePlotEither()`, which opens ONE native
-  `showSaveFilePicker()` dialog listing both "PNG image" and "SVG image" as `types` — the OS/browser
-  dialog's own "Save as type" dropdown becomes the format picker. Since the returned handle has no
-  "which type was picked" field, the actual format is read back from the resolved file handle's own
-  extension (`/\.svg$/i.test(h.name)`). Falls back to PNG when no native picker is available
-  (Safari/Firefox, or `file://` without picker support). A raster panel still calls the single-type
-  `saveBlob()` helper as before — `savePlotEither()` is a second, plot-only sibling to it.
+  `setupPlot(cv, isPlot=false)` letterboxes a fixed 4:3 sub-rectangle for the ~13 non-frame plots this
+  app draws on the raw/SR canvases (drift, NeNA, FRC, PCFO, line-profile, calibration, the shared
+  histogram, spt's D/track-length/MSD plots, sSMLM's distance/angle histograms, smFRET's time
+  trace/E-vs-S). `canvas#sr,canvas#raw{min-height:320px}` floors the canvas height so an extreme
+  (very wide or very narrow) camera-frame aspect ratio can't crush these plots to an illegible sliver
+  — `aspect-ratio` still wins for any normal, near-square dataset.
 
-  `SvgRecordingContext` (next to `setupPlot()`) is a small, purpose-built class that duck-types the
-  exact Canvas2D surface those 7 functions use (paths/rects/circles/text/save/restore/translate/
-  rotate/clip — no gradients, patterns, images or curves) and records real SVG DOM nodes instead of
-  painting pixels — written from scratch rather than vendoring a general canvas→SVG shim.
-  `save()`/`translate()`/`rotate()` each push a FRESH nested `<g>` rather than mutating the current
-  group's own `transform` — an SVG transform applies to ALL of a group's children, so mutating an
-  already-populated group would retroactively move siblings drawn *before* the call; pushing a new
-  group per transform and having `restore()` truncate the stack back to the depth recorded at the
-  matching `save()` reproduces real canvas transform-scoping exactly. `makeSvgPlotCanvas(w,h)` wraps
-  a `SvgRecordingContext` as a plain object duck-typing the slice of `HTMLCanvasElement` that
-  `setupPlot()` touches (`clientWidth`/`clientHeight`/`width`/`height`/`getContext`), so
-  `setupPlot()` and all 7 plot functions run completely UNCHANGED against it. The redirection is one
-  module-level `_plotTarget` variable, consulted by each plot function's own hardcoded
-  `setupPlot($('raw'|'sr'), true)` call (`_plotTarget||$('raw')`) — `null` normally, set only for
-  the duration of the SVG render inside `exportPlotEither()`; the PNG render in the same function
-  still screenshots the real on-screen canvas directly. Reuses `_plotExportMode`'s light export
-  palette and the existing `saveImgModal` left/right chooser when both panels have content — that
-  chooser only decides WHICH window; format is decided downstream. SVG `<text>` stays real, editable
-  text (not outlines), so it re-renders with whatever font is available on the *viewing* system — a
-  known, accepted trade-off versus PNG's baked-in glyph pixels.
+  Each `.card` now has TWO `<h4>`s: a title-only one (a direct `.card` child, ABOVE the canvas) and a
+  separate icon-buttons/description one (INSIDE `.panel-body`, right after the canvas, BELOW it) —
+  each with its own margin rule (`.card h4` vs. `.panel-body > h4`, same base selector, watch for the
+  two silently cancelling if either is edited). `hideOtherRawToggleBtns(exceptId)` keeps the raw-panel
+  mode toggles (drift/spt/sSMLM histogram mode, segmentation image/hist) mutually exclusive — any new
+  raw-panel toggle must call it too, or switching directly between two plot dispatchers with no
+  "reclaim point" in between can leave a stale toggle button stranded.
 
-  **UI colour theme** (`applyTheme(name)`, params module, `dark`/`light`/`contrast`) is set via
-  `[data-theme]` on `<html>`, driving ~17 CSS custom properties (`--bg`/`--panel`/`--line`/`--fg`/
-  `--muted`/`--accent`/`--accent2`/`--warn`/`--danger`(+`-hover`)/`--surface`(+`-hover`)/`--deep`/
-  `--scrollbar-thumb`(+`-hover`)/`--shadow`/`--scrim`/`--row-stripe`/`--accent-tint`) — three icon
-  buttons in `.header-actions` switch it, `.active` marking the current one. Persisted via
-  `localStorage` (genuinely new for this project — Save/Load Settings is explicit JSON, not
-  localStorage; still 100% client-side) — every access wrapped in `try/catch`: a failed read falls
-  back to `'dark'`, a failed write is silently ignored, no error ever surfaces. A tiny inline
-  `<script>` right after `</style>` pre-sets `[data-theme]` from the same key before first paint to
-  avoid a flash of the wrong theme; `applyTheme()` re-derives and re-applies the same value once the
-  main script runs. Deliberately NOT a `PARAMS` entry — pure display/layout, same as sidebar
-  collapsed/floating state.
+  `redrawRawContrast()` (the Contrast slider's own drag handler) must never call `drawRaw()`
+  unconditionally — `if(!rawPixelData || rawSegView || rawIsPlot) return;` guards against dragging
+  Contrast while ANY plot (not just the segmentation image, the original narrower guard) owns the raw
+  panel, which would otherwise silently reclaim it back to a live frame.
 
-  **Quick guide** (`helpBtn`) sits in the sidebar sharing `#tableBtn`'s row, right of **View
-  data/filtering**, styled with its own bespoke `.helpbtn` look; `wireHelp()` finds it by
-  `id="helpBtn"`, position- and class-independent.
+  `SvgRecordingContext` duck-types the Canvas2D surface the 7 vector-shaped plots use for "Save
+  plot/image"'s SVG export (paths/rects/circles/text/save/restore/translate/rotate/clip — no
+  gradients/patterns/images/curves). Two gotchas specific to this recorder: (1) `.arc()` only ever
+  feeds `.fill()` — its `.stroke()` never consumes arc state, so a stroke-only circle (radial
+  gridlines, a polar plot's rings) renders nothing in SVG unless built as a many-segment polygon via
+  plain `moveTo`/`lineTo` instead; (2) there is no `.closePath()` — close an outline with an explicit
+  trailing `lineTo(startX,startY)`. `save()`/`translate()`/`rotate()` each push a FRESH nested `<g>`
+  (mutating the current group's own transform would retroactively move already-drawn siblings).
 
-  **`webSMLM_lastVersion`** (localStorage, same try/catch fail-safe as the theme) is a sibling of
-  `webSMLM_theme`: on load it parses the release number (`vX.Y.Z`) out of the `<h1>` pill's own
-  text and compares it against whatever was previously saved for this browser, logging
-  `webSMLM updated: vA.B.C → vX.Y.Z — see what's new: <CHANGELOG.md link>` when they differ, since
-  the single-file/no-auto-update design otherwise gives a returning visitor no signal that anything
-  shipped between visits. Deliberately parses only the leading `vX.Y.Z`, never the full pill text —
-  the pill also carries a `-dev · build YYYY-MM-DDx` suffix that changes on every build-letter bump.
+  UI colour theme (`applyTheme(name)`, `dark`/`light`/`contrast`) drives ~17 CSS custom properties via
+  `[data-theme]` on `<html>`, persisted in `localStorage` (every access try/catch-wrapped, silent
+  fallback to `'dark'`) — deliberately not a `PARAMS` entry (pure display/layout). Raw-frame/
+  reconstruction overlays and the `LUT_CPS` dropdown are deliberately untouched by the UI theme (they
+  sit on arbitrary image/data pixels, not a themeable panel background). `plotColors()` reads theme
+  colours live for on-screen plots; `_plotExportMode=true` (only inside `exportPanel()`'s plot branch)
+  swaps to a fixed light export palette so a saved PNG reads well regardless of the active theme.
 
-  `axisScale(maxAbs)` gives an axis whose values commonly run large, matplotlib-style "offset
-  notation": ticks show a small (single digit + one decimal) scaled number, with a single `×10ⁿ`
-  multiplier drawn once near the axis (`n = floor(log10(maxAbs))`). Lives in **render** (not
-  `drawPcfoPlot()`, the one plot currently needing it) so any other plot with the same large-number
-  problem can reuse it.
+  **CSS conventions worth knowing before touching layout**: buttons/panel headers/icon buttons have
+  their resting-state border colour-matched to their own background (a flat look, not `border:none`,
+  so nothing's box model shifts) — hover/focus/active border-colour changes are the one remaining use
+  of colour on a border. The raw/reconstruction canvas is the one exception needing a literal
+  `border:none` (its background is fixed pure black, never matching any theme's card background, so
+  colour-matching still left a visible ring). Value inputs (`input.num`/`.numflat`/`select.sel`,
+  including the stepper-button pair) keep a REAL visible border (`var(--line)`) — an editable box has
+  no other affordance signalling it's clickable, unlike a button/header. Slider thumbs are 10px
+  (`.scrubslider`/`.dualrange`) — the JS-side `DUALRANGE_THUMB_PX` constant (three independent
+  copies: `syncRawContrastUI()`/`syncSrContrastUI()`, `smfretSyncRangeUI()`) must be kept in sync with
+  the CSS value by hand, since a native thumb's centre travels within `[thumbW/2, trackW-thumbW/2]`,
+  not the full track. Below the 860px breakpoint, `input.num`/`select.sel`/`.numflat` jump to 16px
+  font (iOS auto-zooms below that) while `label.row` text stays at 12px — a deliberate size mismatch,
+  not a bug. `select.sel` is a FIXED `127px` (not a `%` of the row — matches the established
+  half-width-button figure inside a `details.sim` section; `justify-content:space-between` on
+  `label.row` still pushes it flush against the row's own right edge regardless of this width) —
+  deliberately accepted trade-off: a handful of longer option labels (e.g. "Gauss MLE spherical",
+  "Wavelet (B-spline)", "Via distances and angles") truncate in the closed dropdown at this width
+  (no ellipsis, native `<select>` clipping) — the full label is always readable once opened.
+  `select.sel` also sets an EXPLICIT `height:25px` (with `padding:2px 6px`) — a real, reported
+  alignment bug: with just padding matching `button`'s own (no explicit height), a `<select>`
+  rendered visibly taller (29px) than a `.numstep`-wrapped `input.num` (25px) or a `button` (27px),
+  even with identical padding/font-size/border — neither `appearance:none` nor tightening the
+  padding alone closed the gap, confirming the extra height was `<select>`'s own internal default
+  line-height/box-model quirk, not native dropdown-arrow chrome; only overriding `height` directly
+  fixes it. Matched to `input.num`'s own 25px (not button's 27px) since select and numstep-wrapped
+  inputs are the two control types that actually interleave row-by-row within one `details.sim`
+  section. `html{-webkit-text-size-adjust:100%;text-size-adjust:100%}` (right after the
+  `box-sizing:border-box` reset) additionally opts the whole page out of mobile Safari/Chrome's own
+  text-autosizing heuristic — confirmed via a real mobile screenshot to inflate a `<select>`'s own
+  rendered text size above its neighbours' despite sharing the identical `font-size:12px` rule.
+  **Every row's own value control shares one common RIGHT edge with plain buttons** (numstep input,
+  `select.sel`, checkbox alike) — `details.sim` only ever pads its children on the LEFT (the indent
+  read as "belonging to" the section), never the right, so nothing needs a special right-alignment
+  rule at all; see the `label.row` nesting-depth gotcha below for a real, reported case where an
+  extra `padding-right:4px` rule was removed after it turned out to cause exactly the misalignment
+  it was meant to prevent.
 
-  Every plot draws a real L-shaped axis border (left + bottom, `C.text`) plus a short (5px)
-  outward-facing tick mark at each major tick, on both axes. The border is drawn LAST, after the
-  data, so bars/points flush against an axis edge (NeNA in particular) can't be covered by it. Tick
-  labels shift outward by the same 5px to clear the marks.
+  **`input[type=checkbox]` renders as a modern toggle switch, not the native tickbox** — requested,
+  "blueish when on and greyish when off." Pure CSS on the real `<input type="checkbox">` itself
+  (`appearance:none` turns it into a blank pill; `::before` is the sliding knob) — no wrapper
+  markup, so every existing `:checked`/`change`-event listener keeps working unchanged. The knob
+  stays a fixed light colour in BOTH states (only the TRACK changes colour — the standard iOS/
+  Material convention), with a `var(--muted)` ring + a small drop shadow for its own edge
+  definition against light theme's own near-white "off" track. **`box-sizing:border-box` on the
+  `::before` is required, not redundant with the app-wide `*{box-sizing:border-box}` reset** — a
+  bare `*` selector never matches `::before`/`::after` (they aren't real DOM elements; reaching
+  them needs `*::before`, which this reset doesn't do) — without it, the knob's own border was
+  added ON TOP of its size instead of inside it, pushing it 1px off-centre in the track, a real,
+  reported bug caught by measuring the actual rendered box, not just eyeballing it.
 
-  The side-by-side/stacked panel layout (`.canvases.stacked`, single column) is resolved by
-  `applyLayout()`: `layoutOverride` (module-level, `null`/`true`/`false`) takes precedence over the
-  `frameAspectWH.h/frameAspectWH.w<0.5` auto-heuristic once the user clicks **Stack panels**/**Side
-  by side** (`layoutToggleBtn`), and sticks across further loads this session. `setFrameAspect(w,h)`
-  is the single place that sets `frameAspectWH`, the CSS `--frame-ar` custom property, AND calls
-  `applyLayout()` — `initScrub()` calls it with the loaded stack's own `w`/`h`; a CSV load
-  (`csvFile`'s change handler, MODULE: table) calls it with `parseCsvLocs()`'s own bounding-box
-  `w`/`h` instead, since there's no stack in that path. The reconstruction's own bounding box is
-  always somewhat smaller than the original camera FOV (border-adjacent localizations are dropped
-  during fitting).
+- **workers** — frame-parallel detect/fit; see the Web Worker gotcha below. `getPool()`'s own worker
+  COUNT is capped at `2` on a memory-constrained device (`isMemoryConstrainedDevice()`), not the
+  desktop `min(12, hardwareConcurrency)` — a real, reported gap: each worker receives its own
+  postMessage-CLONED copy of every frame batch dispatched to it (no transfer list), so pool size
+  directly multiplies how much raw frame data is resident at once, completely independent of and
+  unmonitored by `checkLocsMemory()` (MODULE: pipeline, which only estimates the growing locs array).
+  A phone reporting `hardwareConcurrency=6-8` (common) previously had that many× a batch's own frame
+  memory in flight simultaneously with no budget check on it at all.
 
-  **`parseCsvLocs()` NEVER shifts loc coordinates** — `(0,0)` always means the same physical camera
-  pixel it meant in the original file/session, full stop.
+- **export** — ThunderSTORM-compatible CSV. `photons`/`bg`/`bgstd` are already true photon units by
+  export time (gain/offset applied inside the fit). `sigma_x`/`sigma_y`, `angle`, `x2`/`y2`/
+  `pairAngle`, `cell_id`/`cell_area`, `track_id`/`D_coeff` are all optional CSV/table columns, present
+  only when a loc actually carries that field. **The worker-pool message protocol (currently 15
+  floats/loc) must be widened at all 3 sites together** — the worker's own `out.push(...)`, and BOTH
+  `wk.onmessage` unpack loops (the plain pool-dispatch loop and the FTM barrier-phased loop, which
+  duplicate this on purpose) — whenever a new per-loc field needs to survive a worker-pool Run, or
+  it's silently dropped for that path only (the single-threaded fallback keeps it for free, so the bug
+  is easy to miss).
 
-  **Raw-frame display contrast** (`rawBlack`/`rawWhite`, the Contrast slider, Picasso-inspired) is
-  a FIXED [black,white] ADU range applied identically to every frame by `drawRaw()`, replacing an
-  earlier per-frame auto-stretch that made brightness/contrast visibly shift as you scrubbed and let
-  a single dead/hot pixel dominate a frame's own min or max. `estimateRawContrastRange(stack)`
-  (called once right after a stack loads) establishes the slider's bounds/initial handles by
-  sampling a bounded number (50) of seeded-random frames — the same `pickSeededFrames()` PCFO's own
-  gain/offset estimate uses — a reasonable trade-off for a display convenience, not a measurement.
-  `applyCropToRaw()`/`uncropRaw()` each make this same call too, right before `showFrame(0)`, since
-  a crop/uncrop swaps `stack` for a genuinely different pixel population. Deliberately excluded from
-  `PARAMS`/Save-Load Settings/the headless `analyze()` config — same "pure display/layout" carve-out
-  as UI theme and sidebar state — a display convenience local to one interactive session.
-- **workers** — frame-parallel detect/fit (see below).
-- **export** — ThunderSTORM-compatible CSV. `photons`/`bg`/`bgstd` are already true photon units
-  by the time they reach export (gain/offset applied inside the fit, see **fit**), so export/the
-  table histogram do no further conversion — they read `gain`/`camoff` only to log a "gain 1 /
-  offset 0" warning when a user hasn't set real camera values. `"sigma_x [nm]"`/`"sigma_y [nm]"`
-  (CSV) and `sigma_x`/`sigma_y` (table) are optional columns, present whenever ANY loc carries a
-  real per-axis width (`isFinite(L.sx)&&isFinite(L.sy)`, i.e. the Run used `mle3d` or `gaussmleEll`)
-  — independent of `sigma1st`/`sx0th`/`sy0th`/`sx1st`/`sy1st` (sSMLM-pair-specific; these are
-  per-loc, paired or not). `parseCsvLocs()` reads them back into `L.sx`/`L.sy` for a round trip.
-  `"angle [deg]"` (CSV) / `angle` (table) is the same kind of optional column, present only when
-  `gaussianMLEellipticangled` set `L.angle` (radians on the loc, converted to/from degrees at the
-  CSV/table boundary) — the fitted ellipse rotation itself, previously computed but never surfaced
-  anywhere: with `localize3D` checked it's a genuine per-emitter angle, with it unchecked every loc
-  shares the same FIXED `sSmlmAngleCenter` value (still exported, but not a per-emitter measurement).
-  **Required a real fix**: the worker pool's message protocol only packed `x,y,photons,bg,bgstd,
-  sigma,z,zClamped,frame,lpx,lpy,lpz` (12 floats) per loc — `sigma` (`(sx+sy)/2`) but never `sx`/`sy`
-  themselves — so a worker-pool Run silently lost per-axis width entirely, even though the
-  single-threaded fallback (`locs.push(L)` directly) always kept it. Widened to 14 floats (`sx`,`sy`
-  appended, `NaN` for methods that don't fit them) at all three sites that must move together — the
-  worker's own `out.push(...)`, and both `wk.onmessage` unpack loops (the plain pool-dispatch loop
-  and the FTM barrier-phased loop, which duplicate this on purpose, see **in/out**'s FTM entry) — a
-  stride mismatch between any of the three is a silent data-corruption bug, not a crash. Widened
-  again to 15 floats (`angle` appended, radians, `NaN` unless the Run used `gaussmleEll`) so the
-  fitted ellipse rotation survives a worker-pool Run too — same three-site convention, same risk.
-- **3D calibration** — astigmatic: σ_x/σ_y vs z bead curves, JSON save/load. Astigmatism is the
-  only method implemented; other 3D approaches (Double Helix, Biplane) would live here too.
-  `calibrationCore()` takes the same `shouldStop` hook `runCore()` (Localize) does, checked at the
-  same yield point as its progress/preview callbacks (a Stop click can only be observed while
-  yielding); `runCalibration()` enables `stopBtn` and resets `stopRequested` the same way `run()`
-  does.
-- **drift** — AIM (adaptive intersection maximization), point-based, 2D+z. `drawDriftCurve()`'s
-  own green (`#0a7d32`)/magenta (`#c81cc8`)/blue (`#3572b0`) drift-x/y/z palette is treated as the
-  project's reference colour pairing — other plots' own green/magenta curves (NeNA, **spt**'s
-  track-length fit) were retroactively matched to it so a colour means the same thing across plots.
+  `buildCsvText()` returns `parts` — ~5000-row string chunks, never one joined string — specifically
+  so a huge export never forces a single JS string through concatenation; interactive **Save data**
+  already consumes this correctly (`new Blob(parts,...)`). `analyze()` (MODULE: headless API) used to
+  undo that safety by returning `csvText:parts.join('')` unconditionally — a real, reported crash on a
+  real ~12-million-localization dataset (`RangeError: Invalid string length`, measured directly against
+  both Node's and Chrome's own V8: the real hard ceiling is `2**29-24 = 536,870,888` characters,
+  identical in both). Fixed two ways: `analyze()` now always returns `csvParts` (always safe, any
+  scale) alongside `csvText`, which is `null` instead of a broken/truncated string once the joined
+  length would exceed `CSV_TEXT_MAX_CHARS` (a margin below that measured ceiling, not the ceiling
+  itself — `parts.join('')` needs to allocate the whole result on top of `parts` already in memory, so
+  joining right up to the hard number risks an allocation failure before the length check even helps).
+  Separately, `config.exportCsvRows` streams `parts` through `config.onRecord('csv', [chunk])` instead
+  of the return value at all — the same reasoning as `exportTrackData`/`exportSSmlmCandidates`/
+  `exportCalibrationPoints`/`exportPcfoTiles` below (a headless caller's return value crosses the
+  DevTools Protocol as one JSON blob), just applied to the one export every run produces rather than
+  an opt-in analysis step's side output. `tools/webSMLM-cli.mjs` sets this unconditionally (not a CLI
+  flag — every run wants its CSV written safely) and special-cases the `'csv'` `onRecord` kind to write
+  each chunk verbatim into `result.csv` rather than NDJSON-wrapping it like the other four kinds.
 
-  `drawDriftCurve()` is a thin dispatcher over two plot functions, chosen by module-level
-  `driftPlotMode` (`'frame'` default, or `'xy'`): `drawDriftCurveVsFrame()` is x/y/(z) vs frame
-  index; `drawDriftCurveXY()` is a single trajectory (drift y vs drift x), each segment coloured by
-  frame (time) through `getLUT(paramValue('lut'))`.
+- **3D calibration** — astigmatic σx/σy-vs-z bead curves, JSON save/load; the only 3D method
+  implemented. `calibrationCore()`/`runCalibration()` follow the same `*Core()`+wrapper split as
+  Localize, including Stop support.
 
-  **Stop support** (v0.11.10 — AIM's two rounds can take a while, and a user tuning
-  `driftSeg`/`driftRoi` wants to see the curve to judge settings before a run they might discard).
-  `aimDrift2D()`/`aimDriftZ()`'s two rounds are checked against `shouldStop()` per segment; Round 1
-  is inherently sequential (`dx[k]` depends on `dx[k-1]`), so a stop there truncates to a genuine
-  prefix of correctly-estimated segments. Round 2 needs EVERY segment's round-1 result to build its
-  `full` reference, so a Round-1 stop skips Round 2 entirely; a Round-2 stop keeps whatever segments
-  it already re-estimated and falls back to each remaining segment's own round-1 value. `fdx`/`fdy`
-  stay sized to the FULL requested frame range regardless, reusing the existing tail-interpolation
-  logic past the stop point, with `stopped`/`stoppedAtFrame` on the result so `driftCore()` and the
-  interactive plot can tell a genuine measurement from the flat continuation. `driftCore()` treats a
-  stop in EITHER the 2D or z pass as the WHOLE run being incomplete — never applying a complete 2D
-  correction alongside a partial/missing z one — and skips applying ANY correction to `locs` in that
-  case, exactly as if Correct drift had never been clicked. `correctDrift()` still shows the partial
-  curve (dashed vertical marker + "stopped here — flat beyond" label, `rawInfo` leading with
-  "PREVIEW ONLY, not applied") so judging convergence still works without committing. Headless
-  `analyze()` never passes a `shouldStop` hook, so `stopped` is always `false` there.
+- **drift** — AIM (adaptive intersection maximization, point-based, 2D+z) or Cross correlation
+  (image-based FFT registration, needs no Localize run at all), selected by `driftMethod`.
+  `driftCore()` branches between two structurally-different estimator functions sharing one return
+  shape (`{fdx,fdy,segCenters,segdx,segdy,nSeg,...}`). Both support Stop mid-run (a partial curve
+  previews but is never applied). `drawDriftCurve()`'s green/magenta/blue drift-x/y/z palette is this
+  app's reference colour pairing, reused by other plots' own similarly-shaped curves (NeNA, spt's
+  track-length fit).
 
-  **`driftSamplePct`** ("AIM sample %", default 100, v0.11.11 — AIM becomes slow on a large
-  dataset). `bestShift()` iterates its `(2R+1)²` shift-search grid once per OCCUPIED BIN of the
-  segment being aligned — not per raw point, and not against `ref`'s size — so fewer points in that
-  segment directly cuts both this loop and the bin-map build, roughly proportional to the
-  percentage. `subsampleSegments(seg, samplePct)` does the actual thinning, called from both
-  `aimDrift2D()` and `aimDriftZ()` after their per-segment grouping — mutates `seg` in place, one
-  shared seeded RNG (`mulberry32(AIM_SAMPLE_SEED)`) across the whole call so a given (locs order, %)
-  pair always samples the same points (same precedent as **spt**'s `getVisibleTracksForOverlay()`).
-  Unlike that overlay sampling, this is NOT purely cosmetic: fewer points means noisier
-  histogram-intersection counts feeding the sub-pixel parabolic peak fit, trading real estimation
-  precision for speed — default stays 100. `AIM_SAMPLE_FLOOR` (200) guards the failure mode: a
-  segment already at or below the floor is left untouched, and an above-floor segment falls back to
-  its full point set if post-sampling count would drop below the floor — verified against synthetic
-  linear-drift ground truth (300k pts, 100 segments): 20% sampling raised drift-estimate RMS error
-  only modestly (3.94→4.41 px), while 5% (below the floor) correctly fell back to the full segment
-  and reproduced the 100% result exactly.
+  **AIM round 2's own reference used to include the segment being aligned, making round 2 unable to
+  ever revise round 1's error** — `bestShift()`'s intersection score is bounded above by `Σcs[i]`
+  whenever `ref` already contains the segment's own contribution, so zero additional shift always
+  wins regardless of round 1's true error. Fixed via leave-one-out (`subFrom`/`addTo` around each
+  segment's own scoring — O(N) total, not an O(nSeg²) full rebuild); this is a deliberate divergence
+  from Picasso's own `aim.py`, which has the identical self-referential bug. The leave-one-out fix
+  also needs `bestShift()`'s own `if(best<=0) return [0,0]` guard: a segment left with NO real
+  evidence (`nSeg===1`, or the sole occupant of its spatial footprint) otherwise ties every candidate
+  shift at 0 and spuriously resolves to the search window's own corner. Both the 2D and z passes need
+  this — the z pass has the identical self-inclusion bug, not covered by any upstream fix.
 
-- **locprecision** — NeNA (localization precision, Endesfelder fit) and FRC (image resolution,
-  inline radix-2 FFT). Marked **experimental**, not yet cross-validated against established tools.
-  `drawNenaPlot()`'s two overlaid curves are green (`#0a7d32`, the FULL Endesfelder fit — signal +
-  short-range + long-range terms) and magenta (`#c81cc8`, the signal-Rayleigh term alone).
+  `driftSamplePct` subsamples a segment's own points (seeded, deterministic — `mulberry32`) before
+  AIM's shift search; a real precision/speed trade (noisier histogram-intersection counts), not
+  cosmetic, floored at `AIM_SAMPLE_FLOOR`(200).
 
-- **sSMLM** — spectrally resolved SMLM: pairs 0th/1st-order localizations from a diffraction
-  grating (ported from [`HohlbeinLab/sSMLMAnalyzer`](https://github.com/HohlbeinLab/sSMLMAnalyzer);
-  Martens et al., *Nano Lett.* 22(21), 8618–8625, 2022). Role assignment (which point of a pair is
-  0th vs 1st) is **directional, not brightness-based** — real-data investigation found photon count
-  barely correlates with position (≈50/50 even at confident intensity gaps, likely PSF-overlap/
-  crowding at real emitter densities), so `sSmlmAngleCenter` is a genuine SIGNED bearing (full
-  ±180°) and `pairCore()` classifies each candidate by direction into `outEdges`/`hasIncoming`
-  maps: a point qualifies as 0th order only if it has ≥1 outgoing edge (a candidate on the
-  configured bearing) AND zero incoming evidence (opposite bearing, more likely someone else's 1st
-  order) — self-disqualifying, no brightness needed. PSF width (σ, broader for the spectrally
-  smeared 1st order) showed only ~65–70% correlation with role — available as an optional,
-  default-OFF extra filter (`sSmlmRequireNarrower`), not required. **2-point pairs only** (0th+1st)
-  — multi-order chaining and FFT-based angle/distance auto-detection are `docs/REFACTOR_PLAN.md`
-  follow-ups; the interactive **Preview pairs** distance/angle histograms
-  (`computeHist()`/`drawHistogram()` from **table**) cover "find my window" instead — always
-  fetched over a WIDE fixed scan (0–6000 nm, any angle), ignoring the current field values, so
-  narrowing either one first can't hide the true peak. The **angle** histogram, unlike the distance
-  one, restricts to the current distance window (angle signal is only sharp within the real peak)
-  and plots each candidate's `rawAngle` AND its exact reverse (`+180°`) — which of a candidate's two
-  points gets the smaller array index (and so which direction `rawAngle` reports) is a row-order
-  accident, not evenly split in real data, so plotting only the raw bearing looks wildly asymmetric;
-  doubling it makes the two peaks equal. `fitSSmlmAngle()` (**Fit angle & tol.**) estimates
-  `sSmlmAngleCenter`/`sSmlmAngleTol` from that same data — 2°-bin peak detection + half-max-width
-  walk, THEN DOUBLED as a safety margin (the raw half-max width alone came out ~1° against real
-  data, vs. the ~5° that actually worked by hand). Both histograms draw the currently configured
-  window as markers (`computeHist()`'s optional 4th `markers` param), refreshed live on field edits
-  and after a fit via `refreshSSmlmHistIfShown()`.
+  `correlationDrift2D()`'s segment 0 is ALWAYS the fixed reference by construction (never
+  re-estimated, unlike AIM's own two-round refinement) — it must NOT be zero-meaned the way AIM's own
+  output is; smFRET's own drift correction depends on this exact frame-0 anchoring.
 
-  **`sSmlmHistBtn`** ("Show histograms") is one button covering both the distance and angle
-  histograms, with `sSmlmHistModeBtn` toggling which mode `drawSSmlmHist()` draws — `sSmlmHistMode`
-  `'dist'`/`'angle'` — labelled `"Distances"`/`"Angles"` (the OTHER mode's name, `driftPlotModeBtn`'s
-  convention). **Deliberately different from spt's own D/track-length histogram merge**:
-  `drawSSmlmHist()` overrides `$('rawTitle')` to a single FIXED `"sSMLM histograms"` for both modes
-  — spt's own merge keeps `drawHistogram()`'s per-mode title instead, by explicit request.
-  `previewSSmlmPairs()` resets `sSmlmHistMode='dist'` before its own first draw — a fresh Preview
-  always opens on Distances, same precedent `driftPlotMode`/`sptHistMode` follow.
+  **`driftCore()` applies the correction by mutating `L.x`/`L.y`/`L.z` IN PLACE on the SAME loc
+  objects/array** (reversibly — the original values are stashed in `L.x0`/`L.y0`/`L.z0` first, restored
+  before every fresh estimate so re-running with different settings always estimates from the raw
+  data). This collided with a real, reported bug in the GPU render's own accumulate cache
+  (`_gpuAccumCache`, MODULE: gpu): its cache-HIT check is `locs===cachedLocs && n===cachedN` — correct
+  for "an unrelated setting changed but locs itself is untouched," but unable to tell that apart from
+  "the SAME array, SAME length, but every position was just rewritten" — so `rerender(true)` right
+  after Drift correction silently kept showing the STALE, pre-correction accumulated image (position/
+  NeNA/FRC all read `locs` directly and were correctly up to date, so only the rendered reconstruction
+  itself went stale — a real reported symptom: "still looks washed out/motion-blurred after Drift
+  correction," "fixed" by toggling render mode away and back only because `renderMode` happens to be
+  part of the SAME cache key). The CPU render path never had this problem — its own persistent scratch
+  buffers (`_srAcc` etc., MODULE: render) are reused for memory only, keyed on dimensions, and the
+  accumulate loop over `locs` always reruns in full regardless. Fixed by having `driftCore()` itself
+  call `destroyGpuAccumCache()` right after mutating positions, so the very next render is forced back
+  onto its full-rebuild path — necessarily slower than an incremental append (every position changed,
+  not just new locs added, so there is nothing to append onto), but that cost is unavoidable, not a
+  regression: it is the real, previously-skipped work the stale cache was hiding.
 
-  **Fit angle & tol.** and **Pair** share one button row; **Unpair** sits alone in the row below. An
-  unpaired localization is dropped from the result. A pair's reported position is the 0th order's
-  OWN x/y (undispersed — already the true position), not the midpoint: the 1st order's offset
-  varies per emitter with wavelength, so averaging would blur position.
+- **locprecision** — NeNA (localization precision, Endesfelder fit) and FRC (image resolution, inline
+  radix-2 FFT). Marked **experimental**, not yet cross-validated against established tools.
+  `drawNenaPlot()`'s green (full Endesfelder fit)/magenta (signal-Rayleigh term alone) pairing is the
+  reference this app's other two-curve plots match.
 
-  Stores the inter-order distance in its own `dist` field so a future 3D-fit + sSMLM combination
-  could carry real depth AND spectral distance on the same loc without one clobbering the other.
-  `renderSuperRes()`/`zRange()` take an explicit `colorField` parameter (`'z'` or `'dist'`) so the
-  SAME depth-coded render path colours by either; `rerender()`/`analyze()` derive it as
-  `hasZ ? 'z' : (hasDist ? 'dist' : null)`. The sidebar's **Colour by depth (z)**/**z min/max (nm)**
-  labels switch wording live to "sSMLM distance" whenever `colorField==='dist'`. **`pairCore()`
-  itself throws** (not just the interactive wrapper) if the input already has real 3D `z`, OR
-  already has a `dist` field (already-paired output). Interactively, **Pair** also sets
-  `zmin`/`zmax` to the configured distance window, since every accepted pair's `dist` already lies
-  inside it by construction. Three module-level vars track state: `sSmlmOriginalLocs` (the true raw
-  backup, captured once — also the authoritative pairing input: Preview/Pair always read
-  `sSmlmOriginalLocs || lastResult.locs`, never `lastResult.locs` alone, since that may currently be
-  an already-paired subset with no 1st-order companions left to find), `sSmlmPairedLocs` (latest
-  Pair result), and `sSmlmShowingRaw`. The reconstruction-panel toggle (`sSmlmColorBtn`, "Show
-  spectral"/"Show standard") swaps `lastResult.locs` between them (plus `zcolor`) — a real data
-  swap, without discarding the pairing the way Unpair does. **Headless**: `config.sSmlmPair` runs
-  pairing right after Localize, before drift/NeNA/FRC; `pairCore()`'s throws propagate immediately,
-  and the result's `sSmlmPair` field records `nPairs`/`nInput`/`meanDistance`/`stdDistance`.
-  `tools/webSMLM-cli.mjs`'s `--sSmlmPair` and `?autorun=`'s `sSmlmPair=1` both forward to it.
+- **sSMLM** ("(Caution!) Pairing (sSMLM & FRET)") — pairs 0th/1st-order localizations from a
+  diffraction grating (or, via smFRET, a donor/acceptor prism split). "(Caution!)" flags this as one
+  specific method with real assumptions, not a general technique (shared prefix with smFRET/spt).
+  Ported from [`HohlbeinLab/sSMLMAnalyzer`](https://github.com/HohlbeinLab/sSMLMAnalyzer)
+  (Martens et al., *Nano Lett.* 22(21), 8618–8625, 2022).
 
-- **spt** (single particle tracking, v0.11.2) — links per-frame localizations into trajectories and
-  computes a per-track diffusion coefficient. A trackpy-**inspired** variant (same
-  `search_range`/`memory` terminology and linking philosophy as the Python `trackpy` package), not
-  a literal port. Ported from the user's own `sptPALM-Python` pipeline (L. lactis sptPALM, Martens
-  et al., *Nat. Commun.* 10, 3552, 2019). `linkTracks()` walks frames in order; each frame's
-  track↔candidate bipartite graph (edges within `sptSearchRange`, gated by `sptMemory` for
-  gap-bridging) splits into connected components ("subnetworks") via union-find, each solved by a
-  self-contained Hungarian/Kuhn–Munkres implementation (`hungarianAssign()`) for the
-  minimum-total-squared-displacement assignment. NOT trackpy's own recursive exact-subnetwork
-  solver; components above `HUNGARIAN_MAX` (120) fall back to greedy nearest-neighbor instead
-  (one-time logged warning) rather than let O(n³) stall the tab — a documented scope limit, not
-  expected to matter for real single-molecule SPT density. Returns a NEW locs array (never
-  mutates) with `track_id` set on EVERY localization, even length-1 tracks — length filtering
-  happens only at the diffusion-coefficient step. `trackDiffusionCoeffs()` ports
-  `diff_coeffs_per_track()`'s core MSD math: one D (µm²/s) per track with at least
-  `sptTrackLenMin` localizations, from the gap-corrected mean of ALL of that track's own
-  single-frame squared displacements — an average, explicitly NOT a linear MSD-vs-lag-time fit,
-  matching the reference pipeline — `D = MSD/(4·frametime) − locError²/frametime` (2D,
-  static-localization-error-corrected). Unlike the reference pipeline there is no
-  `sptTrackLenMax` truncation. `trackDiffusionCoeffs()` also collects `trackLengths` for EVERY
-  linked track regardless of D qualification — `drawSptTrackLenHist()`'s log-Y-axis histogram of
-  this is how a user judges whether `sptTrackLenMin` is set sensibly (`computeHist()`/
-  `drawHistogram()` gained a `logY` parameter for this: bars/ticks map through `log10(count)`,
-  with a 0-count bin pinned to the floor via `log10(max(1,c))=0`; the hover readout hands log-space
-  bounds to its own `fmt` callback rather than teaching the shared hover code a Y-scale option). A
-  real, expected artifact of the D formula is that near-immobile or very-short tracks can compute a
-  non-positive D — `drawSptDHist()` EXCLUDES these from the plotted log10(D) histogram (logged
-  count, not silently dropped) rather than pooling them into one fake-spike bin. **Track**
-  (`runSptTrack()`) is idempotent, safe to re-run any time. Immediately draws the D histogram,
-  fed `log10(D)` (D commonly spans orders of magnitude); not yet nicely `10^x`-formatted tick
-  labels (v1 shortcut, `docs/REFACTOR_PLAN.md`). `sptDPlotMin`/`Max` are a DISPLAY-only axis
-  window — `meanD`/`medianD` always reflect every qualifying track.
+  Role assignment (0th vs. 1st order) is DIRECTIONAL, not brightness-based — real-data investigation
+  found photon count barely correlates with position at real emitter densities. `sSmlmAngleCenter` is
+  a genuine signed bearing (±180°); `pairCore()` classifies a candidate as 0th order only if it has
+  ≥1 outgoing edge on that bearing AND zero incoming evidence (opposite bearing). 2-point pairs only
+  (0th+1st) — multi-order chaining is a `docs/REFACTOR_PLAN.md` follow-up.
 
-  **`sptHistBtn`** ("Show histograms") shows either the D or track-length histogram;
-  `sptHistModeBtn` (same `.logbtn` placement as `driftPlotModeBtn`) toggles which of
-  `drawSptDHist()`/`drawSptTrackLenHist()` is on screen, labelled with the OTHER mode's name.
-  `sptHistMode` resets to `'D'` only at the top of a fresh `runSptTrack()`. `sptHistBtn` is enabled
-  off `trackLengths.length`; if a fresh Track run has zero qualifying D estimates, it sets
-  `sptHistMode='length'` first so a dataset with tracks but no D estimate still shows a useful
-  histogram automatically.
+  **Preview pairs** auto-runs `fitSSmlmDistAndAngle()`: a distance fit FIRST (a theoretical
+  background PDF — the distance distribution between two random UNPAIRED points confined to the
+  localizations' own bounding box, `(a,b)`/circle-equivalent `R=√(ab/π)`, NOT the full camera FOV —
+  plus a Gaussian signal term, LM-fit mirroring `fitNeNA()`'s own engine, `sSmlmBgProfile` (rect/disk)
+  a user choice, not auto-detected) sets Distance min/max; an angle fit SECOND (2°-bin peak +
+  half-max-width walk, doubled as a validated safety margin against real data) then reads the
+  just-fitted distance window and sets Primary angle/tolerance.
 
-  D = (MSD/4 − locErrorUm²)/frametime is exactly linear in 1/frametime, and MSD itself (cached per
-  track in `trackDiffusionCoeffs()`'s `trackMSD` Map, plumbed to `lastSpt.trackMSD`) depends on
-  neither frametime nor locError. `recomputeSptD()` exploits this: editing **Frame time** or
-  **Localization error** after **Track** rescales every track's D directly from `trackMSD`, no
-  re-linking — unlike **Search range**/**Memory**/**Min track length**, which still need a fresh
-  **Track**. **Get from NeNA** (`sptLocErrorFromNenaBtn`) writes `sptLocError.value`
-  programmatically, which doesn't fire `change`, so its handler calls `recomputeSptD()` explicitly.
+  **Background PDF citations** — rectangle (sides `a≤b`, 3 domain pieces): Philip, J. *The
+  Probability Distribution of the Distance Between Two Random Points in a Box.* Technical Report
+  TRITA-MAT-07-MA-10, KTH, Stockholm, 2007 (§4) — commonly mis-cited as "1991" (a footnote year on
+  the same title page for an unrelated AMS classification scheme; the report itself is dated 2007,
+  matching its own report number). Disk (single piece): Solomon, H. *Geometric Probability*, SIAM,
+  1978, p. 129 (via MathWorld "Disk Line Picking"). Both formulas were independently verified (Monte
+  Carlo + integration-to-1 + known closed-form mean) before being transcribed into code.
 
-  `drawSptTrackLenHist()` fits an exponential decay (`fitTrackLifetime()`, count(L) ~ A·exp(−L/τ),
-  a photobleaching-limited survival model) via WEIGHTED least-squares on ln(count) vs bin centre,
-  weight = the bin's own count. **Weighting is required, not cosmetic**: bin counts are
-  Poisson-distributed (Var(ln(count)) ~ 1/count) — an unweighted fit gave a count-of-2 tail bin the
-  same say as a count-of-8000 peak bin, dragging the fit an order of magnitude below the first bar.
-  Fit curve drawn magenta (`#c81cc8`, matching **drift**'s pairing), attached as
-  `histData.curve`/`curveLabel`. τ is reported in both locs and seconds; **locs≈frames only when
-  `sptMemory=0`** — a bridged gap still counts as one "loc" despite spanning >1 frame, so the
-  seconds figure is an approximation once gap-bridging is active. `computeHist()`'s `markers`
-  parameter draws a vertical line at the current `sptTrackLenMin` (`trackLengths` never depends on
-  that field, precisely so the marker can help pick it) — its `change` listener calls
-  `refreshSptTrackLenHistIfShown()` to redraw the marker live, no re-Track needed.
+  Distance min/max carry a fixed ceiling (`10000` nm) — widened once for a real dual-view/
+  image-splitter dataset, then REVERTED once the widened scan/clamp diluted a genuinely small
+  (sub-µm) real peak on a wedge-prism/grating dataset. That large-displacement, disjoint-region case
+  is now smFRET's own **channel matching** (`alignSmfretChannels()`) instead — a direct point-set
+  registration method with no such cap, so this method no longer needs to cover both scales.
 
-  `track_id`/`D_coeff` are independent, optional table/CSV columns (same pattern as sSMLM's
-  `dist`/`sigma1st`), so the filter grammar works on tracking data for free. **Save track data**
-  (`sptSaveBtn`/`exportSptSummary()`) is a genuinely DIFFERENT export: `sptTrackSummary()`
-  aggregates into one row per TRACK (`track_id`/`n_locs`/`D_coeff`/`mean_x`/`mean_y`) built from
-  the tracked locs directly, not `lastSpt`'s own (D-qualifying-only) arrays. **Headless**:
-  `config.sptTrack` runs tracking AFTER drift/NeNA/FRC (opposite order from `sSmlmPair`) since a
-  per-track D benefits from drift-corrected coordinates; the result's `spt` field records
-  `nTracks`/`nQualify`/`meanD`/`medianD` only (`trackMSD` is a `Map`, not JSON-serialisable).
-  `tools/webSMLM-cli.mjs`'s `--sptTrack`/`?autorun=`'s `sptTrack=1` forward to it. No
-  length-RESOLVED D histogram — tracked as `docs/REFACTOR_PLAN.md` follow-up.
+  The Angles view is a **polar (rose) plot**, not the shared cartesian histogram (a true peak
+  straddling the 0°/360° wrap would otherwise split into two illegible edge bars): 0°=right,
+  90°=top, increasing counterclockwise. Both the Distances histogram's min/max markers and the
+  Angles plot's three selection lines (Primary angle, ±tolerance) are directly draggable — grabbing
+  either end of a ±tolerance line's own diameter must fold to the same near-side representative
+  first (mod 180°), or the far end reads a wildly wrong tolerance.
 
-  **Tracks overlay** (`srTracksOverlayBtn` "Show tracks"/"Hide tracks" next to the SR-panel title;
-  `sptShowTracksBtn` in the sidebar turns it ON) plots a filtered/sampled subset of tracks as thin
-  polylines over the reconstruction (`drawTracksOverlay()`), styled to match the user's own
-  `sptPALM-Python`: plain magenta (`#ff3bff`) by default, or — `sptTracksColorByD` (checked by
-  default) — each track coloured by its own mean D via `getLUT('fire')`, normalised against
-  `sptDPlotMin`/`Max`; a track with no qualifying D draws neutral `#666`. A filled circle marks
-  each track's start point (radius = 2× line width); the track number sits beside it in white on a
-  `rgba(0,0,0,.6)` backing box, font size scaling with `view.zoom/fitZoom()` (not `view.zoom`
-  alone, so it's dataset/`mag`-independent), clamped `[9,14]px`. Clicking a track's polyline
-  selects it (`trackHitTest()`, point-to-segment distance, `8/view.zoom` tolerance) — the selected
-  track overrides to magenta (colour-by-D mode) or `#3fb950` green (plain mode). `selectedTrackId`
-  resets at the same five call sites `srTracksOverlayOn` does. Turning the overlay on also switches
-  the reconstruction to the `grey` LUT (`switchLutToGreyForTracks()`).
+  `sSmlmPairContext` (`'sSmlm'`/`'smfret'`) governs what dragging a Distances/Angles marker does
+  afterward: the plain sSMLM path re-renders the reconstruction (`syncSSmlmZRangeFromDist()`); the
+  smFRET path instead live-re-pairs and re-marks the SOI composite's own overlay
+  (`refreshSmfretPairingLive()`) WITHOUT touching the reconstruction panel — both listeners fire off
+  the SAME field `change` event, so `syncSSmlmZRangeFromDist()` must explicitly check the context, not
+  just "is something paired."
 
-  **Line thickness is `view.zoom` alone, NOT `mag*view.zoom`** — one `srFull` pixel's own
-  on-screen size = `view.zoom`; `mag*view.zoom` draws one CAMERA pixel's width and is unbounded at
-  high zoom — get this wrong again and it reproduces a real bug (giant spikes covering the
-  reconstruction when zoomed in on one track).
+- **smFRET** ("(Caution!) Time traces and FRET") — finds sites of interest (SOI,
+  `locateSmfretSOI()` → `smfretSOICore()`, the DOM-free half `analyze()`'s `config.smfretLocateSOI`
+  calls too — average-then-detect-once, same reasoning as bead calibration), extracts DD/DA/AA
+  intensity-vs-time traces (`getSmfretTimeTraces()`), and optionally pairs sites for FRET. Not
+  squeezed into sSMLM or 3D calibration despite reusing sSMLM's own pairing machinery — a genuinely
+  different optical setup (prism/polychroic split vs. a diffraction grating).
 
-  **`drawTracksColorBar()`** (D legend) anchors to the PANEL itself (`x=DW-28-bw, y=(DH-bh)/2`,
-  `bw`/`bh`=`16`/`180`) — not `drawDepthBar()`'s data-extent anchor (tried first, read as squeezed
-  into the corner); shifts left by `bw+24` when a real depth-colour bar shares the margin. **Must
-  set `ctx.lineWidth=1` explicitly before its own `strokeRect()`** — `ctx.lineWidth` is canvas
-  STATE, not reset between draw calls, and this runs immediately after `drawTracksOverlay()` in the
-  same `drawView()` call, so without the reset its border silently inherited the tracks' own
-  zoom-dependent line width (a real bug: the legend border thickened along with the track lines at
-  high zoom). Same lesson for `textBaseline`: the unit label sets it to `'bottom'` explicitly
-  rather than inheriting `'middle'` from the tick-label loop above it.
+  **Analyse FRET** (`smfretFretEnabled`, default checked) is the point of the module's own two-part
+  name: time traces work standalone (donor-channel-only leakage/bleaching measurements) with no
+  pairing at all. With ALEX on, AA is sampled at the pair's own inferred acceptor position `(x2,y2)`
+  once paired, falling back to the donor position `(x,y)` when unpaired (the only position available).
 
-  `getTracksOverlayData()` groups `lastResult.locs` by `track_id` (excluding `track_id<0`) sorted
-  by frame, cached by object identity against `lastResult.locs`. **`getVisibleTracksForOverlay()`**
-  then narrows the list before drawing: `sptTrackLenMin` drops short tracks, then
-  `sptShowTracksPct` (default 10%) samples a fixed percentage of the survivors deterministically —
-  `mulberry32(TRACKS_OVERLAY_SEED)` draws one float **per track in the FULL, unfiltered id-ordered
-  list**, keeping a track iff its draw is `<pct/100` AND it meets `sptTrackLenMin`. **The draw must
-  run over the full list, not the length-filtered subset**, or raising `sptTrackLenMin` would
-  reshuffle which tracks the RNG assigns to survivors — verified with a monotonicity sweep: the
-  same dataset always shows the same track identities at a given percentage; raising the percentage
-  only adds tracks; raising `sptTrackLenMin` only removes tracks. Cached against (list identity,
-  minLen, pct); all three controls live-refresh via `refreshTracksOverlayIfShown()`.
+  **ALEX** (`alexEnabled`/`alexFirstFrame`) establishes a fixed period-2 frame parity — every
+  ALEX-aware function (the SOI composite's own averaging, `getSmfretTimeTraces()`'s per-frame
+  extraction, `smfretPoolE()`/`smfretPoolES()`) reads that parity; there is no general non-SOI
+  frame-role tagging (a `docs/REFACTOR_PLAN.md` follow-up).
 
-  **`sptShowTrackDataBtn`** ("Show track data") opens `trackTableModal`: a sortable, filterable
-  table of `sptTrackSummary()`'s per-track rows, reusing the main table's `parseFilter()` grammar
-  and filter-autocomplete (`wireFilterAutocomplete()`, factored out for both boxes to share) rather
-  than reimplementing it. Deliberately a SEPARATE, minimal implementation otherwise (own state/draw
-  functions) rather than generalising the main table's own machinery, which is entangled with
-  reconstruction filtering/temporal clustering/crop that a per-track summary has no equivalent of
-  yet. `#trackTable` shares `#locTable`'s CSS via one combined selector list. Rebuilds fresh from
-  `lastResult.locs` on every open; committed filters persist across close/open. Enabled/disabled by
-  the same `!r.trackLengths.length` condition as `sptSaveBtn`/`sptShowTracksBtn`.
+  **Two pairing methods**, `smfretPairMethod` (**Pairing method** dropdown):
+  - **Via distances and angles** (`getSmfretPairingFromDonor()`) — a thin wrapper over sSMLM's own
+    Preview+Pair, restricted to the donor-excitation composite. **Position donor** disambiguates
+    which of the two 180°-apart bearing candidates a doubled-angle fit produces actually points
+    donor→acceptor — data alone can't tell, this needs the user's own knowledge of the setup.
+  - **Via channel matching** (`alignSmfretChannels()`) — direct point-set REGISTRATION between
+    independently-detected DD and DA/AA populations, no histogram at all. Built because a
+    histogram/background-model fit inherits a real confound in a wide-aspect FOV: two random points
+    are geometrically more likely to be oriented along the FOV's own long axis, which can coincide
+    with the true physical donor→acceptor bearing, making the real signal indistinguishable from
+    background shape. `smfretFovSplitX(locs, w)` finds the physical channel-split gap from the SOI
+    positions' own x-histogram (a raw pixel-intensity profile isn't informative enough — background
+    illumination swamps it). A coarse displacement search (`smfretSearchDisplacement()`, spatial-hash
+    accelerated) seeds a small ICP loop fitting a full 2D AFFINE transform (`smfretFitAffine()`,
+    ordinary LSQ, `solveLin()`) — needed because a pure translation can't absorb a real inter-channel
+    rotation/scale mismatch (confirmed on real data: the paired-distance CV grew with search
+    tolerance under translation-only, the signature of a systematic, not random, residual). Shows an
+    alignment-overlay QC visualization (a green/magenta backward-warp composite) automatically on
+    success. The winning transform's own match set IS the pairing — no separate distance/angle
+    `pairCore()` step afterward.
 
-  **Cell-by-cell tracking is also wired headlessly** via `config.segmentationFile` (a File, loaded
-  like `config.file`/`config.calibrationFile`, through its own hidden `#segmentationFileInput`).
-  Its mere presence switches `sptCore()` to `segCtx`-based cell-by-cell tracking, same as checking
-  **Apply segmentation?** interactively. This surfaced (and fixed) a real, previously-latent bug:
-  `linkTracksPerCell()` read per-cell area off the module-level `segmentedImageData` global
-  directly instead of taking it as a parameter — harmless interactively (always populated before
-  this can run) but silently broken headlessly, since `analyze()` never touches that global —
-  every loc would have come back excluded with no error. Fixed by recomputing the area map from
-  the passed-in `segLabels` via `computeSegmentedImageData()` (pure, DOM-free) instead — a general
-  lesson for any future `*Core()`-reachable function: a module-level global populated before every
-  interactive call site is invisible until something calls the same function headlessly.
-  `tools/webSMLM-cli.mjs`'s `--segmentation <mask.tif>` forwards to it; `?autorun=` has no
-  file-upload mechanism at all, so it doesn't gain an equivalent.
+  **Extraction** (`getSmfretTimeTraces()`): either a free-position MLE fit (default,
+  `gaussianMLEspheric`, x,y merely SEEDED at the known position — correctly fails/rejects on a frame
+  with no real molecule) or aperture photometry (`smfretApertureMode`, no fit, the shared
+  `apertureGeometry()`/`percentile()` from **fit**). A rejected/non-converged fit writes a real,
+  meaningful `0` (not `NaN`) — the reject logic already IS the judgement that no molecule was on;
+  `NaN` is reserved for "too close to this frame's own edge, no window to fit at all." The MLE default
+  additionally rejects a result whose σ exceeds `2×σ_PSF` (smFRET-specific, on top of the shared
+  `MLE_MAX_SIGMA` — a wide, dim, diffuse blob otherwise integrates a large spurious photon count with
+  no localized bright pixel needed; kept local to smFRET since 3D calibration's own astigmatic fits
+  legitimately need σ to range far more widely away from focus).
 
-  **Segmentation image** (`applySegmentation` checkbox, default unchecked; v1 toward
-  cell-segmentation-aware tracking). Checking it reveals **Load segmented image**
-  (`segLoadBtn`/hidden `segFile`, same accept list as **Load movie**), loading a separate
-  integer-labelled mask through the same `loadTiffFile()` any movie goes through — 0=background,
-  1/2/3/…=cell number. Only frame 0 is read (warns, doesn't error, on a multi-frame file). A
-  movie/mask W×H mismatch logs a warning but loading still proceeds ("warn, don't block").
+  **E(S) histogram**: 1D (`E=DA/(DD+DA)`) or 2D E-vs-S (`(DD+DA)/(AA+DD+DA)`, needs ALEX+AA), pooled
+  across all sites/time, with `Min`/`Max DD+DA` and `Min`/`Max AA` burst-selection ranges (each
+  channel must be individually `>0`, not just the sum — a rejected-fit `0` or an unfloored negative on
+  just ONE channel otherwise clamps the ratio to an edge, 0 or 1, rather than being excluded). Under
+  ALEX, DD/DA and AA live on strictly ALTERNATING frame indices by construction — pooling must pair a
+  donor-excitation sample with its own ADJACENT acceptor-excitation frame's AA value (prefer `i+1`,
+  fall back to `i-1`), never the same index. The 2D density uses hexagonal binning (axial hex-grid,
+  cube-coordinate rounding) coloured via `getLUT('viridis')`, not a blurred raster — a deliberate
+  redesign matching published smFRET burst-histogram figure conventions, with no colour bar (relative
+  brightness only).
 
-  `computeSegmentedImageData()` does one pass over the label array, building `segmentedImageData`
-  (one `{id,cx,cy,areaPx}` row per nonzero label) — verified numerically EXACT against an
-  independent numpy computation on the real bundled
-  `experimental_data/bf_analysed_JH_procBrightfield_segm.tif` (111 cells).
+  **Apply drift correction** (`smfretApplyDrift`, default off) runs whichever `driftMethod`
+  **Drift correction** is configured with — Cross correlation needs no Localize at all; AIM runs one
+  silent, discarded whole-movie Localize first — then re-anchors AIM's own zero-meaned output to
+  frame 0 (`fdx[0]`/`fdy[0]` subtracted off the whole array), since a site's fixed `(x,y)` IS frame 0
+  by construction. Extraction reads `(x-fdx[fi], y-fdy[fi])` — SUBTRACTING the drift, the inverse of
+  `driftCore()`'s own "add `fdx[f]` to correct" convention, since this recovers where a REFERENCE-
+  frame position sits in the RAW current frame.
 
-  `drawSegmentedImage()` renders it through the SAME `rawFull`/`rawView` raster pipeline
-  `drawRaw()` uses for an ordinary frame (fit/pan/zoom, and a correct raster PNG export for free,
-  since `exportPanel()`'s PNG-vs-SVG dispatch keys off `rawFull` being non-null) rather than the
-  plot mechanism — this is real pixel-density content with no meaningful vector form.
-  `rawPixelData` is repurposed to hold the integer label array while shown (`rawSegView` flag) —
-  `fmtRawPixel()`'s hover branches on it to show "cell N"/"background"; `redrawRawContrast()`
-  no-ops instead of corrupting the label data through grayscale contrast mapping. The raw-panel
-  crop tool is disabled while shown and re-enables automatically once a live frame reclaims the
-  panel (`drawRaw()` resets `rawSegView=false`/`setRawPlot(false)`, same mechanism used for
-  reclaiming from a plot). Unchecking **Apply segmentation?** reverts to the live frame and drops
-  `segmentedImageData`/`segmentedImageLabels`.
+  The SOI composite marks (never filters — an earlier, stricter "remove the box" design was reverted)
+  a paired site's ROI dark-orange (`#d2691e`, `markSmfretSoiPairedKeys()`) or gold (`#e8b400`) for an
+  AA-SOURCED (channel-matching) match specifically — a real but structurally weaker guarantee than a
+  same-image (distAngle) match, since it comes from a SEPARATE, independently-fit composite matched
+  by nearest-neighbour tolerance rather than exact position equality.
 
-  **Show image** (`segShowBtn`) shows either the segmentation image or its cell-area histogram; a
-  raw-panel-title toggle (`segShowModeBtn`) flips `segShowMode` (`'image'`/`'hist'`) and calls
-  `drawSegShow()` again. Unlike the spt/sSMLM histogram toggles (switching between two PLOTS
-  sharing one draw call), this switches between a RASTER IMAGE (`drawSegmentedImage()`) and a PLOT
-  (`drawSegAreaHist()`) — two structurally different rendering paths with no shared draw primitive,
-  so `drawSegShow()` is a thin dispatcher; each mode keeps its own panel title. Hidden at the same
-  two reclaim points every other raw-panel toggle uses.
+  `drawSmfretTrace(idx)` follows the "left panel doubles as a plot surface" pattern (see the
+  Left/right panel plot pattern gotcha below); its x-axis is time (s), not frame index
+  (`time=frame_index×frametime` is exactly linear, so only tick GENERATION changed). ROI thumbnails
+  (DD/DA/AA crops with a magenta fit crosshair) draw as a strip below the x-axis on the same canvas,
+  fire-and-forget async, with their own staleness guards (`_smfretRoiGen`, a check against
+  `rawPlotName`/`smfretTraceIdx` right before the actual draw) since the frame fetch they need can
+  resolve after the raw panel has already moved on to something else.
 
-  `drawSegmentedImage()` also calls `setFrameAspect(w,h)` with the segmentation image's OWN
-  dimensions, taking over `--frame-ar` regardless of what set it before — a real bug otherwise: for
-  a CSV-loaded result (no `stack`), `--frame-ar` was left at `parseCsvLocs()`'s own APPROXIMATE
-  loc-bounding-box, so the panel got letterboxed with a gap that looked like a data misalignment.
-  The segmentation image's dimensions are the more authoritative source once one is loaded — the
-  reconstruction panel may pick up a small letterbox gap of its own instead, the right trade.
+- **spt** ("(Caution!) Single-particle tracking") — links per-frame localizations into trajectories
+  and computes a per-track diffusion coefficient. A trackpy-**inspired** variant (same
+  `search_range`/`memory` terminology and philosophy as the Python `trackpy` package), not a literal
+  port — one specific, scope-limited method (a single average-per-track D, no MSD-vs-lag fit), same
+  "(Caution!)" framing as sSMLM/smFRET. Ported from the user's own `sptPALM-Python` pipeline (L.
+  lactis sptPALM, Martens et al., *Nat. Commun.* 10, 3552, 2019).
 
-  `segmentedImageLabels` (`{arr,w,h}`, distinct from the per-cell stats table
-  `segmentedImageData`) persists independently of whatever the raw panel currently shows, unlike
-  `rawPixelData` — this is what **Show image** re-displays (deterministic seed-0 recolouring, so
-  pixel-identical to the original load) without re-reading the file, and what tracking reads from.
+  `linkTracks()`: each frame's track↔candidate bipartite graph (edges within `sptSearchRange`, gated
+  by `sptMemory` for gap-bridging) splits into connected components via union-find, each solved by a
+  self-contained Hungarian assignment (`hungarianAssign()`) — falls back to greedy nearest-neighbor
+  above `HUNGARIAN_MAX`(120) components rather than let O(n³) stall the tab (a documented scope
+  limit). `trackDiffusionCoeffs()`: `D = MSD/(4·frametime) − locError²/frametime`, the gap-corrected
+  MEAN of a track's own single-frame squared displacements — an average, explicitly NOT a
+  MSD-vs-lag-time fit (matching the reference pipeline). D is linear in `1/frametime` and MSD itself
+  is cached per track (`trackMSD`) — editing **Frame time**/**Localization error** after **Track**
+  rescales instantly with no re-link; **Search range**/**Memory**/**Min track length** still need a
+  fresh Track.
 
-  Cell colouring (`shuffledLabelColors()`) ports the *idea* behind the user's own
-  `sptPALM-Python/helper_functions.py`'s `randomize_label_image()`: raster-order segmentation tools
-  number cells in scan order, so physically adjacent cells often get consecutive label values,
-  which map to near-identical hues through an ordinary continuous colour ramp. This shuffles each
-  label's RANK (0..N-1) via a seeded PRNG (`mulberry32`) and maps rank/N straight to a hue
-  (`hsvToRgb`, s=0.85/v=0.95) — spaces hues evenly regardless of gaps in the original label values.
-  Verified visually against the real bacteria dataset — no two adjacent cells share a similar
-  colour.
+  **Tracks overlay** line thickness is `view.zoom` ALONE, never `mag*view.zoom` (a real, previously-
+  shipped bug: `mag*view.zoom` draws one CAMERA pixel's width, unbounded at high zoom — giant spikes
+  covering the reconstruction). `getVisibleTracksForOverlay()`'s deterministic seeded sample
+  (`sptShowTracksPct`) must draw over the FULL id-ordered track list, not the length-filtered subset —
+  otherwise raising `sptTrackLenMin` reshuffles which tracks a fixed percentage happens to keep.
 
-  **SR-panel "Show segm."/"Show recon."** (`srSegOverlayBtn`) swaps the panel between the normal
-  density reconstruction and the segmented cells (OPAQUE) with the SAME density reconstruction
-  drawn on top, its black background made highly transparent — cell colour shows through wherever
-  there's no real signal, density stays visible on top (two earlier designs — a semi-transparent
-  blend, then opaque cells with plain white points — were tried and rejected on direct feedback).
-  Two offscreen canvases, both built in `drawView()`:
-  - `buildSegOverlayCanvas()` — at `segmentedImageLabels`' own CAMERA-pixel resolution, label 0
-    transparent, every other pixel OPAQUE via the same `shuffledLabelColors(seed=0)` call
-    `drawSegmentedImage()` uses. Cached by object identity against `segmentedImageLabels`.
-  - `buildTransparentReconCanvas()` — redraws `srFull` with alpha derived from each pixel's own
-    LUMINANCE (`0.299r+0.587g+0.114b`, safe since every `LUT_CPS` ramp starts at `[0,0,0]`). `*2.5`
-    gain so a pixel reaches full opacity well before true peak density; `MIN_SIGNAL_ALPHA` (90)
-    floors the alpha of any nonzero-luminance pixel — without it a sparse/isolated localization
-    (already near-black by LUT design) went dim AND nearly transparent at once, invisible against a
-    bright cell colour underneath. Cached by object identity against `srFull`.
+  **Segmentation-aware tracking** (`applySegmentation`, loads an integer-labelled mask via
+  `computeSegmentedImageData()`): `linkTracksPerCell()` runs `linkTracks()` SEPARATELY per qualifying
+  cell (filtered by `areaPx` against Min./Max. cell area), so no track crosses a cell boundary.
+  `segmentedImageLabels.refPxNm` is the pixel size the mask was loaded AT — the overlay scales the
+  source-rect by `(current pxnm)/refPxNm`, NOT the reverse (a real, previously-shipped sign error —
+  double-check the direction empirically again if this formula is ever touched). This is also wired
+  headlessly via `config.segmentationFile`; `linkTracksPerCell()` must take `segLabels` as a
+  parameter rather than reading the module-level `segmentedImageData` global directly, since
+  `analyze()`'s own scope never touches that global (a real, previously-latent bug — the general
+  lesson: a module-level global populated before every interactive call site is invisible until
+  something calls the same function headlessly).
 
-  Neither canvas is gated on `segmentedImageLabels.w/h` exactly matching `lastResult.w/h` — real
-  segmentation masks are routinely a few px off from the movie's own dimensions, and requiring
-  exact equality (an earlier version did) silently drew nothing for that common case. Matches this
-  app's "warn, don't block" convention — `ctx.drawImage()` clips naturally at a genuine mismatch.
-
-  **`segmentedImageLabels.refPxNm`** — localization POSITIONS never depend on `pxnm` (only the
-  scale bar/`srInfo` readout do), so correcting **Pixel size (nm)** after loading a segmentation
-  image had no visible effect on the overlay, a real bug. Fixed by treating the `pxnm` value at
-  LOAD time as the segmentation image's own calibration reference (`refPxNm`, stashed only on a
-  fresh load); `drawView()` scales the segmentation canvas's source-rect by
-  `(current pxnm)/refPxNm`. **The direction was wrong in the first shipped version** (inverted,
-  `refPxNm/current`) — caught only by checking against real data: double-check the direction
-  empirically again if this formula is ever touched. Editing Pixel size (nm) while active needs no
-  new wiring — the existing `pxnm` `change` listener already triggers `rerender()`→`drawView()`.
-
-  **Cell-by-cell tracking** (`Min./Max. cell area (px)`, default 50/∞, same `default:Infinity`
-  convention `fitLastFrame` uses). Their two `label.row`s are direct children of `#sptBox`
-  (`segAreaMinRow`/`segAreaMaxRow`, `padding-left:40px`) rather than nested inside `#segLoadRow` —
-  see the `label.row` nesting-depth gotcha above for why nesting there silently broke their
-  right-edge alignment despite still looking indented. A fresh **Load segm. image** sets
-  `segAreaMax` to `Math.max(...segmentedImageData.map(c=>c.areaPx))` — a real upper bound for that
-  image. Ports `apply_cell_segmentation_sptPALM.py`/`tracking_sptPALM.py`'s own `use_segmentations`
-  branch. `cellIdForLoc(L,segLabels)` looks up a loc's raw label the same way `fmtRawPixel()`'s
-  hover does; `linkTracksPerCell()` groups locs by that label FILTERED through
-  `segmentedImageData`'s own `areaPx` (`-1` sentinel, deliberately not `0`, which some dataset's
-  raw mask might legitimately use as a real label — for background OR an out-of-range cell) and
-  runs `linkTracks()` SEPARATELY per qualifying cell, so a track can never cross a cell boundary.
-  Each cell's local `track_id` range is offset by a running counter (mirroring the reference
-  pipeline's `track_id_shift = max(tracks['track_id'])+1`) so the merged result stays globally
-  unique. `sptCore()` takes an optional 5th `segCtx` (`{labels,areaMin,areaMax}`) parameter
-  selecting `linkTracksPerCell()` over the plain `linkTracks()` call; `trackDiffusionCoeffs()`
-  needed no changes — it already skips `track_id<0`. `runSptTrack()` only builds `segCtx` when
-  **Apply segmentation?** is checked AND an image is actually loaded (falls back to plain
-  whole-FOV tracking with a warning otherwise). `cell_id`/`cell_area [px]` become optional CSV/
-  table columns exactly like `track_id`/`D_coeff`.
 - **pipeline** — top-level orchestration wiring the UI buttons to the modules. Localize, drift
   correction and 3D calibration are each split into a DOM-free `*Core(config, stack, hooks)`
   function (`runCore`/`driftCore`/`calibrationCore`) plus a thin interactive wrapper
   (`run()`/`correctDrift()`/`runCalibration()`) that resolves DOM state into `config`, calls the
   core, then applies results back to globals/UI. `window.webSMLM.analyze(config)` — the headless
-  entry point, v0.10.0 — calls the same cores directly with an explicit config and no DOM at all;
-  `tools/webSMLM-cli.mjs` (Node + Playwright) drives `analyze()` from the command line, fully
-  headless. New code belongs in the relevant `*Core` when it should also work headlessly (most
-  analysis logic should); only DOM-reading/writing belongs in the wrapper. See
-  `docs/DOCUMENTATION.md` §8 for the full headless API and `docs/REFACTOR_PLAN.md` for the design
-  rationale (three-layer split: in-page API, CLI driver, URL-param autorun).
+  entry point — calls the same cores directly with an explicit config and no DOM at all;
+  `tools/webSMLM-cli.mjs` (Node + Playwright) drives `analyze()` from the command line. New
+  analysis logic belongs in the relevant `*Core` when it should also work headlessly (most should);
+  only DOM-reading/writing belongs in the wrapper. See `docs/DOCUMENTATION.md` §8 for the full
+  headless API and `docs/REFACTOR_PLAN.md` for the design rationale.
 
-  **Keyboard hotkeys** (`wireHotkeys()`, v0.11.9): holding **Alt** (Option on Mac) shows numbered
-  hint badges over the 10 always-visible top-level action buttons (`HOTKEY_BUTTONS`, on-screen
-  order); tapping the matching digit clicks that button. Adding **Shift** switches the hint set to
-  `HOTKEY_SECTIONS`, the 10 collapsible sidebar `<details>` modules — the digit toggles that
-  section's `.open` and, on open, scrolls to and `.focus()`es its `<summary>` so the next Tab press
-  lands on the section's first input (a closed `<details>`'s descendants aren't in the tab order
-  until `.open` flips true). Alt, not Ctrl — Ctrl+1..9 is already bound to browser tab-switching on
-  Windows/Linux; being modifier-gated also means no focused-input guard is needed against the app's
-  many free-typable numeric fields. Both digit lists are FIXED to on-screen position (a hint simply
-  doesn't render for a disabled button or off-screen section, but the mapping never renumbers), so
-  muscle memory (e.g. Alt+5 = Localize) stays valid regardless of app state. **Digit matching uses
-  `e.code`, not `e.key`** — a real bug caught before release: macOS remaps `e.key` for the digit
-  row while Option is held (Option+2 sends `"™"`, not `"2"`), so an `e.key`-based version showed
-  hint badges but silently never fired on Mac; `e.code` (`"Digit1".."Digit0"`) is the physical key,
-  unaffected by modifier-driven remapping. `.hotkeyHint` badges are a FIXED blue (`#0969da`) rather
-  than `var(--accent)`, same "overlay stays fixed across themes" convention as raw-frame overlays
-  and the tracks-colour legend. Known gap: on the mobile/floating sidebar drawer (collapsed by
-  default), Alt+Shift+N still opens the target `<details>` underneath, just invisibly until the
-  drawer itself is shown.
+  **`runCore()`'s own `checkLocsMemory()` genuinely STOPS a Run, not just warns** — a real, reported
+  gap: an earlier warn-only version logged a message once the growing `locs` array crossed 70% of
+  **Total memory budget (`memBudgetGB`)**, but nothing actually halted the Run, so a real ~30k-frame
+  mobile Run still "silently crashed" (total data loss). `runCore()` now shadows its own `shouldStop`
+  with `()=>shouldStopHook()||memStopTriggered` right
+  after destructuring the hook — every existing `shouldStop()` call site (worker dispatch loops, the
+  serial yield loop, the FTM barrier phase) picks up a memory-triggered stop for free, with the exact
+  same "stop mid-way, keep the partial locs found so far" handling a manual Stop click already gets.
+  This also means a headless `analyze()` call (which passes no `shouldStop` hook at all) now gets
+  this same protection, a genuine improvement there, not just interactively.
 
-  **Load movie/data** (`loadBtn`) is one button over ONE hidden `#file` input whose `accept` lists
-  `.tif,.tiff,.nd2,.csv` together. Dispatch is by file EXTENSION alone (`/\.csv$/i`) — real content
-  sniffing for the movie side (`isTiffFile()`/`isNd2File()`) still happens downstream, inside
-  `loadMovieFiles()`'s own `loadTiffFilesAuto()`/`loadTiffFile()` call chain. `loadMovieFiles
-  (fileList)` and `loadCsvFile(file)` are named functions the combined handler dispatches to. A
-  selection mixing a CSV with movie file(s) is refused outright with a logged error, rather than
-  guessing via file count or order. An all-CSV selection with more than one file warns (doesn't
-  block) and loads only `files[0]`.
+  **`checkLocsMemory()`'s own STOP point is a CALCULATED reserve, not a guessed fraction of
+  `memBudgetGB`** — first shipped at flat fractions (`0.95`, then `0.7`/`0.55` — each one just another
+  guess, no more principled than the last, and asked about directly: "what is the reasoning behind
+  the 55%?" didn't have a solid answer). Now: `stopAt = budget − renderBytesEstimate −
+  frameBatchReserve − stackResidentBytes`, all three terms REAL numbers computed from THIS run's own
+  configuration, not arbitrary safety margins —
+  - `renderBytesEstimate` = `estimateRenderBytes(w*config.mag, h*config.mag, config.zcolor,
+    config.rblur, config.renderMode)` (MODULE: render), computed ONCE up front: exactly what the
+    reconstruction render that WILL run right after this Run stops or finishes will cost.
+  - `frameBatchReserve` = `2*pool.length*BATCH*w*h*4` (0 on the serial no-worker path), set once
+    `pool`/`BATCH` are resolved: decoded frames are always `Float32Array(w*h)` regardless of the
+    source file's own bit depth (`decodeInto()`, MODULE: in/out), and every worker's own in-flight
+    batch is postMessage-CLONED (main thread's own copy + each worker's clone, worst case across all
+    workers at once) — the SAME clone cost `renderSuperRes()` accounts for, just for frame data
+    instead of locs.
+  - `stackResidentBytes` = `stack.residentBytes||0` — `stack` is already `runCore()`'s own explicit
+    parameter, so this reads correctly in both the interactive and headless case with no shadowing
+    risk. Asked about directly: "if a 3GB file is loaded, is memory consumption then increasing well
+    above 3GB depending on loc count, or is 3GB only the limit for file size?" — a fair question that
+    exposed a real, still-standing gap even after the render/frame-batch reserves above:
+    `loadTiff()`'s own whole-file caching decision (MODULE: in/out) can let a single decoded movie
+    consume most of `memgb` on its own (a real ~2.5 GB cache against a 3 GB budget is a normal,
+    correctly-logged outcome), but this check used to compute its OWN reserve against the FULL
+    nominal budget with no idea that cache already existed — so yes, combined peak memory COULD run
+    well above the configured budget depending on loc count, until this term closed it.
 
-  **`analyze()`'s `config.file` now also accepts a `.csv`** (v0.11.13, same extension-only
-  dispatch), parsed via `parseCsvLocs()` instead of `loadTiffFile()` — Localize/crop/
-  `estimateGainOffset`/calibration are all skipped (no raw pixel data to act on), but everything
-  downstream (`sSmlmPair`/`correctDrift`/`computeNeNA`/`computeFRC`/`sptTrack`/export/render) runs
-  unchanged, since none of those `*Core()` functions ever took a `stack` to begin with — only
-  `locs`/`pxnm`. `timings` comes back `null` (no Run to time); `tools/webSMLM-cli.mjs` handles that
-  (a real, previously-crashing gap — its own summary line unconditionally read `timings.runMs`).
-  `loadCsvFile()` now calls `logCmd()` too, matching `loadMovieFiles()`'s own convention — until
-  this, a CSV load was the one **Load movie/data** path that recorded no command at all, a real,
-  reported gap (spotted from the log output itself: prose with no command line above it) that also
-  happened to be genuinely justified before this — there was no headless equivalent to record.
+  `locs` may use whatever's left of `budget` after those three reservations — still an ESTIMATE
+  (`200` bytes/row, `LOC_ROW_BYTES`, likely itself an UNDERESTIMATE of a real 15-own-property loc
+  object's V8 footprint — biasing this toward acting a little late, not early), but no longer an
+  arbitrary safety margin: it's a real answer to "how much room does THIS run's own render,
+  in-flight frame batches, and already-loaded movie actually need," computed from THIS run's own
+  settings. A WARN heads-up fires at 80% of that SAME calculated `stopAt` — still one real number,
+  just an earlier point on it. Reported: a real ~30k-frame mobile MLE-spherical Run crashed even at
+  flat-fraction thresholds, right after auto-stopping's own graceful message — the render step right
+  after a stop had no idea how much the already-resident locs array was using, which the calculated
+  reserve now directly prevents (see **render**'s own paragraph on `checkRenderSize()`'s matching
+  fix). Still an estimate, not a guarantee — no client-side JS can detect or prevent an OS-level tab
+  kill for certain.
 
-  `config.exportPlots` (also `--exportPlots`/`exportPlots=1`) renders whichever of drift/NeNA/FRC/
-  PCFO/calibration were actually computed this call into `result.plots`, each a `{pngDataUrl,
-  svgText}` pair — reuses **render**'s `renderPlotBothFormats()`/`_plotTarget` redirection (the
-  same mechanism "Save plot/image" uses interactively), so no visible browser window is needed.
-  `drawNenaPlot(res)`/`drawFrcPlot(r)` already take an explicit result parameter; `drawDriftCurve()`
-  /`drawPcfoPlot()`/`drawCalibration()` don't (they read module-level globals) — three small
-  `render*PlotHeadless()` wrappers stash the real global(s), call `renderPlotBothFormats()`, then
-  restore them. `calib`'s wrapper specifically must live OUTSIDE `analyze()`'s own body: `analyze()`
-  declares its own local `let calib=null` shadowing the module-level one `drawCalibration()` reads.
-  The calibration plot needs a FRESH build this call — a bare `calibrationJson` only carries the
-  derived model, not the point cloud the plot needs. The raw frame/reconstruction are never
-  included (no vector form at real localization counts); the line-profile plot (a user-drawn line)
-  has no headless equivalent.
+  **Never `delete` a property off a loc object post-hoc — set it to `undefined` instead.**
+  `config.auditCandidates` (headless/test-only, keeps each accepted loc's originating detection-pixel
+  index for cross-checking) used to `delete L._candidatePixel` on every loc once no longer needed. A
+  real, reported crash at TRUE full scale (`tests/gpu/bench-real-data.mjs --full`, ~4M real
+  localizations) traced to this: `delete` forces V8 to convert that object off its fast, shared,
+  shape-based hidden-class representation onto a slow, per-object dictionary-mode (hash-table)
+  representation — measured directly to roughly DOUBLE memory for a large loc array (675.2MB→
+  1682.3MB, +150%, for 3M loc-shaped objects in isolation), which at true full scale pushed
+  `totalJSHeap` to the tab's own heap limit right after Localize finished. Fixed by
+  `L._candidatePixel=undefined` instead — behaviorally identical (every construction site already
+  treats `undefined` as the "not audited" sentinel, never distinguishes it from "property absent"),
+  but keeps every loc on its existing fast hidden class. General rule going forward: post-hoc-clearing
+  a property that WAS present on a hot, large-N object array should always assign `undefined` (or a
+  suitable sentinel), never `delete` — `delete` is fine on small, one-off, or genuinely short-lived
+  objects (e.g. a single settings-migration object), never on a large homogeneous array of hot
+  objects the app already relies on staying monomorphic (matching `LOC_ROW_BYTES`'s own fast-shape
+  assumption above).
 
-  **`config.exportHistograms`** (`string[]`, also `--exportHistograms photons,sigma,bg` — comma
-  -separated, no spaces) covers the "no headless equivalent" gap for the shared column histogram:
-  since `computeHist()`/`drawHistogram()` already takes an explicit `vals` array (no table/DOM
-  state needed), `renderHistogramPlotHeadless(col, vals, unit)` stashes `histData`/`histView`
-  (which `computeHist()` itself sets), computes the requested histogram, renders via
-  `renderPlotBothFormats(drawHistogram)`, then restores prior state. A separate flag from
-  `exportPlots`, usable with or without it, with an explicit column LIST (not a fixed default set).
-  Results land in `result.plots` as flat `hist_<column>` keys (not a nested `plots.histograms`
-  object), so `tools/webSMLM-cli.mjs`'s already-generic `writePlots()` needed zero changes.
-  `x`/`y`/`z`/`dist`/`sigma`/`sigma_x`/`sigma_y` convert to nm before histogramming (matching the
-  CSV/table convention); every other column histograms as-is. A column that's absent or entirely
-  non-finite logs a warning and is silently skipped, not a hard error.
+  **The `useGpuFit` branch's raw-panel live preview (`refreshRawPreview()`) keeps a small, bounded
+  ring of recently-detected frames, not just the latest one.** A real, reported bug: the raw panel's
+  magenta fit crosshairs stopped appearing inside the green detection boxes during a fast-detecting,
+  GPU-fit-bound Run (dense real data, many CPU detect workers feeding one shared GPU fit pipeline).
+  Root cause: `makeGpuFitAccumulator()` batches candidates from MANY frames into one accumulator slot
+  before firing a single GPU dispatch (by design — see that function's own comment on why a
+  one-dispatch-per-frame granularity was too small to pay off), and `makeGpuFitSlotPool()`'s own
+  `acquire()` never blocks the detector — it hands out a temporary overflow slot rather than ever
+  applying back-pressure — so detection can run arbitrarily far ahead of fitting with no natural
+  limit. `refreshRawPreview()` used to always show the JUST-detected frame, filtering `locs` for an
+  exact frame match — but that frame's own candidates essentially never have fit results back by the
+  time the next preview tick fires, so the crosshair overlay stayed empty almost continuously on
+  exactly the kind of Run where you'd most want to see it working. Fixed by retaining a small ring of
+  `{fi, img, mx}` triples (one per recently-detected frame) and, on each preview tick, searching it
+  backward for the newest frame that's either already fit (has entries in `locs`) or genuinely had no
+  candidates to begin with (`mx.length===0`, nothing to wait for) — showing that frame's own image,
+  boxes, and crosshairs together keeps them visually consistent, at the cost of the raw panel lagging
+  slightly behind "now" while GPU fitting catches up. Deliberately capped SMALL and FIXED (`max(4,
+  pool.length*2)`), not sized to the true backlog (unbounded in principle, per the no-back-pressure
+  note above) — if the real lag ever exceeds the ring's depth, this just degrades to the pre-fix
+  behaviour (latest frame, crosshairs pending) rather than let retained preview images grow without
+  bound.
 
-  **`config.exportTrackData`/`exportSSmlmCandidates`/`exportCalibrationPoints`/`exportPcfoTiles`**
-  (v0.11.10, `docs/DOCUMENTATION.md` §8 has the full schema) stream a per-record dataset too
-  large/detailed for `analyze()`'s own return value — a per-track MSD-vs-lag curve, an sSMLM
-  candidate pair, a calibration bead point, a PCFO tile point — through a new
-  `config.onRecord(kind, batch)` hook in bounded batches (`makeRecordEmitter()`, 2000/batch), never
-  accumulated in-page or put on the return value (which crosses the DevTools Protocol as one JSON
-  blob when CLI-driven — exactly why `pcfo.pts`/`sSmlmPair.locs` are already trimmed out of
-  `tools/webSMLM-cli.mjs`'s own return handling). `sptCore()`/`pairCore()`/`calibrationCore()`/
-  `pcfoCore()` each accept the matching flag + `hooks.onRecord`; `computeEnsembleMsd()` (MODULE:
-  spt) now also returns `perTrackMsd` (`Map<track_id,[{lag,tamsd}]>`) for exactly this — previously
-  computed then discarded once pooled into the ensemble mean. `tools/webSMLM-cli.mjs` is the
-  reference consumer: `--exportTrackData`/etc. forward `onRecord` via the SAME live `console.log()`
-  channel `onProgress`/`onLog` use, appended to a per-kind `.ndjson` file via
-  `fs.createWriteStream()`.
-- **liveStreaming** (`window.webSMLM.liveStream`) — Marked **experimental**: real, but younger and
-  less battle-tested than the rest of the app (several real bugs found and fixed via actual
-  openframe-rig/Playwright testing this same 0.12.0 cycle — Stop not wired for streaming, the locs
-  table staying disabled all session, an adaptive-cadence timing gap). A Micro-Manager/pycromanager
-  camera bridge, physically right after **pipeline** (whose `runCore()` it calls per chunk) and split into its own
-  indexed `MODULE:` banner for its size, not moved elsewhere in the file. Distinct from, and named
-  to avoid colliding with, both the in/out module's own unrelated TIFF chunked/streamed-loading
-  flag (`chunkmb`/`loadMultiIfdStreaming()`/`stack.streaming`) and the headless API's NDJSON
-  "streaming per-record exports" (`onRecord`/`makeRecordEmitter()`, above) — three genuinely
-  different features that all happen to use the word "stream". Two ways in, both nested inside
-  `memBox` ("Memory & streaming"): an opt-in WebSocket the page itself connects OUT to (never
-  listens), for hooking into a tab already open (`tools/test_livestream_demo.py`); or an external
-  Playwright-driven bridge (`tools/webSMLM-livestream-bridge.mjs`, e.g. driving a Gladoscopy RT
-  node) via a hidden `#liveStreamChunkInput` file conduit. Either way, each chunk is localized
-  independently via `runCore()` (no cross-chunk context, so FTM is unsupported in this mode) and
-  appended to a running total, repainting the reconstruction through the same `lastResult`/
-  `rerender()` globals an interactive Localize run already uses. No separate Start step: a
-  session (`liveStreamState`) arms itself the moment streaming actually begins — Connect, or the
-  first pushed chunk — using whatever pxnm/gain/method/etc. the sidebar is set to at that moment.
-  The top-level **Stop** button is the one control that ends a session either way (closing the
-  WebSocket first if one's open); an earlier separate Disconnect button was folded into it and
-  removed once Stop covered everything it did. The raw panel gets its own scrubbable frame history
-  (`liveStreamShowRawFrame()`), auto-following the newest frame unless paused by a manual scrub,
-  capped to **Memory budget (GB)** via a ring buffer (`liveStreamState.rawFrames`) since an
-  open-ended acquisition can't keep every raw frame in memory. The periodic cadence render is
-  adaptively time-based (`liveStreamState.previewInterval`, seeded from `srPreviewMs`/scaled to
-  ~10x its own measured cost up to `srPreviewMaxMs` — the same mechanism a normal Localize run's
-  live preview uses; a manual "Render every N frames" setting was removed since its effective
-  cadence depended on external chunk size, not anything this app controls), guarded by
-  `liveStreamState.renderBusy` so a fast chunk stream can't pile up renders faster than the single
-  dedicated render worker can finish them, plus a conservative idle/pause detector and a session's
-  own final render on end so the displayed reconstruction never lags behind `lastResult.locs`.
-  `liveStreamOwnsRawPanel()` is the single shared "does streaming currently own the raw panel"
-  check, used by the Contrast-auto handler and wheel-scrub routing — `initScrub()` deliberately does
-  NOT use it: a fresh stack/CSV load must always reclaim the panel from a stopped session's leftover
-  scrub-back history, a narrower check by design, not an oversight. **View data/filtering** (the
-  locs table) is available mid-session too (same "any locs exist" gate as drift/NeNA/FRC) for
-  browsing/sorting/histograms, but committing a NEW filter (or the reconstruction panel's crop
-  tool, same `_tableFilters` mechanism) is refused while streaming — a filter is a one-time
-  snapshot never re-applied to later chunks, so using one mid-stream would silently freeze the
-  displayed reconstruction while `lastResult.locs` kept growing underneath it. **Clear
-  localizations** (`liveStreamClearBtn`, `clearLiveStreamingLocalizations()`) resets `allLocs`/
-  `frameOffset`/`rawFrames`/the reconstruction to empty without touching `.active` — chunks keep
-  arriving through the call, no reconnect needed.
-- **table** — the sortable, cumulatively-filterable localizations table ("View data/filtering")
-  and per-column histograms. Committed filters set `renderLocs`, which drives the reconstruction
-  live. The SR panel's crop tool (`cropBtn`, click two corners) is not a separate mechanism — it
-  pushes an x/y-range clause into the same `_tableFilters` array a typed filter would, so
-  reconstruction, export, NeNA and FRC all see a crop identically to any other filter. Typing
-  `tempClusteringXY < 10` (nm) into the filter box is different in kind from an ordinary clause —
-  it doesn't select a subset, it *merges* consecutive-frame detections of the same blinking
-  molecule into fewer, higher-precision "events" (`clusterEvents()`), changing the BASE row set
-  rather than which rows currently pass. `getBaseLocs()` is the single place deciding whether the
-  base is raw `lastResult.locs` or clustered events; everything else consumes whichever it gets,
-  the same loc-shape either way. `checkTableSize()` guards `locTableData()` the same way
-  `checkRenderSize()` guards **render**'s buffers — each row estimated at ~200 bytes (V8 per-object
-  overhead) against `memgb`; throws if over budget, caught at all three build sites so a too-large
-  table fails with a log message and leaves whatever was on screen before.
+  **`memBudgetGB`/`memgb`/`chunkmb` are three independent settings** ("Total memory budget (GB)",
+  "Budget raw movies (GB)", "Stream heap (MB)", all under "Memory & streaming"): `memBudgetGB` is the
+  OPT-IN total-memory ceiling `checkLocsMemory()`/`checkRenderSize()`/`checkTableSize()` all compare
+  against (default `Infinity`/unset on desktop — most setups never need one for the file sizes this
+  app is typically used with); `memgb` only ever decides whole-file-cache-vs-stream at load time
+  (`readBudget()`, MODULE: in/out), unrelated to the ceiling. `MOBILE_MEM_DEFAULTS`
+  (`syncParamControls()`, MODULE: params) substitutes a much stricter profile for all three on a
+  memory-constrained device only (`isMemoryConstrainedDevice()`) — `memBudgetGB:0.5` (a real,
+  enforced ceiling from the very first load, not something a mobile user has to already know to set;
+  tuned down from an initial `1` after real-world crash reports even at that value), `memgb:0` (floors
+  `readBudget()` at 0, so EVERY movie load on such a device streams, never whole-file-caches,
+  regardless of size), `chunkmb:250` (a smaller per-chunk working set, since streaming is the only
+  path there, not an occasional fallback). Desktop/laptop keeps every one of these three fields' own
+  ordinary default, completely unaffected by this table.
 
-  `computeHist()`/`drawHistogram()` (reused by table-column histograms, sSMLM's distance/angle
-  histograms, and **spt**'s D/track-length histograms) can overlay a fit curve: `histData.curve`, a
-  `x=>y` function sampled across the current view in the same bin-height units as the bars, plus an
-  optional `histData.curveLabel`. Unlike `markers` (a `computeHist()` parameter, positions known
-  before binning), `curve` isn't a `computeHist()` argument — a fit like `fitTrackLifetime()` needs
-  the ALREADY-binned `histData` to fit against, so the caller sets `histData.curve`/`curveLabel`
-  after `computeHist()` returns, before `drawHistogram()`. Defaults to `null`.
+  **`maybeShowMemWarning()`** (declared right before `loadMovieFiles()`) is the complementary piece —
+  no client-side JS can fully guarantee no OOM tab-kill on a sufficiently large/dense movie regardless
+  of how conservative the starting defaults are, so on a memory-constrained device, loading a movie
+  also shows a one-time (`_memWarnShown`, at most once per PAGE LOAD — a crash reloads the whole page
+  anyway, which is itself a fresh load and naturally re-arms this) pop-up (`#memWarnModal`, wired in
+  `wireHelp()` alongside the app's other modals) restating the three live values above and pointing at
+  what to try next if analysis keeps failing (lower `memBudgetGB` further, narrow the analysed frame
+  range, lower Magnification, use a smaller/cropped file); its own **Open Memory & streaming** button
+  expands and scrolls to `#memBox` directly. Purely informational — never blocks the load itself.
 
-  `computeHist()`'s x-axis range (`hi`) carries a 5% right-edge headroom (`hi = lo +
-  (dmax-lo)*1.05`), mirroring the Y-axis's own `ymax*=1.08` factor: without it, `hi===dmax`
-  exactly, so the tallest/rightmost bin's right edge fuses visually with the plot's own border. A
-  real bug on **spt**'s track-length histogram: a long-tail outlier track was effectively
-  invisible, indistinguishable from the axis line — binning was never the problem (`b>=nb` already
-  clips into the last bin), only the missing visual margin was.
+  **A live "Mem: ..." readout** sits in the Log card's own title row (`#memReadout`, a
+  `updateMemReadout()` polled every 2s via `setInterval` — "dynamic" here means "polled regularly,"
+  not "recomputed on every triggering event") — asked directly: "can you dynamically display how
+  much memory webSMLM is using, or is that off limits?" Honest answer, and what got built: on Safari
+  it genuinely IS off limits — no `performance.memory` (Chrome/Edge-only, never implemented by
+  WebKit, deliberately, for fingerprinting/side-channel reasons) and no `navigator.deviceMemory`
+  (same) exist there, so there is no real number this page can ever read on that browser. The
+  readout always shows webSMLM's own ESTIMATE (the exact same `LOC_ROW_BYTES`/`estimateRenderBytes()`
+  math the guards above use, clearly labelled as an estimate in its own tooltip) and, only on
+  browsers that actually expose them, the REAL measured JS heap usage plus an approximate total
+  device RAM to genuinely rate it against — never fabricates either figure when unavailable.
 
-The list above is in the file's actual physical order (as of v0.11.1, **workers** and
-**export** were swapped to match — see `docs/REFACTOR_PLAN.md` for the reasoning and how it was
-verified safe: both are pure declarations, no cross-referencing top-level state, so JS hoisting
-made the physical move a no-op for behavior).
+  **`stack.residentBytes` closes a real, reported gap in the readout: it still showed ~0 right after
+  loading a real multi-GB movie**, even though `loadTiff()` (MODULE: in/out) had just onLog'd its own
+  "Decoded working set if fully cached: ~2.50 GB" line — the biggest single memory consumer for a
+  whole-file-cached load, invisible to the readout because it only ever looked at
+  `lastResult`/`locs`, with no idea a loaded STACK itself could be holding gigabytes. Every
+  `loadTiff()` branch that actually decides to cache decoded frames now tags its own returned stack
+  object with `residentBytes` — the SAME number it already computed and logged, not a second,
+  independently-derived estimate: `needC`/`need` for the two full-cache branches; `fileSize` for the
+  "exceeds budget, decode-per-frame from the still-resident raw buffer" branch; a live
+  `get residentBytes(){return fileSize+cf*frameBytes}` on the internal streaming FALLBACK (`cf` can
+  shrink after an allocation failure, so a plain property would go stale). `updateMemReadout()` reads
+  `stack.residentBytes||0`. **Known, NOT-yet-covered gap**: `loadTiffSequence()`/`makeConcatStack()`
+  (multi-file loads), `loadNd2File()`, and `loadFitsFile()` don't tag `residentBytes` yet — the
+  readout under-reports for those specific load paths until they get the same treatment; the
+  genuinely disk-backed `loadMultiIfdStreaming()` (MODULE: in/out) correctly has none to report (no
+  persistent cache exists there at all).
+  **A real, caught-before-shipping layout bug**: `.card h4 > span:first-child` (MODULE: params)
+  gives a card's own FIRST `<h4>` child `white-space:nowrap`/`overflow:hidden`/ellipsis, meant for a
+  short plain title — bundling the Log card's own buttons AND this new readout into that same first
+  span (tried first) got squashed onto one unwrapping, clipped line the moment the readout made the
+  row too long for a narrow viewport. Fixed by giving the Log h4 a SECOND child span (buttons +
+  readout, own `flex-wrap:wrap`) instead of stuffing everything into the first — not subject to that
+  rule at all, so it can actually wrap on a narrow screen instead of overflowing.
 
-### Web Worker gotcha (read before touching detect/fit/workers)
+  **Standing rule — every actionable GUI control needs a plain top-level function behind it.** A
+  button click, checkbox change, or any control that actually computes or changes data must call ONE
+  plain top-level `function`/`async function`, never inline its real logic in an anonymous
+  `addEventListener` closure (reading/writing a handful of DOM elements to reflect state — disabling
+  a button, toggling a class — is fine to leave inline). The log terminal's `eval()` shares this
+  file's own top-level scope, so any plain top-level function is automatically callable from the
+  terminal with zero extra wiring; an inline handler is invisible to it. This is the actual mechanism
+  behind "GUI and command-line support are interchangeable" — one implementation per action, not a
+  parallel API kept in sync by hand.
 
-Workers are **not** separate files. `workerSource()` builds worker code by calling `.toString()`
-on the very functions the main thread uses, so detection/fitting logic exists once. Consequences:
+  **The Log window is also an interactive JS terminal** (`#logTerminal`). `runTerminalStatement(text)`
+  uses the same two-attempt strategy Node's own REPL uses (try as a captured expression first, else
+  run as a plain body) via a direct `eval()` (not `new Function`) placed inside a function declared in
+  this file's own single top-level `<script>` — so it shares the full lexical scope chain (every
+  module-level `let`/`const`, not just `window`-attached names). `↑`/`↓` recall the combined list of
+  every logged `{type:'cmd'}` command and past terminal input (`terminalHistoryList()`).
+  `resolveTerminalConfig()` (1) backfills every `PARAMS` field a terminal-run config OMITS from LIVE
+  session state via `paramValue()` (never a `PARAMS` default — so a recalled command reflects the
+  session as it stands right now, not generic defaults), and (2) resolves a bare filename STRING back
+  to a real registered `File`/`Blob` (`_terminalFileRegistry`/`registerTerminalFile()`, called at
+  every point a real File actually enters the app) or falls back to `_lastTerminalFile` (last-write-
+  wins) when the config has no `file`/`files` key at all — recalling ANY logged action and pressing
+  Enter must reproduce that exact action, not throw a low-level type error or silently substitute
+  generic defaults. `applyHeadlessResultToSession(result)` is the bridge that pushes a bare
+  `analyze()`'s own result into the live interactive session (resets crop/drift/table state, sets
+  `lastResult`, explicitly nulls the module-level `stack` even if an unrelated movie was loaded
+  earlier — `analyze()`'s own `stack` is a function-local variable that never touches that global).
 
-- A worker gets a fresh global scope. Any module-level state a stringified function relies on must
-  be re-declared in `WORKER_PRELUDE`, or the worker throws a `ReferenceError` and silently falls
-  back to single-threaded. If you add a `let`/`const` at module scope that a detect/fit function
-  reads, add it to `WORKER_PRELUDE` too (there is a runtime check listing `missing` names).
+  **`logCmd(config, jsOverride)`** — most actionable functions (`estimateGainOffset()`,
+  `runSptTrack()`, `correctDrift()`, …) take no arguments and read live session state; `jsOverride` is
+  literal JS text logged/recalled/run instead of a generic `analyze({...})` reconstruction, since
+  `analyze()` ALWAYS does load→detect/fit→… in one shot and has no way to run any of these in
+  isolation — recalling a bare `analyze({...})` for one of these would silently re-Localize the whole
+  stack, a real correctness/performance bug for exactly this class of action.
+  `overrideWithFields(config, call)` builds a SELF-CONTAINED override: for every `config` key naming a
+  real sidebar field, it prefixes `call` with a `$('id').value=...`/`.checked=...` assignment (skips a
+  key with no matching element, e.g. a bookkeeping marker or `<input type=file>`) — recalling this
+  loads the whole line into the terminal already editable, change a value, press Enter.
+
+  **A multi-fact `onLog()` message is ONE call with embedded `"\n"`s and a plain, short `"  "`
+  (2-space) continuation indent — never several separate `onLog()` calls hand-padded with just enough
+  leading spaces to visually align under a shared label.** `wrapCommentLine()` (MODULE: params) marks
+  and word-wraps every `"\n"`-split line independently at 80 columns, so a hand-counted indent only
+  survives until that specific line is long enough to wrap a SECOND time — the wrapped remainder then
+  starts flush after the marker with no indent at all, and outside this app's own monospace log box
+  (a copy-paste, an exported log) the indent has nothing to align against regardless. A real, reported
+  case: the GPU-fit diagnostic block (MODULE: pipeline, `runCore()`'s own "who actually did the work"
+  section) used to be a dozen separate `onLog()` calls each padded to align under `"GPU fit:       "`
+  — reads as a broken wall of misaligned fragments once copied out. Fixed by combining each related
+  cluster into one call. Separately, `formatLogEntry()` strips a prose message's own leading `"\n"`
+  (used by many action-start messages, e.g. `onLog('\nRun: ...')`, to open a visual gap before a new
+  action's header) specifically when that entry lands right after a `cmd`/`term` entry, which already
+  prints its own blank-line separator — without this a command and its own first result line printed
+  with a spurious blank line between them, making it ambiguous which command a given comment actually
+  belonged to (also reported directly).
+
+  **`_sessionEpoch`/`newEpoch()`/`staleEpoch()`** — every long-running, state-writing action (Run,
+  drift, calibration, spt, sSMLM/smFRET pairing, crop, load, simulate) captures
+  `const myEpoch=newEpoch()` right after its own preconditions and checks `staleEpoch(myEpoch)`
+  immediately before every LATER write to shared state, especially the first thing after an `await` —
+  bailing out (discarding its own result entirely) if a newer action has bumped the epoch since. This
+  exists because the terminal calls these functions directly, bypassing the DOM-only "button disabled
+  while running" protection an interactive click has (a superseded async completion can otherwise
+  silently overwrite a genuinely newer result). Deliberately does NOT try to force the superseded
+  operation to actually stop early (no `stopRequested` dance — fragile, and simply discarding a stale
+  result is just as correct), and deliberately does NOT epoch-guard a function's own button-enable/
+  `finally` cleanup (a superseding action may not manage the same buttons, which would leave one stuck
+  disabled forever instead).
+
+  **Keyboard hotkeys** (`wireHotkeys()`): holding **Alt** shows numbered hint badges over the 10
+  always-visible top-level action buttons (`HOTKEY_BUTTONS`, fixed on-screen order); **Alt+Shift**
+  switches to the 10 collapsible sidebar `<details>` modules (`HOTKEY_SECTIONS`). Digit matching uses
+  `e.code` (`"Digit1".."Digit0"`), never `e.key` — macOS remaps `e.key` for the digit row while Option
+  is held. **Alt+T** focuses the log terminal (one fixed binding, checked before the digit lookup).
+  **Alt+Shift+P/F/S** are three more fixed single bindings (Pixel size, Frame time, the Stack
+  panels/Side by side toggle).
+
+  `makeNavigator(cv, nav)` is the shared pan/zoom (drag/wheel/pinch/double-tap-to-fit) wiring for the
+  raw/SR canvases (Pointer Events). `trackDragDistance(cv)` separately measures total on-screen
+  movement since the last press (`wasDrag()`, past `CLICK_DRAG_PX`=5 CSS px) — a browser still fires a
+  native `click` after a drag-to-pan sequence on the same element regardless of distance travelled, so
+  every click-armed multi-point tool sharing that canvas (raw-panel crop, SR crop/measure/track-
+  select) must check `wasDrag()` at the top of its own click handler or a pan can plant a stray
+  corner/point.
+
+- **liveStreaming** (`window.webSMLM.liveStream`) — Marked **experimental**. A Micro-Manager/
+  pycromanager camera bridge; two ways in, both nested inside "Memory & streaming": an opt-in
+  WebSocket the page connects OUT to (never listens), or an external Playwright-driven bridge
+  (`tools/webSMLM-livestream-bridge.mjs`) pushing chunks via `window.webSMLM.liveStream.pushChunk()`.
+  Each chunk is localized independently via `runCore()` (no cross-chunk context — FTM is unsupported
+  here) and appended to a running total, repainting through the same `lastResult`/`rerender()`
+  globals an interactive Localize run uses. No separate Start step — a session arms itself the moment
+  streaming actually begins. The top-level **Stop** button ends a session either way. Committing a
+  NEW table filter (or the crop tool) is refused while streaming — a filter is a one-time snapshot
+  never re-applied to later chunks, so using one mid-stream would silently freeze the display while
+  `lastResult.locs` kept growing underneath it.
+
+- **table** — the sortable, cumulatively-filterable localizations table ("View data/filtering") and
+  per-column histograms. Committed filters set `renderLocs`, driving the reconstruction live. The SR
+  panel's crop tool pushes an x/y-range clause into the SAME `_tableFilters` array a typed filter
+  would — reconstruction, export, NeNA and FRC all see a crop identically to any other filter.
+
+  Filtering is CLI/JS-loggable: every `_tableFilters.push()` calls
+  `logCmd({tableFilters: tableFilterExprList()})` — the FULL cumulative array each time (a curated
+  snapshot, not a diff). `tableFiltersCore(locs, px, exprList)` is the pure, DOM-free replay half
+  `config.tableFilters` calls headlessly.
+
+  `tempClustering(XY|Z|Memory) <= N` is a different KIND of clause from an ordinary filter — it
+  doesn't select a subset, it re-merges a blinking molecule's own detections into fewer, higher-
+  precision "events" (`clusterEvents()`), changing the BASE row set. `getBaseLocs()` is the single
+  place deciding raw-vs-clustered; `memoryFrames` (gap-bridging tolerance, default 0 = strict
+  adjacency) can grow unboundedly with a real gap tolerance — no spatial-grid optimization has been
+  needed yet, matching spt's own Hungarian-vs-greedy "don't optimize for a scale nobody's hit"
+  precedent.
+
+  `checkTableSize()` guards `locTableData()` against `memBudgetGB` the same way `checkRenderSize()`
+  guards render buffers (each row estimated at ~200 bytes).
+
+## Web Worker gotcha (read before touching detect/fit/workers)
+
+Workers are **not** separate files. `workerSource()` builds worker code by calling `.toString()` on
+the very functions the main thread uses, so detection/fitting logic exists once. Consequences:
+
+- A worker gets a fresh global scope. Any module-level state a stringified function relies on must be
+  re-declared in `WORKER_PRELUDE`, or the worker throws a `ReferenceError` and silently falls back to
+  single-threaded. If you add a `let`/`const` at module scope that a detect/fit function reads, add it
+  to `WORKER_PRELUDE` too (there is a runtime check listing `missing` names).
 - Any helper a stringified function calls must itself be included in the `workerSource()` body.
-- The same pool serves two unrelated message protocols: detect/fit's frame-batch dispatch
-  (`d.frames`/`d.start`/…) and FTM's single-frame row-band preview (`d.ftmFrame`/`d.buf`/…) —
-  `onmessage` branches on `d.ftmFrame` before falling into the detect/fit path. A new worker job
-  needs its own branch and its own `d.<flag>` field, not a repurposed existing one. FTM's
-  *other* use — `makeFtmStack()`, feeding `runCore()`'s Localize path — deliberately does **not**
-  add a third message type: it runs its chunk correction on the main thread instead, precisely
-  because `runCore()`'s own worker-dispatch can have several workers mid-detect/fit while a chunk
-  fetch is in flight, and a third job type on the same pool would overwrite a busy worker's
-  `onmessage` (one property, not a queue) out from under it. Don't "fix" this by giving chunk
-  correction a worker branch without also solving that scheduling conflict properly.
+- The same pool serves two unrelated message protocols: detect/fit's frame-batch dispatch and FTM's
+  single-frame row-band preview — `onmessage` branches on `d.ftmFrame` before falling into the
+  detect/fit path. A new worker job needs its own branch and its own `d.<flag>` field, not a
+  repurposed existing one. FTM's *other* use (`makeFtmStack()`, feeding Localize) deliberately does
+  **not** add a third message type — it runs on the main thread instead, since `runCore()`'s own
+  worker-dispatch can have several workers mid-detect/fit while a chunk fetch is in flight, and a
+  third job type on the same pool would overwrite a busy worker's `onmessage` (one property, not a
+  queue) out from under it.
 
-### Left/right panel plot pattern
+## Left/right panel plot pattern
 
 The left panel (`raw` canvas) doubles as a plot surface. To show a plot instead of a frame, set
 `rawFull=null; rawIsPlot=true; rawPlotName=<kind>` and draw directly on `$('raw')`; call
-`syncSaveImg()`. Calibration plots render on the right (`sr`) canvas via `srIsPlot`. Switching a
-panel back to a frame/reconstruction (`drawRawView`/`drawView`) must clear any plot-only overlay
-state so a stale plot can't paint over live pixels.
-
-**The four raw-panel mode-toggle buttons must call `hideOtherRawToggleBtns(exceptId)` (MODULE:
-render, next to `drawRaw()`).** `driftPlotModeBtn`/`sptHistModeBtn`/`sSmlmHistModeBtn`/
-`segShowModeBtn` are mutually exclusive by construction — only one plot/image can occupy the panel
-at a time. A DIRECT switch between two plot dispatchers with no "reclaim point" in between (e.g.
-**Correct drift**/**Show drift**, leaving `driftPlotModeBtn` up, immediately followed by **Preview
-pairs**) used to leave the PREVIOUS toggle stranded on screen alongside the new one — a real,
-reported bug, since each dispatcher only knew how to show/label its OWN button. Fixed by having
-all four dispatchers (plus `drawRaw()`/`drawSegmentedImage()`) call `hideOtherRawToggleBtns()`
-first. Any FUTURE raw-panel toggle button must do the same — add its id to the helper's list.
+`syncSaveImg()`. Calibration/E-S-histogram plots render on the right (`sr`) canvas via `srIsPlot`.
+Switching a panel back to a frame/reconstruction (`drawRawView`/`drawView`) must clear any plot-only
+overlay state so a stale plot can't paint over live pixels. Every raw-panel mode-toggle button must
+call `hideOtherRawToggleBtns(exceptId)` — see **render** above.
 
 **And the other half of that rule, which was missing until v0.12.0-dev/2026-09-04h: a plot that
 owns NO toggle must call the helper too**, with no argument. Only toggle-owning dispatchers called
@@ -1368,122 +1319,112 @@ plot over the new one. Fixed in `drawNenaPlot()`, `drawFrcPlot()`, `drawPcfoPlot
 `renderProfile()` and `drawHistogram()`; the rule is now simply that **every** raw-panel plot
 clears the toggles it does not own.
 
-### Live preview (real-time detect/fit on the scrubbed frame)
+## Live preview (real-time detect/fit on the scrubbed frame)
 
-`showFrame()` re-detects and re-fits whatever frame the raw-panel scrubber is on, so
-switching detection/fit method or scrubbing shows results immediately without a full Run.
-Two paths, chosen by the `#liveUpdate` checkbox:
+`showFrame()` re-detects and re-fits whatever frame the raw-panel scrubber is on, so switching
+detection/fit method or scrubbing shows results immediately without a full Run. Two paths, chosen by
+the `#liveUpdate` checkbox:
 
-- **checked** — reads the current UI controls live and calls `detectSpots()` fresh; this is a
-  throwaway visualization, never written to `lastResult`/`locs`/`srFull`.
+- **checked** — reads the current UI controls live and calls `detectSpots()` fresh; throwaway, never
+  written to `lastResult`/`locs`/`srFull`.
 - **unchecked** — replays the *last full Run's* (or Calibration's) parameters from the cached
-  `det:{sigma,k,win,border,exactBP,mode}` bundle on `lastResult`/`calib`, so the overlay matches
-  what was actually localized rather than whatever the controls currently show.
+  `det:{sigma,k,win,border,exactBP,mode}` bundle on `lastResult`/`calib`, so the overlay matches what
+  was actually localized.
 
-Any control that affects detection/fit is wired into the live-preview listener array (search
-for `.forEach(id=>{` near the settings-JSON code) — a new per-method parameter needs adding there
-too, or changing it won't refresh the scrubbed-frame preview until the next full Run.
+Any control that affects detection/fit is wired into the live-preview listener array (search for
+`.forEach(id=>{` near the settings-JSON code) — a new per-method parameter needs adding there too, or
+it won't refresh the scrubbed-frame preview until the next full Run.
 
-Both paths suppress the fit crosshairs (not the ROI boxes) outside `fitFirstFrame`/`fitLastFrame`
-— `fitFrameRange()` is the single place deciding "in range" for both `showFrame()` and `runCore()`,
-so scrubbing to a frame a Run would never touch can't show a misleading live-fit result there.
+## Button label length
 
-### Button label length
+Sidebar/panel-title buttons must fit on one line at the sidebar's normal width — a label that wraps
+reads as broken layout. Abbreviate rather than let a label wrap (`dist.`, `min`/`max`, `deg`) —
+favour standard abbreviations over truncation that could be misread. Two-word-joined-by-punctuation
+labels read `Word/word` with no surrounding spaces (**Save plot/image**, **View data/filtering**,
+**Load movie/data**) — the established compact-label style here.
 
-Sidebar/panel-title buttons must fit on one line at the sidebar's normal width — a label that
-wraps reads as broken layout, not a design choice. Abbreviate rather than let a label wrap:
-"Fit angle & tol." not "Fit angle & tolerance" (see **sSMLM**). Favour standard, unambiguous
-abbreviations (`dist.`, `min`/`max`, `deg`) over truncation that could be misread.
+## `label.row` nesting-depth gotcha (indented sidebar sub-rows)
 
-Two-word-joined-by-punctuation labels read `Word/word` with no surrounding spaces (**Save
-plot/image**, **View data/filtering**, **Load movie/data**) — matches the compact house style
-already used elsewhere (`sigma_x`/`sigma_y`, `min`/`max`). A `+` joining two nouns (as
-"View data + filtering" used to) reads as addition/combination rather than an either/or or
-belongs-together pairing; `/` is the established connector for that here.
+`details.sim>*:not(summary){padding-left:14px}` is a DIRECT-CHILD selector — it only matches an
+element immediately inside a `details.sim`, not one nested a level deeper inside a wrapping `<div>`.
+A `label.row` nested that way gets NO indent at all (flush against the details.sim's own left edge)
+unless the wrapper itself separately supplies one — easy to miss since a nested row can still look
+plausible at a glance. An indented sidebar sub-row should instead be a DIRECT child of its
+`details.sim`, given its own `id` + inline `style="display:none;padding-left:40px"` (the extra push
+past the baseline 14px, since it's a step further indented than an ordinary row), shown/hidden by the
+same handler that toggles its sibling group. **Right-edge alignment needs no special-casing at all**
+— `details.sim` only ever sets `padding-left`, never `padding-right`, so a row's own value control
+(numstep input, `select.sel`, checkbox) naturally lands flush with a plain button's own right edge
+regardless of nesting depth or indentation (a `details.sim>label.row{padding-right:4px}` rule used to
+exist here specifically to "fix" this, but measured directly it caused the exact misalignment it
+claimed to prevent — removed entirely, see the CSS conventions paragraph above).
 
-### `label.row` nesting-depth gotcha (indented sidebar sub-rows)
-
-`details.sim>label.row{padding-right:4px}` (keeps a row's numstep +/- buttons flush with every
-other row's own right edge) is a DIRECT-CHILD selector — it only matches a `label.row` immediately
-inside a `details.sim`, not one nested a level deeper inside a wrapping `<div>` (e.g. a
-conditionally-shown sub-group like `#segLoadRow`). Such a nested row still LOOKS indented
-(inherits left padding from the wrapper's own `details.sim>*:not(summary){padding-left:14px}`), so
-the missing 4px right-padding is easy to miss until compared pixel-for-pixel against a
-properly-indented row (a real bug: `segAreaMin`/`segAreaMax`, MODULE: spt, originally lived inside
-`#segLoadRow` this way). An indented sidebar sub-row (the `ftmWindowRow` pattern) should instead be
-a DIRECT child of its `details.sim`, given its own `id` + inline
-`style="display:none;padding-left:40px"` (40px, not 14px, so it still reads as subordinate to a
-plain top-level row), shown/hidden by the SAME handler that toggles its sibling group. The opposite
-direction breaks the same way: a row placed OUTSIDE any `details.sim` (e.g. `pxnm`, pinned
-always-visible) also needs its own explicit `style="padding-right:4px"`.
-
-### Syntax gotcha
+## Syntax gotcha
 
 Leading-unary `**` is a SyntaxError in both JavaScriptCore and V8: write `-((x-d)**2)`, never
 `-(x-d)**2`.
 
-### `getBoundingClientRect()` + scroll gotcha (position:fixed elements anchored to an in-flow one)
+## `getBoundingClientRect()` + scroll gotcha (position:fixed elements anchored to an in-flow one)
 
-`#sideToggle`/`#sidePin` (the mobile/floating sidebar drawer's toggle/pin buttons) are
-`position:fixed`, but their `top` is `calc(var(--header-content-bottom) - ...)`, where
-`--header-content-bottom` is set by `measureHeader()` from
-`.header-actions.getBoundingClientRect().bottom` — VIEWPORT-relative, so it shifts as the page
-scrolls. A `position:fixed` element itself doesn't move on scroll, so this must store the header's
-RESTING position (as if scrolled to the top), not whatever the viewport-relative rect reads at the
-moment `measureHeader()` fires. Add `window.scrollY` back: `rect.bottom + window.scrollY` is
-scroll-invariant, `rect.bottom` alone is not. A real bug without it: `measureHeader()` also runs on
-every `resize` event, and mobile browsers fire a `resize` when their address bar collapses/expands
-DURING an ordinary scroll — so a resize firing while scrolled away from the top baked in a deeply
-negative `--header-content-bottom`, pushing the toggle permanently off-screen until the next
-correct remeasurement. General rule: any `getBoundingClientRect()` measurement feeding a
-`position:fixed` element's offset must add `window.scrollY`/`window.pageXOffset` back in.
-`--header-h` (a size, not a position) doesn't need this — only `.bottom`/`.top`/`.left`/`.right`
-reads do.
+`#sideToggle`/`#sidePin` are `position:fixed`, but their `top` is derived from
+`--header-content-bottom` (`measureHeader()`, `.header-actions.getBoundingClientRect().bottom`) —
+VIEWPORT-relative, so it shifts as the page scrolls. A `position:fixed` element itself doesn't move on
+scroll, so this must store the header's RESTING position, not whatever the viewport-relative rect
+reads at the moment `measureHeader()` fires: add `window.scrollY` back — `rect.bottom + window.scrollY`
+is scroll-invariant, `rect.bottom` alone is not. General rule: any `getBoundingClientRect()`
+measurement feeding a `position:fixed` element's offset must add `window.scrollY`/`window.pageXOffset`
+back in — a mobile browser's own `resize` event during an ordinary scroll (address bar collapsing) is
+a real trigger for this to go wrong without it. A size (`--header-h`) doesn't need this, only
+`.bottom`/`.top`/`.left`/`.right` reads do.
 
-### Window resize must always re-fit the reconstruction/raw panels, not just when `atFit`
+## Window resize must always re-fit the reconstruction/raw panels, not just when `atFit`
 
-`refitCanvases()` (the debounced `window.resize`/`ResizeObserver` handler, MODULE: pipeline) used
-to only call `fitView()`/`fitRawView()` when `view.atFit`/`rawView.atFit` was still `true` —
-reasoned as "don't clobber a user's manual zoom/pan on an unrelated redraw." But `atFit` turns
-`false` the moment the user zooms or pans ONCE, and on any real dataset a user almost always does
-— so resizing the window stopped re-fitting the reconstruction for the rest of the session after
-the first zoom/pan, a real bug. Fixed by making a window/panel RESIZE always re-fit
-unconditionally, regardless of `atFit` — a resize reshapes the PANEL, a distinct action from
-zoom/pan, so the two shouldn't share a gate. `atFit` is still set correctly by `fitView()`/pan/zoom,
-it just no longer gates anything.
+`refitCanvases()` (the debounced `window.resize`/`ResizeObserver` handler) always re-fits
+unconditionally on a resize, regardless of `view.atFit`/`rawView.atFit` — `atFit` turns `false` the
+moment a user zooms or pans once, which is almost always, so gating a resize's own re-fit on it would
+stop re-fitting for the rest of the session after the first zoom/pan. A resize reshapes the PANEL, a
+distinct action from zoom/pan, so the two must not share a gate. `atFit` is still set correctly by
+`fitView()`/pan/zoom, it just doesn't gate the resize handler.
 
-### Mobile input font-size vs. label font-size
+## Form controls need an explicit `font-family:inherit`
 
-Below the 860px breakpoint, `input.num`/`select.sel` jump to 16px (iOS auto-zooms on focusing a
-smaller input; 16px is the threshold that stops it) while `label.row` text stays at the base 12px
-— a real, known, deliberate size mismatch, not a bug to "fix" by shrinking the input back down.
+Browsers' own UA stylesheets give `button`/`input`/`select`/`textarea` a non-inheriting default font
+(Chromium: plain Arial) — ordinary elements (`label`, `div`, `span`, …) inherit `body`'s own font
+stack automatically, form controls never have. Fixed with one shared rule,
+`button,input,select,textarea{font-family:inherit}`, right after the `*{box-sizing:border-box}` reset
+at the top of the stylesheet. `#logTerminal`'s own deliberate monospace shorthand (an ID selector,
+higher specificity) is unaffected.
 
-### `<noscript>` + `.textContent +=` gotcha
+## The sidebar-hidden left/right panel gap must stay symmetric
 
-Never put a `<noscript>` inside an element that JS later reads via `.textContent` (especially
-`+=`, which reads-then-overwrites). With scripting enabled, a browser parses `<noscript>...
-</noscript>` content as RAWTEXT — a single opaque text node, not real child markup — so
-`.textContent` on an ancestor includes that raw text (literal tags and all) even though the
-`<noscript>` itself renders as nothing. Reading `.textContent` is harmless; but the moment
-something WRITES `.textContent` (as `log()`'s own `.textContent += '\n'+m` does, writing to
-`$('logText')`), the noscript element gets destroyed and replaced by one flat text node —
-permanently baking that raw warning text into the log's own visible content on the very first
-`log()` call, regardless of whether scripting is actually enabled. This was a real, shipped bug:
-`#log`'s seed HTML had its own `<noscript>⚠ JavaScript appears to be disabled…</noscript>` (a
-redundant, log-local echo of the real disabled-JS warning), and it showed up as literal visible
-text with JS fully working. Fixed by removing it — the top-of-`<body>` `<noscript>` banner (a big
-red full-page warning, never touched by any JS) already covers the genuinely-disabled-JS case.
+`.main{padding:10px 12px 10px 0}` has deliberately ZERO left padding — correct while the sidebar is
+visible, since the visual gap on that side is meant to come from `.sidebar`'s own padding + the grid
+gap, not `.main` itself. Once `body.side-hidden .sidebar{display:none}` removes the sidebar from the
+grid, `.main`'s own left padding must be restored to match its right (`body.side-hidden
+.main{padding-left:12px}`), or the raw panel's left gap collapses to just its `.card`'s own inner
+padding while the SR panel's right gap stays unchanged. Scoped inside `@media (min-width:861px)` — on
+mobile the sidebar is a `position:fixed` overlay drawer never part of the grid at all, and the
+higher-specificity `body.side-hidden .main` selector would otherwise win over the mobile layout's own
+already-symmetric `.main{padding:14px 14px}` rule and reintroduce an asymmetry mobile never had.
+
+## `<noscript>` + `.textContent +=` gotcha
+
+Never put a `<noscript>` inside an element that JS later reads via `.textContent` (especially `+=`,
+which reads-then-overwrites). With scripting enabled, a browser parses `<noscript>...</noscript>`
+content as RAWTEXT — a single opaque text node, not real child markup — so `.textContent` on an
+ancestor includes that raw text (literal tags and all) even though the `<noscript>` itself renders as
+nothing. Reading `.textContent` is harmless; the moment something WRITES `.textContent` through an
+ancestor, the noscript element is destroyed and replaced by one flat text node, permanently baking
+the raw warning text into the visible content regardless of whether scripting is actually enabled.
 General rule: `<noscript>` is only safe near code that reads/writes `.textContent`/`.innerHTML` if
 nothing ever WRITES through an ancestor of it.
 
-**Log box / logged-text width split** (`#log`/`#logText`) — the log card's border/background used
-to be capped at `max-width:100ch` directly on `#log`, leaving its right edge short of the
-reconstruction panel's own edge on a wide window (the cap was meant to keep a wrapped LINE
-readable, not shrink the box). Split into `#log` (the outer box — border/background/scroll, no
-width cap) wrapping a plain child `#logText` (`max-width:80ch`, matching a standard terminal width)
-that holds the actual text. `log()`/`clearLogBtn`/`exportLogBtn` all read/write `#logText`'s
-`.textContent` now; `#log.scrollTop` (the outer box) is still what `log()` sets to autoscroll,
-since `#logText` has no scrollbar of its own.
+**Log box / logged-text width split** (`#log`/`#logText`) — `#log` is the outer box (border/
+background/scroll, no width cap); `#logText` is a plain child holding the actual text
+(`max-width:80ch`, a standard terminal width). `log()`/`clearLogBtn`/`exportLogBtn` all read/write
+`#logText`'s `.textContent`; `#log.scrollTop` (the outer box) is what `log()` sets to autoscroll,
+since `#logText` has no scrollbar of its own. `#log`'s own height is a fixed 236px, sized for exactly
+12 text lines (`12×18px` + `20px` padding) — a plain fixed height, not viewport-relative.
 
 ## Validating changes (no test framework)
 
@@ -1501,149 +1442,134 @@ osascript -l JavaScript -e "var s=$.NSString.stringWithContentsOfFileEncodingErr
 ```
 
 Numeric additions (fit, NeNA, FRC, drift, calibration) are validated by extracting the specific
-functions, stubbing their globals (`performance`, `log`, etc.), and running against synthetic
-ground truth in the same `osascript -l JavaScript` (JXA) engine. JXA has no good JIT (~50–100×
-slower than V8), so keep validation inputs small.
+functions, stubbing their globals (`performance`, `log`, etc.), and running against synthetic ground
+truth in the same `osascript -l JavaScript` (JXA) engine. JXA has no good JIT (~50–100× slower than
+V8), so keep validation inputs small.
+
+Playwright (`tools/node_modules`, Chromium bundled by default; WebKit can be installed with
+`npx playwright install webkit` for a Safari-approximating cross-browser check) is the standard tool
+for interactive/visual verification — write a throwaway script under your scratchpad or `tools/`
+(prefixed `_tmp_` and deleted before considering work done), never commit one.
 
 ### `micromanager_plugin/webSMLM_Streaming` (Java) — rebuild locally to test, never commit the jar
 
 Editing any `.java` file under `micromanager_plugin/webSMLM_Streaming/src/` does **not** update
 `target/webSMLM_Streaming.jar` by itself — that jar is a build artifact, and a stale one left in
-place after a source edit is worse than no jar at all (it silently keeps running the old code,
-with no signal that anything's out of date). **Rebuild it locally every time you need to actually
-test a Java-source change**:
+place after a source edit silently keeps running old code with no signal anything's out of date.
+Rebuild it locally every time you need to actually test a Java-source change:
 
 ```sh
 mvn package -Dmm.install.dir="C:\path\to\your\Micro-Manager-install"
 ```
 
 (see `micromanager_plugin/webSMLM_Streaming/README.md`'s own *Building* section for the full
-requirements — a local MM 2.0 install for the MM/ImageJ/scijava system-scoped jars, JDK 11+, Maven
-3.6+). If `mvn` isn't on `PATH` in the current environment, don't skip the rebuild — compile and
-jar manually instead, e.g. via `javac`/`jar` straight out of the JDK, using the same dependency
-jars `pom.xml` lists (the MM install's own `MMJ_.jar`/`MMCoreJ.jar`/`ij.jar`/
-`scijava-common-*.jar`, plus Java-WebSocket/guava/slf4j-api from `~/.m2/repository` if already
-cached there from a prior `mvn` run) — compile all four source files together, then jar up the
-compiled classes plus Java-WebSocket's own extracted classes (guava/slf4j-api stay `provided`,
-i.e. compile-time only, matching `pom.xml`'s shade config — don't bundle them). Confirm the rebuilt
-jar actually contains the change (e.g. `jar tf target/webSMLM_Streaming.jar` lists the expected
-classes, or `javap -cp target/webSMLM_Streaming.jar <class>` shows the new/changed method) rather
-than assuming the build succeeded.
+requirements — a local MM 2.0 install, JDK 11+, Maven 3.6+). If `mvn` isn't on `PATH`, compile and
+jar manually via `javac`/`jar` using the same dependency jars `pom.xml` lists. Confirm the rebuilt jar
+actually contains the change (`jar tf`/`javap`) rather than assuming the build succeeded.
 
-**`target/` is gitignored — the compiled jar is never committed** (an earlier version of this
-plugin shipped it in-tree; dropped on review: a binary rebuilt-and-recommitted on every edit grows
-the repo forever with undiffable blobs, and git alone can't prove a committed jar actually matches
-the source it sits next to). Distribute a built jar to end users via a GitHub Release asset (or
-have them run the `mvn package` command above themselves) instead of expecting one to already be
-in the repo.
+`target/` is gitignored — the compiled jar is **never committed** (a binary rebuilt-and-recommitted
+on every edit would grow the repo forever with undiffable blobs, and git alone can't prove a
+committed jar matches the source next to it). Distribute a built jar via a GitHub Release asset, or
+have users run the `mvn package` command themselves.
 
 ## Branch & release workflow
 
-- **`main`** is live: it is served by GitHub Pages (`hohlbeinlab.github.io/webSMLM/webSMLM.html`)
-  and archived on Zenodo. **`webSMLM_local`** is the dev branch — do work there.
-- Only push to `main`, merge, or cut a release **when the user explicitly asks.** Release = commit
-  on `webSMLM_local` → push → `git checkout main && git merge --ff-only webSMLM_local` → push main.
+- **`main`** is live: it is served by GitHub Pages (`hohlbeinlab.github.io/webSMLM/webSMLM.html`) and
+  archived on Zenodo. **`webSMLM_local`** is the dev branch — do work there.
+- Only push to `main`, merge, or cut a release **when the user explicitly asks.** Release = commit on
+  `webSMLM_local` → push → `git checkout main && git merge --ff-only webSMLM_local` → push main.
 - Cadence: **minor bumps (`0.x.0`) → cut a GitHub release + new Zenodo version DOI. Patch releases
   (`0.x.y`) → version bump + push to `main` only, no DOI.**
-- Version lives in two spots in `webSMLM.html` (the `.pill` in the `<h1>`, and `#logText`'s own
-  seed text — a child of `#log` itself since the box/logged-text width split, see the `<noscript>`
-  gotcha section) plus `CITATION.cff`. Dev builds are marked `vX.Y.Z-dev · build YYYY-MM-DDx`;
-  clear the dev marker to `vX.Y.Z · proof-of-concept` on release. **Bump the build letter suffix
-  (`a`→`b`→`c`…) on every round of changes the user is about to test** — it's the only visible
-  signal (pill + log stamp) that a hard-refreshed page is actually running the latest edits, not a
-  cached prior build. Past `z` in a single day, roll over spreadsheet-column-style (`z`→`aa`→`ab`…)
-  rather than moving to a new date — first needed 2026-08-24, which shipped enough same-day rounds
-  to exhaust the single-letter alphabet. **Every build-letter bump also gets its own commit on
-  `webSMLM_local`** (no need to ask first — this one's a standing instruction), so each testable
-  round has real git history, not just an accumulating uncommitted diff. This is independent of
-  releasing: `webSMLM_local` accumulates fine-grained commits continuously; `main` only receives
-  them in a batch, at an explicit release, per the cadence above. **Same round: check the
-  top-of-file MODULE INDEX comment against a fresh `grep -n "MODULE:"`** and refresh any line
-  number that's drifted by more than a few lines — cheap to check every time, and it's the whole
-  point of the index that it stays trustworthy rather than becoming another stale comment.
-- Every release also updates `CHANGELOG.md` (newest first; DOI column) and, where the release
-  closes out or changes a roadmap item, `docs/REFACTOR_PLAN.md`. Pages typically redeploys ~1-2 min
-  after a push; check with `gh api repos/HohlbeinLab/webSMLM/pages/builds/latest`.
-- **Read the Docs also rebuilds on every push to `main`** as of 2026-08-24 — a GitHub webhook
-  (repo Settings → Webhooks, id `669780136`, events: `push`) targets RTD's own incoming-webhook URL
-  for this project (`https://app.readthedocs.org/api/v2/webhook/websmlm/331808/`, HMAC-signed with a
-  secret held only on the GitHub and RTD sides, never in this repo). No API-based check exists for
-  this the way Pages has one (`gh api .../pages/builds/latest`) — after a release, either check the
-  RTD project's own Builds page, or confirm the live site reflects the change a few minutes later.
+- Version lives in two spots in `webSMLM.html` (the `.pill` in the `<h1>`, and `#logText`'s own seed
+  text) plus `CITATION.cff`. Dev builds are marked `vX.Y.Z-dev · build YYYY-MM-DDx`; clear the dev
+  marker to `vX.Y.Z · proof-of-concept` on release. **Bump the build letter suffix (`a`→`b`→`c`…) on
+  every round of changes the user is about to test** — it's the only visible signal (pill + log
+  stamp) that a hard-refreshed page is actually running the latest edits, not a cached prior build.
+  Past `z` in a single day, roll over spreadsheet-column-style (`z`→`aa`→`ab`…). **Every build-letter
+  bump also gets its own commit on `webSMLM_local`** (no need to ask first — a standing instruction),
+  so each testable round has real git history. This is independent of releasing: `webSMLM_local`
+  accumulates fine-grained commits continuously; `main` only receives them in a batch, at an explicit
+  release. **Same round: check the top-of-file MODULE INDEX comment against a fresh
+  `grep -n "MODULE:"`** and refresh any line number that's drifted by more than a few lines.
+- Every release also updates `CHANGELOG.md` (newest first; DOI column) and, where the release closes
+  out or changes a roadmap item, `docs/REFACTOR_PLAN.md`. Pages typically redeploys ~1-2 min after a
+  push; check with `gh api repos/HohlbeinLab/webSMLM/pages/builds/latest`.
+- **Read the Docs also rebuilds on every push to `main`** — a GitHub webhook (repo Settings →
+  Webhooks, id `669780136`, events: `push`) targets RTD's own incoming-webhook URL, HMAC-signed with a
+  secret held only on the GitHub and RTD sides. No API-based check exists for this the way Pages has
+  one — after a release, either check the RTD project's own Builds page, or confirm the live site
+  reflects the change a few minutes later.
+- Push `webSMLM_local` to origin regularly (backup) — do not let commits accumulate only locally.
+  This is independent of, and does not require asking about, pushing/merging into `main`.
 
 ## Reference material
 
 - `README.md` — deliberately short: launch instructions, the guided workflow (kept in sync with the
   in-app **Quick guide** modal's own "Guided workflow" — update both together if either changes),
-  data/privacy, scripting/headless, roadmap, distribution/citation, licence. Trimmed of its own
-  former "What it does" feature list, performance table, algorithm reference list and "Known
-  limitations" section (v0.11.6) — those are fully covered by `docs/DOCUMENTATION.md` (features,
-  §9 references) and `docs/REFACTOR_PLAN.md` (limitations/roadmap) respectively now, so keeping a
-  third, drifting copy in the README stopped being worth it.
-- `docs/DOCUMENTATION.md` — detailed reference for every button/control/`PARAMS` entry, the
-  on-disk file formats (settings/calibration/CSV JSON), the headless API/CLI (§8), and every
-  algorithm reference (§9) — the place to check or update for exact defaults, ranges and
-  behaviour, complementary to the deliberately sparse in-app **Quick guide**.
+  data/privacy, scripting/headless, roadmap, distribution/citation, licence.
+- `docs/DOCUMENTATION.md` — detailed reference for every button/control/`PARAMS` entry, the on-disk
+  file formats (settings/calibration/CSV JSON), the headless API/CLI (§8), and every algorithm
+  reference (§9) — the place to check or update for exact defaults, ranges and behaviour,
+  complementary to the deliberately sparse in-app **Quick guide**. §1 also has a reference table of
+  every actionable GUI control → its terminal-callable function name.
 - `docs/REFACTOR_PLAN.md` — forward-looking roadmap only; shipped-feature history lives in
   `CHANGELOG.md` instead. Think in version numbers, not "phases".
-- `experimental_data/` — sample stacks (gitignored large files) with a README of public sources
-  and their camera/pixel-size parameters.
+- `CHANGELOG.md` — the per-release log, including specific settings/numbers and notable rejected
+  approaches for any given release. This is where "why did we build/change X" for anything already
+  shipped should be checked or added — not this file.
+- `experimental_data/` — sample stacks (gitignored large files) with a README of public sources and
+  their camera/pixel-size parameters.
 - `tools/` — scripting/headless tooling for advanced users, not needed for interactive use:
   `webSMLM-cli.mjs` (Node + Playwright, true headless, the recommended one), `browser_sweep.py`/
-  `browser-sweep.sh` (stdlib-only Python / bash, drive a real visible browser for a parameter
-  sweep). See each script's header comment and `docs/DOCUMENTATION.md` §8.
+  `browser-sweep.sh` (stdlib-only Python / bash, drive a real visible browser for a parameter sweep).
+  See each script's header comment and `docs/DOCUMENTATION.md` §8.
 
 ## Documentation build
-- `docs/DOCUMENTATION.md` is the only authored source for the detailed Read the Docs
-  manual. The Read the Docs build is Markdown-native (Sphinx + MyST).
-- `docs/readthedocs/build_docs.py` splits `DOCUMENTATION.md` at each level-2 (`##`)
-  heading into separate temporary Markdown pages so the published manual has one
-  Read the Docs page per major section. It also generates the documentation
-  `index.md`/toctree, preserves cross-section references, and adjusts relative
-  documentation-image paths.
-- Generated files are disposable and **must not be edited or committed**:
-  `docs/readthedocs/content/`
-  `docs/readthedocs/index.md`
-  `docs/readthedocs/_build/`
-  Documentation-content changes belong in `docs/DOCUMENTATION.md`; if the generated
-  structure, links, or paths are wrong, fix `docs/readthedocs/build_docs.py` instead.
-- Documentation images live once in `docs/images/` and are referenced from
-  `DOCUMENTATION.md` as `images/...`.
-- Read the Docs runs the splitter before Sphinx via `.readthedocs.yaml`. For a
-  local strict build from the repository root:
-      python docs/readthedocs/build_docs.py
-      python -m sphinx -W --keep-going -b html docs/readthedocs docs/readthedocs/_build/html
-- If generated documentation is wrong, fix `docs/DOCUMENTATION.md` or, when the
-  generation logic itself is responsible, `docs/readthedocs/build_docs.py`.
-- **In-app "more info…" popups** (`.hint` divs, the sidebar's own contextual help, distinct from
-  both the Quick guide modal and this RTD manual) used to be hand-authored independently of
-  `DOCUMENTATION.md` — a real drift risk (both describe the same controls, sometimes citing the
-  same papers). `tools/sync_hints.mjs` (plain Node, zero dependencies) fixes this by making
-  `DOCUMENTATION.md` the single source: each `.hint` div carries a stable `id="hint-<name>"`; the
-  matching content lives inside a `<!-- HINT:<name> --> ... <!-- /HINT:<name> -->` marker in
+
+- `docs/DOCUMENTATION.md` is the only authored source for the detailed Read the Docs manual. The
+  Read the Docs build is Markdown-native (Sphinx + MyST).
+- `docs/readthedocs/build_docs.py` splits `DOCUMENTATION.md` at each level-2 (`##`) heading into
+  separate temporary Markdown pages so the published manual has one Read the Docs page per major
+  section. It also generates the documentation `index.md`/toctree, preserves cross-section
+  references, and adjusts relative documentation-image paths.
+- Generated files are disposable and **must not be edited or committed**: `docs/readthedocs/content/`,
+  `docs/readthedocs/index.md`, `docs/readthedocs/_build/`. Documentation-content changes belong in
+  `docs/DOCUMENTATION.md`; if the generated structure, links, or paths are wrong, fix
+  `docs/readthedocs/build_docs.py` instead.
+- Documentation images live once in `docs/images/`, referenced from `DOCUMENTATION.md` as
+  `images/...`.
+- Read the Docs runs the splitter before Sphinx via `.readthedocs.yaml`. For a local strict build
+  from the repository root:
+  ```
+  python docs/readthedocs/build_docs.py
+  python -m sphinx -W --keep-going -b html docs/readthedocs docs/readthedocs/_build/html
+  ```
+- If generated documentation is wrong, fix `docs/DOCUMENTATION.md` or, when the generation logic
+  itself is responsible, `docs/readthedocs/build_docs.py`.
+- **In-app "more info…" popups** (`.hint` divs) are synced FROM `docs/DOCUMENTATION.md`, not
+  hand-authored independently — this is the single source, avoiding drift between two places
+  describing the same controls. Each `.hint` div carries a stable `id="hint-<name>"`; the matching
+  content lives inside a `<!-- HINT:<name> --> ... <!-- /HINT:<name> -->` marker in
   `DOCUMENTATION.md` (right after that control group's PARAMS table in §2), as **raw HTML**
-  deliberately, not Markdown — byte-identical in both places, no Markdown→HTML conversion step to
-  itself go stale. Edit a hint's content ONLY inside its `DOCUMENTATION.md` marker, then run
-  `node tools/sync_hints.mjs` (rewrites `webSMLM.html`'s `.hint` divs to match, reindented flat) —
-  never hand-edit a `.hint` div directly, it'll be overwritten on the next sync. `--check` exits 1
-  without writing if `webSMLM.html` would change, for a pre-commit/CI-style drift check. The
-  `<span class="pill">module: X</span>` label at the top of each `.hint` div is NOT part of the
-  synced content (kept as fixed markup in `webSMLM.html`). All 17 `.hint` divs
-  (`hint-memory`/`hint-liveStreaming`/`hint-simulation-user`/`hint-simulation-type`/
-  `hint-simulation-fluorophore`/`hint-simulation-camera`/`hint-simulation-psf`/`hint-simulation`/
-  `hint-pcfo`/`hint-calibration`/`hint-detectfit`/`hint-export`/`hint-render`/`hint-drift`/
-  `hint-locprecision`/`hint-sSMLM`/`hint-spt`) use this mechanism — the Simulation settings panel
-  is the one place with more than one `.hint` per `<details class="sim">` section, split across
-  its own sub-groups (see **simulation** module notes above) plus a final coarse
-  `hint-simulation` overview. Each
-  marker is placed as the INTRO to its DOCUMENTATION.md section, right after the PARAMS table — the
-  surrounding prose picks up only where the popup leaves off, not restating it.
-- **Quick guide** (the in-app modal, `helpBtn`) is deliberately thin: just the intro blurb, the
-  5-step **Guided workflow** (step 2 briefly names the fit-method families and points at the docs
-  for depth), **Acknowledgements**, and **License & author** — no per-module walkthrough, no
-  citation list; `docs/DOCUMENTATION.md` (§9 "References & further reading" for citations) is the
-  maintained source for that depth now, and `DOCUMENTATION.md` is what the `.hint` popups link to
-  when they need to point somewhere. The modal's own text is hand-authored UI copy, not synced by
-  `sync_hints.mjs` (that mechanism only covers `.hint` divs). `README.md`'s own "Guided workflow"
-  section is kept as a copy of this same 5-step list — update both together — see **Reference
-  material** below.
+  deliberately, not Markdown — byte-identical in both places. Edit a hint's content ONLY inside its
+  `DOCUMENTATION.md` marker, then run `node tools/sync_hints.mjs` (rewrites `webSMLM.html`'s `.hint`
+  divs to match) — never hand-edit a `.hint` div directly, it'll be overwritten on the next sync.
+  `--check` exits 1 without writing if `webSMLM.html` would change, for a pre-commit/CI-style drift
+  check. The `<span class="pill">module: X</span>` label at the top of each `.hint` div is NOT part
+  of the synced content (fixed markup in `webSMLM.html`). The 18 `.hint` divs are
+  `hint-memory` (also covers live streaming — no separate `hint-liveStreaming`),
+  `hint-simulation` plus its seven sub-group hints (`hint-simulation-user`/`-type`/`-nup`/
+  `-fluorophore`/`-background`/`-camera`/`-psf` — the Simulation settings panel is the one place
+  with more than one `.hint` per `<details class="sim">` section), `hint-pcfo`, `hint-calibration`, `hint-detectfit` (also covers **export**'s own
+  Gain/Camera offset fields, moved to the top of Localisation settings — no separate `hint-export`),
+  `hint-render`, `hint-drift` (also covers Localization precision/NeNA/FRC — no separate
+  `hint-locprecision`), `hint-validation` (the **Score vs truth** section, its own box since
+  upstream folded Localization precision into Drift), `hint-sSMLM`, `hint-smfret`, `hint-spt`. Each marker is placed as the INTRO to
+  its DOCUMENTATION.md section, right after the PARAMS table — the surrounding prose picks up only
+  where the popup leaves off. A popup's own internal paragraph order should match its sidebar's own
+  top-to-bottom field order — check this whenever a sidebar section's field order changes.
+- **Quick guide** (the in-app modal, `helpBtn`) is deliberately thin: intro blurb, the 5-step
+  **Guided workflow**, **Acknowledgements**, **License & author** — no per-module walkthrough, no
+  citation list (`docs/DOCUMENTATION.md` §9 is the maintained source for citations now). The modal's
+  own text is hand-authored UI copy, not synced by `sync_hints.mjs`. `README.md`'s own "Guided
+  workflow" section is a copy of this same 5-step list — update both together.

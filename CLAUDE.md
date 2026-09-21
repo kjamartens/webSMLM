@@ -321,7 +321,8 @@ in a module.
   (`simulation_realism:'med'`, so bleach 0.2, CV 0.5, `simbg` 10, cell contrast 3, haze 1, fade
   150), `simulation_zRange` 500 and `simulation_nup_count` 100 — the byte-identity baseline is
   therefore NOT the out-of-the-box state any more; select Minimal (and zRange 1000 / 20 NPCs where
-  relevant) to reproduce it. The density preset is `low`/`med`/`high`/`veryhigh` = 0.05/0.2/0.5/2. New random draws
+  relevant) to reproduce it. The density preset is `low`/`med`/`high`/`veryhigh` = 0.05/0.2/0.5/2, default `med` (`dens` 0.2;
+  the old default was 0.05). New random draws
   therefore live ONLY in branches the defaults never enter (the original single-blink loop is kept
   verbatim beside the new one for exactly this reason), and background/haze each draw from their
   OWN stream derived from the seed, after all emitter draws — so switching them on never moves an

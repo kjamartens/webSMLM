@@ -1849,14 +1849,14 @@ elapsed time instead.
 | `frames` | Simulated frame count | number (int) | 50 | 5000 | 50 | 300 |
 | `simulation_fov` | FOV (pixels) | number (int) | 32 | 1024 | 8 | 128 |
 | `simulation_pxnm` | Simulation pixel size (nm) | number | 10 | 500 | 1 | 100 |
-| `dens` | Emitter density (emitters/µm²/frame) | number | 0 | 5 | 0.01 | 0.05 |
+| `dens` | Emitter density (emitters/µm²/frame) | number | 0 | 5 | 0.01 | 0.2 |
 | `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `phot` | Simulated photons/emitter/frame | number (int) | 0 | 50000 | 50 | 900 |
 | `simlifetime` | Simulated ON lifetime (frames, mean) | number | 0.1 | 20 | 0.1 | 1 |
 | `simulation_blinkBleachProb` | Bleach probability per blink | number | 0.01 | 1 | 0.01 | 0.2 |
 | `simulation_offLifetime` | Dark-state lifetime (frames, mean) | number | 0.1 | 5000 | 1 | 20 |
 | `simulation_photCV` | Photon rate spread (CV) | number | 0 | 2 | 0.05 | 0.5 |
-| `simulation_densityPreset` | Emitter density preset | enum (`low` 0.05, `med` 0.2, `high` 0.5, `veryhigh` 2, `custom`) | — | — | — | `low` |
+| `simulation_densityPreset` | Emitter density preset | enum (`low` 0.05, `med` 0.2, `high` 0.5, `veryhigh` 2, `custom`) | — | — | — | `med` |
 | `simulation_realism` | Realism/compute preset | enum (`min`, `med`, `max`, `custom`) | — | — | — | `med` |
 | `simulation_bgCellContrast` | Background: cell contrast (×) | number | 1 | 20 | 0.5 | 3 |
 | `simulation_bgHazeWeight` | Background: out-of-focus haze (weight) | number | 0 | 10 | 0.1 | 1 |

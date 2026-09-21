@@ -3062,8 +3062,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row" title="The pixel size of the SIMULATED camera. The always-visible Pixel size (nm) above is the analysis one, used for the scale bar and exports; it is synced to this after a movie is generated, and the two are separate so a mismatch can be simulated on purpose.">Simulated pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
         <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. Maximal: also adds blinking out-of-focus emitters rendered with the real defocused PSF (Zernike PSF model only) — roughly doubles the simulation time. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min">Minimal (fastest)</option><option value="med" selected>Medium</option><option value="max">Maximal (slowest)</option><option value="custom">Custom</option></select></label>
-        <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.2)</option><option value="high">High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
-        <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
+        <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low">Low (0.05)</option><option value="med" selected>Medium (0.2)</option><option value="high">High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
+        <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.2" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
         <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="10" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
@@ -4272,7 +4272,7 @@ const PARAMS = {
   // Internally converted to a Poisson emitter-arrival rate (= dens*area/lifetime) so that the mean
   // instantaneous occupied density across the movie equals dens; each arrival is instantiated at a
   // randomly chosen structure site and gets exactly one ON period (see simlifetime) — never re-activates.
-  dens: { type:'number', id:'dens', label:'Emitter density (emitters/µm²/frame)', min:0, max:5, step:0.01, default:0.05, int:false },
+  dens: { type:'number', id:'dens', label:'Emitter density (emitters/µm²/frame)', min:0, max:5, step:0.01, default:0.2, int:false },
   // phot = "photons", photon emission rate per simulated emitter while ON, in photons/emitter/frame; an
   // emitter active for only a fraction of a frame (partial overlap with its ON period) emits
   // proportionally fewer photons that frame
@@ -4301,7 +4301,7 @@ const PARAMS = {
   // nothing else; `dens` stays the single source of truth, and editing it by hand flips this to
   // 'custom'. Roughly: sparse enough that PSFs never overlap / moderate / typical SMLM / dense enough that
   // single-emitter fitting visibly breaks down (compare the isolated/crowded split in Score vs truth).
-  simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','veryhigh','custom'], default:'low' },
+  simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','veryhigh','custom'], default:'med' },
   // ---- structured ("biological") background. `simbg` stays the FOV-MEAN photons/px throughout:
   // everything below only reshapes the field in space and time around that mean (see
   // buildSimBackgroundMap()/simBgScale()), so an existing simbg value keeps its meaning. ----
@@ -27940,8 +27940,8 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21f — Simulation defaults: Realism/compute now
-starts at Medium, Structure Z range at ±500 nm and Number of NPCs at 100. Density presets are
+log(`webSMLM v0.12.8-dev · build 2026-09-21f — Simulation defaults: Realism/compute and Density
+now start at Medium, Structure Z range at ±500 nm and Number of NPCs at 100. Density presets are
 Low 0.05, Medium 0.2, High 0.5, Very high 2. Score vs truth moved into Simulation settings.
 — and from build 2026-09-21e: The Direct quadrature PSF evaluator is gone, and with
 it the PSF evaluation method setting: every PSF is now built with the chirp-Z transform, which

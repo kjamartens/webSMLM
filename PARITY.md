@@ -32,6 +32,16 @@ fitter (`psfmle`). Rows those builds invalidate or add are marked
 *(webSMLM 2026-09-20)*; **the demoCam_SMLM_MM column was again NOT
 re-checked** for the same reason as above.
 
+**Partial refresh, 2026-09-21 (webSMLM side only).** webSMLM builds
+`2026-09-21b`-`d` changed how the simulator computes, not what it models:
+a block-summed splat (same result to 3e-8, ~10x faster), counter-based
+camera noise (pcg4d, so seeded movies changed once), and WebGPU paths for
+splat + noise and the `direct` PSF build. They also found that the `direct`
+evaluator is **wrong on wide kernels** — this matters to demoCam, whose
+default is `Direct` (see the PSF-models row and "Numeric cross-check" §3).
+Rows marked *(webSMLM 2026-09-21)*; the demoCam column was again NOT
+re-checked.
+
 **Staleness warning:** this project has other collaborators and no
 mechanism here notifies demoCam_SMLM_MM of new commits. Before starting
 *any* simulation-engine work in either repo that assumes parity (or a gap)
@@ -48,7 +58,7 @@ has not been modified for parity (this file is the only addition here).
 | Fixed-sigma Gaussian | `gaussian`, sigma hardcoded 1.3px, not NA/lambda-derived | `Gaussian`, sigma = 0.21*lambda/NA (physics-derived) -- **demoCam ahead** |
 | Richards-Wolf (scalar Debye-Kirchhoff) | absent | `RichardsWolf` (PSFGenerator) -- **demoCam ahead** |
 | Gibson-Lanni | absent as a standalone model (subsumed into the Zernike model at zero coefficients) | `GibsonLanni` (PSFGenerator) -- **demoCam ahead** |
-| Gibson-Lanni + Zernike (scalar, full 2D pupil) | `zernike` (default), N_RHO=20 x N_PHI=40 polar quadrature or chirp-Z (`simulation_psfEvalMethod`: `direct`\|`fft`, default `fft`) | `GibsonLanniZernike`, same N_RHO/N_PHI, `PsfEvalMethod`: `Direct`\|`ChirpZ`, default `Direct` -- ported this session, ~3.7x measured speedup, 0.22-0.29% relative L2 agreement with Direct |
+| Gibson-Lanni + Zernike (scalar, full 2D pupil) | `zernike` (default), N_RHO=20 x N_PHI=40 polar quadrature or chirp-Z (`simulation_psfEvalMethod`: `direct`\|`fft`, default `fft`); `direct` runs on the GPU with Use GPU acceleration, and logs a warning on kernels wider than its valid radius *(webSMLM 2026-09-21)* | `GibsonLanniZernike`, same N_RHO/N_PHI, `PsfEvalMethod`: `Direct`\|`ChirpZ`, default `Direct` -- ported this session, ~3.7x measured speedup, 0.22-0.29% relative L2 agreement with Direct **on a 1.6 µm kernel only**. **demoCam's default `Direct` inherits the wide-kernel aliasing error** (see "Numeric cross-check" §3) -- switch its default to `ChirpZ`, or keep its kernel under ~2.2 µm *(webSMLM 2026-09-21)* |
 | Zernike coefficients | 28 (OSA 0-27, n<=6), milliwaves in UI, presets + custom; a 15-value custom string is zero-padded, so older settings files are unchanged *(webSMLM 2026-09-20)* | 15 (OSA 0-14), waves, `PsfZernikeCoefficients` + `PsfZernikePreset` (10 presets) -- same convention/index mapping |
 | Sub-pixel kernel placement | `simulation_psfInterp`: `nearest`\|`linear`\|`cubic`\|`fft` (Fourier-shift), default `cubic` | `PsfInterp`: `Nearest`\|`Linear`\|`Cubic`, default `Nearest` (unchanged legacy behavior) -- ported this session (Linear/Cubic); FFT-shift mode not ported (deferred, see below) |
 | Z-stack / defocus | per-emitter Z (site's own z), nearest-plane lookup, no blend | per-emitter Z (site depth + Z-stage global offset add) -- ported this session, nearest-plane only (two-plane blend deliberately not ported, matching webSMLM's own removed-and-not-reintroduced decision) |
@@ -142,3 +152,27 @@ Two separate checks, both run this session:
    the same algorithm/formulas/constants in both languages. Re-run this
    check (`tools/psf_parity_check/README.md`) after any future change to
    either engine's direct-quadrature PSF math.
+3. **Direct vs. chirp-Z vs. an exact Airy disk, on a wide kernel**
+   *(webSMLM 2026-09-21)*. Checks 1 and 2 used a 65x65 px @ 25 nm
+   (1.6 µm) kernel. At webSMLM's default 6 µm kernel (241x241 @ 25 nm,
+   NA 1.4, 660 nm, ns 1.33 / ni 1.518, unaberrated, in focus) the two
+   evaluators disagree by **21% relative L2** after sum-normalization. The
+   cores agree: FWHM 255.7 nm chirp-Z vs 255.6 nm direct vs 255.1 nm Airy,
+   and the first zero is within 1 nm of 0.61·λ/NA_eff. The disagreement is
+   in the tails:
+
+   | Light beyond | chirp-Z | direct | exact Airy, same grid |
+   |---|---|---|---|
+   | 1 µm | 3.44% | 20.07% | 3.39% |
+   | 3 µm (corners) | 0.17% | 16.98% | 0.157% |
+
+   Chirp-Z is the physical one. Direct samples the pupil at N_PHI=40
+   angles, which resolves exp(i·k·r·cos φ) only while k·NA_eff·r < ~N_PHI/2,
+   i.e. out to ~1.6 µm here; beyond that the sum aliases into spurious
+   light. After normalization every emitter's core is ~17-20% too dim.
+   This is a property of the shared algorithm (same N_RHO/N_PHI), so it
+   applies to demoCam's Java `Direct` port too, which is demoCam's
+   default. Fix options: use chirp-Z, keep the kernel under ~2.2 µm wide,
+   or scale N_PHI with the kernel radius (~128 at 6 µm; not done in either
+   project). webSMLM guards its default with a regression check
+   (`tests/gpu/test-sim-gpu.mjs`: chirp-Z's light beyond 3 µm < 1%).

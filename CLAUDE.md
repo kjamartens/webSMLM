@@ -344,8 +344,11 @@ in a module.
   (`readSimCameraModel()`) through `simCtx`/`calibCtx`, both init messages and the GPU spec.
 
   **Simulation on the GPU (2026-09-21).** Two stages have a device path, each through
-  `runStage()` (`STAGE_META` `simFrames`/`simPsf`) and gated twice: the master `useGpu` and
-  `simulation_gpu` (`auto` | `always` | `off`, a row under PSF placement interpolation).
+  `runStage()` (`STAGE_META` `simFrames`/`simPsf`) and taken whenever `useGpu` is on and the
+  engine is up — no size threshold and no separate setting (an `auto`/`always`/`off` option and a
+  crossover existed for one build and were removed: the GPU won every case measured, and the
+  smallest jobs lose only tens of ms of dispatch overhead; unchecking Use GPU acceleration is the
+  way back to the CPU).
   **Frames**: `WGSL_SIM_FRAMES` fuses splat and camera noise, one thread per (pixel, frame), as a
   GATHER over that frame's emitter list in list order — no atomics, and the CPU's own summation
   order. The CPU packs each emitter with `simSplatSetup()`'s indices and weights, so the device
@@ -378,12 +381,24 @@ in a module.
 
   Cold (first use per page session) adds the pipeline compile, ~60–100 ms here, plus, once, the
   engine's own start-up (~1–2 s, shared by every GPU stage; the log line says when a stage paid
-  it). On an integrated GPU the speedups are real but the absolute savings are small at these
-  sizes, which is why `GPU_SIM_CROSSOVER` is low (warm 1e7 / cold 3e7 work units for frames) and
-  `always` exists: a dedicated GPU should win far earlier, and the headroom is in the heavy cases
-  (`--full`: default 300-frame movies, dense, 512², the 401-plane PSF) this laptop was not run
-  on. A GPU 'direct' PSF build beats even the CPU 'fft' default while being the reference
-  evaluator; the default evaluator was deliberately left alone.
+  it). A dedicated GPU should gain more, and the headroom is in the heavy cases (`--full`: default
+  300-frame movies, dense, 512², the 401-plane PSF) this laptop was not run on. A GPU 'direct'
+  PSF build is faster than the CPU 'fft' default, but see the next paragraph for why that does not
+  make it the better evaluator.
+
+  **'direct' is wrong on wide kernels — keep 'fft' the default (2026-09-21d).** The polar
+  quadrature samples the pupil at `PSF_N_PHI`=40 angles, which resolves exp(i·k·r·cos φ) only while
+  k·NA_eff·r stays below ~N_PHI/2, i.e. out to ~1.6 µm at 660 nm / NA_eff 1.33; past that the sum
+  aliases. On the default 6 µm kernel (unaberrated, one plane) 'direct' puts **17%** of the light
+  beyond 3 µm (the square's corners) and 20% beyond 1 µm; 'fft' puts 0.17% / 3.44%, and an exact
+  Airy disk sampled on the same grid 0.157% / 3.39%. The cores agree (FWHM 255.7 'fft' vs 255.6
+  'direct' vs 255.1 Airy, first zero within 1 nm), so the error only shows after normalization:
+  every emitter splatted from a 'direct' kernel is ~17–20% too dim in its core, over a faint ghost
+  pedestal. The 0.22–0.29% agreement PARITY.md recorded was measured on a 1.6 µm kernel, inside
+  the valid radius — which is why it went unnoticed. `buildPsfKernelStack()` now warns when a
+  'direct' kernel reaches past that radius, and `tests/gpu/test-sim-gpu.mjs` pins 'fft''s tail to
+  the Airy value. The GPU makes 'direct' fast, not right; the proper fix (N_PHI scaled with the
+  kernel radius, ~128 at the default) has not been made.
 
   **The analysis-side companion is `PARAMS.cameraExcessNoise` (F², MODULE: fit)**: a Poisson
   likelihood cannot express Var = F²·N, so `runCore()` hands the fitters `gain/F²` (fitting in

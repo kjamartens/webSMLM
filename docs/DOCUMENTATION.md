@@ -1871,7 +1871,6 @@ elapsed time instead.
 | `simulation_psfMaskType` | PSF phase mask | enum | `none`, `doubleHelix` | | | `none` |
 | `simulation_psfMaskModes` | Mask GL modes (double helix) | number | 2 | 8 | 1 | 5 |
 | `simulation_psfMaskWaist` | Mask beam waist (pupil radii) | number | 0.2 | 2 | 0.05 | 1.0 |
-| `simulation_gpu` | GPU for simulation | enum | `auto`, `always`, `off` | | | `auto` |
 | `simulation_illumProfile` | Illumination profile | enum | `flat`, `gaussian`, `sigmoid` | | | `flat` |
 | `simulation_illumFwhmPct` | Illumination width (% of FOV) | number | 10 | 300 | 5 | 60 |
 | `simulation_cameraType` | Simulation camera type | enum | `scmos`, `emccd` | | | `scmos` |
@@ -2142,25 +2141,22 @@ sample through a higher-index immersion medium moves the true focal plane away f
 microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
 step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
 nominal focus offset by the depth. <b>PSF evaluation method</b> chooses how the pupil phase is
-turned into an intensity image: <code>Direct quadrature</code> is the original polar-grid sum,
-the reference; <code>FFT / chirp-Z</code> (default) is a mathematically exact reformulation (not an
-approximation — Bluestein's algorithm computes the identical sum via 3 FFTs instead of a direct
-loop) measured 76x-970x faster on the CPU depending on kernel size; it evaluates the same physics
-on a differently-discretized (Cartesian, not polar) grid and so converges to the same PSF as its
-own internal resolution increases rather than matching the direct method bit-for-bit (residual
-difference well under 1% at its shipped resolution). <b>Preview PSF</b> builds this (cached,
+turned into an intensity image: <code>FFT / chirp-Z</code> (default) is a mathematically exact
+reformulation (Bluestein's algorithm computes the pupil integral via 3 FFTs) on a Cartesian grid,
+measured 76x-970x faster than <code>Direct quadrature</code>, the original polar-grid sum.
+<b>Use FFT / chirp-Z</b>: Direct samples the pupil at only 40 angles, which is valid out to about
+1.6 µm from the PSF centre at 660 nm; on the default 6 µm kernel it puts ~17% of the light into
+spurious energy at the kernel rim (an Airy disk has 0.16% there, FFT 0.17%), so every simulated
+emitter comes out ~17-20% too dim in its core. A warning is logged when Direct is used on a
+kernel wider than its valid radius. <b>Preview PSF</b> builds this (cached,
 oversampled) kernel and shows it as a z-scrollable slice in the raw panel; with <b>PSF model</b> set
 to Zernike-aberrated, "Simulate movie" splats every emitter from this same kernel.</p>
-<p><b>GPU for simulation</b> only matters with <b>Use GPU acceleration</b> checked (Memory &amp;
-streaming). It lets the per-frame splat and camera noise of "Simulate movie" and "Simulate calib.
-stack", and a <code>Direct quadrature</code> PSF build, run on the GPU. <code>Auto</code> (default)
-uses the GPU once a job is large enough to repay its setup — a threshold measured on an integrated
-laptop GPU, where the GPU was still 4-17x faster than the CPU workers on every movie tested;
-<code>Always</code> uses it whenever it can, for a dedicated GPU; <code>Off</code> never. The GPU
-draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on either
-(up to float rounding). FFT phase-shift placement and the Gaussian PSF model always run on the CPU.
-With the GPU on, <code>Direct quadrature</code> is also the faster evaluator of the two (about
-1.5x the CPU's FFT / chirp-Z at 41 planes on an integrated GPU).</p>
+<p>With <b>Use GPU acceleration</b> checked (Memory &amp; streaming), the per-frame splat and
+camera noise of "Simulate movie" and "Simulate calib. stack" run on the GPU (4-17x faster than the
+CPU workers on an integrated laptop GPU), as does a <code>Direct quadrature</code> PSF build. The
+GPU draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on
+either (up to float rounding). FFT phase-shift placement and the Gaussian PSF model always run on
+the CPU.</p>
 <!-- /HINT:simulation-psf -->
 
 **Section overview** (`hint-simulation`, the final, coarse popup at the bottom of the whole panel):
@@ -2736,9 +2732,10 @@ candidates near an MLE fitter's own accept/reject boundary can differ
 slightly (Phasor has no such boundary — it never rejects a candidate, on
 either path).
 
-The simulator has GPU paths too, governed by `simulation_gpu` on top of
-`useGpu`: the splat + camera-noise stage of Simulate movie and Simulate
-calib. stack, and the `direct` PSF build. Camera noise is drawn from a
+The simulator has GPU paths too, taken whenever `useGpu` is on: the
+splat + camera-noise stage of Simulate movie and Simulate calib. stack, and
+the `direct` PSF build (which stays the less accurate evaluator on wide
+kernels — see the PSF evaluation method note in §2). Camera noise is drawn from a
 counter-based generator (pcg4d, addressed by seed, frame, pixel and draw
 count) that the CPU and the GPU compute identically, so a seeded movie is
 reproducible on either path and the two agree to float rounding: on 100% of

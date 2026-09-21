@@ -136,6 +136,22 @@ try {
   }
   check('noise reproducible from (seed, frame)', st.repeat);
 
+  // ---- which PSF evaluator is physically right on a wide kernel -----------------------------------
+  // Direct quadrature samples the pupil at 40 angles and aliases beyond ~1.6 µm (660 nm, NA_eff
+  // 1.33); on the default 6 µm kernel it put 17% of the light past 3 µm (the square's corners). An
+  // exact Airy disk sampled on the same grid has 0.157% there.
+  // FFT / chirp-Z must stay physical — this guards the default evaluator.
+  const tail = await page.evaluate(async () => {
+    const cfg = readPsfConfigFromUI(); cfg.nz = 1; cfg.zernikeCoeffs = cfg.zernikeCoeffs.map(() => 0);
+    const nx = 2 * cfg.halfWidthPx + 1, c = (nx - 1) / 2, res = cfg.resLateralM * 1e6;
+    const s = (await buildPsfPlanesSerial(cfg, nx, nx)).slices[0];
+    let tot = 0, out3 = 0;
+    for (let y = 0; y < nx; y++) for (let x = 0; x < nx; x++) { tot += s[y * nx + x]; if (Math.hypot(x - c, y - c) * res > 3) out3 += s[y * nx + x]; }
+    return { frac: out3 / tot, halfUm: cfg.halfWidthPx * res };
+  });
+  check('FFT / chirp-Z PSF tail is physical (light beyond 3 µm < 1%)', tail.frac < 0.01,
+    `${(100 * tail.frac).toFixed(2)}% on a ±${tail.halfUm.toFixed(1)} µm kernel (exact Airy on the same grid: 0.157%; Direct quadrature gives ~17%)`);
+
   const gpu = await checkGpu(page);
   if (!gpu.available) console.log('GPU checks: SKIP (WebGPU unavailable)');
   else {
@@ -243,7 +259,7 @@ try {
         set('simulation_cameraType', camType);
         const movies = [];
         for (const g of [false, true]) {
-          set('useGpu', g); set('simulation_gpu', g ? 'always' : 'off');
+          set('useGpu', g);
           const st = await generateSynthetic();
           movies.push({ path: lastSimTimings.path, frames: await st.getFrames(0, st.n) });
         }
@@ -252,7 +268,7 @@ try {
           const d = Math.abs(movies[0].frames[fi][i] - movies[1].frames[fi][i]); tot++; if (d <= 1e-3) close++; if (d > maxAbs) maxAbs = d; }
         out.push({ camType, paths: movies.map(m => m.path).join('/'), fracClose: close / tot, maxAbs });
       }
-      set('useGpu', false); set('simulation_gpu', 'auto'); set('simulation_hazeRatio', 0); set('simulation_bgCellContrast', 1); set('simbg', 0);
+      set('useGpu', false); set('simulation_hazeRatio', 0); set('simulation_bgCellContrast', 1); set('simbg', 0);
       return out;
     });
     for (const r of f)

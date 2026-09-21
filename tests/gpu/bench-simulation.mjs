@@ -5,7 +5,7 @@
 //
 // Each case runs once cold and then three times warm per path, and the MEDIAN warm run is
 // reported: the cold run builds and caches the PSF kernel stack and, on the GPU path, compiles the
-// pipeline (reported separately, because 'auto' mode pays it once per page session). The median,
+// pipeline (reported separately: every page session pays it once). The median,
 // not one run, because a laptop's clocks and power states put ~0.5 s spikes into maybe one run in
 // four on an integrated GPU, and ±30% into the CPU worker pool.
 //
@@ -69,7 +69,7 @@ async function setParams(page, vals) {
 }
 // Runs `fn` (a page-side generator name) twice; returns cold/warm totals and the warm frame stage.
 async function timeMovie(page, useGpu, calib = false) {
-  await setParams(page, { useGpu, simulation_gpu: useGpu ? 'always' : 'off' });
+  await setParams(page, { useGpu });
   return page.evaluate(async calib => {
     const go = () => calib ? generateCalibrationStack() : generateSynthetic();
     const hasT = typeof lastSimTimings !== 'undefined';
@@ -87,7 +87,7 @@ async function timeMovie(page, useGpu, calib = false) {
 // reps: builds to run. GPU needs a cold one plus warm ones; CPU 'direct' has nothing to warm and
 // takes seconds per plane, so it is built once.
 async function timePsf(page, useGpu, evalMethod = 'direct', reps = 3) {
-  await setParams(page, { useGpu, simulation_gpu: useGpu ? 'always' : 'off', simulation_psfEvalMethod: evalMethod });
+  await setParams(page, { useGpu, simulation_psfEvalMethod: evalMethod });
   return page.evaluate(async reps => {
     const out = [];
     for (let k = 0; k < reps; k++) {

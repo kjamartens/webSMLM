@@ -13,7 +13,9 @@
 //  (d) GPU camera noise against CPU camera noise on the same expectation image (sCMOS and EMCCD),
 //      plus the noise statistics themselves.
 //  (e) GPU PSF planes (direct evaluator) against CPU direct planes.
-import assert from 'node:assert/strict';
+//  (f) End to end: the same seeded Simulate movie (3D, haze, structured background, EMCCD and
+//      sCMOS) generated on the CPU worker pool and on the GPU — events, splat and noise all agree,
+//      so the two movies should match pixel for pixel up to f32 rounding.
 import { launchPage, checkGpu } from '../lib/launch.mjs';
 
 const { browser, page } = await launchPage({ headless: true });
@@ -136,15 +138,82 @@ try {
 
   const gpu = await checkGpu(page);
   if (!gpu.available) console.log('GPU checks: SKIP (WebGPU unavailable)');
-  else if (typeof (await page.evaluate(() => typeof simulateFramesGpu)) === 'string' &&
-           (await page.evaluate(() => typeof simulateFramesGpu)) === 'undefined') console.log('GPU checks: SKIP (no GPU simulator in this build)');
   else {
-    // ---- (a) pcg4d bit-exact ----
-    const a = await page.evaluate(async () => simGpuSelfTestRng(await getGpuEngine(), 1 << 18));
-    check('(a) pcg4d WGSL = JS, bit-exact', a.mismatches === 0, `${a.n.toLocaleString()} u32 compared, ${a.mismatches} mismatches`);
+    // ---- (a) pcg4d and the uniform stream, WGSL vs JS, bit-exact ----
+    const a = await page.evaluate(async () => {
+      const engine = await getGpuEngine(), dev = engine.device, NPIX = 1 << 15, DRAWS = 8;
+      const code = `${WGSL_SIM_NOISE_FNS}
+@group(0) @binding(0) var<storage,read_write> o:array<u32>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){
+  let i=id.x; if(i>=${NPIX}u){return;}
+  let v=pcg4d(vec4u(0x9e3779b9u, 17u, i, 3u));
+  for(var k=0u;k<4u;k++){ o[i*${4 + DRAWS}u+k]=v[k]; }
+  rngStart(12345u, 7u, i);
+  for(var k=0u;k<${DRAWS}u;k++){ o[i*${4 + DRAWS}u+4u+k]=bitcast<u32>(uni()); }
+}`;
+      const pipe = await engine.compilePipeline('test-sim-rng', code, 'main');
+      const bytes = NPIX * (4 + DRAWS) * 4;
+      const buf = dev.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+      const rd = dev.createBuffer({ size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+      const bg = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: buf } }] });
+      const enc = dev.createCommandEncoder(), pass = enc.beginComputePass();
+      pass.setPipeline(pipe); pass.setBindGroup(0, bg); pass.dispatchWorkgroups(NPIX / 64); pass.end();
+      enc.copyBufferToBuffer(buf, 0, rd, 0, bytes); dev.queue.submit([enc.finish()]);
+      await rd.mapAsync(GPUMapMode.READ); const g = new Uint32Array(rd.getMappedRange().slice(0)); rd.unmap();
+      buf.destroy(); rd.destroy();
+      const ref = new Uint32Array(4), fbits = new Float32Array(1), ubits = new Uint32Array(fbits.buffer);
+      let mismatches = 0, n = 0;
+      for (let i = 0; i < NPIX; i++) {
+        pcg4dInto(0x9e3779b9, 17, i, 3, ref);
+        for (let k = 0; k < 4; k++, n++) if (g[i * (4 + DRAWS) + k] !== ref[k]) mismatches++;
+        const u = makeSimNoiseRng(12345, 7); u.pixel(i);
+        for (let k = 0; k < DRAWS; k++, n++) { fbits[0] = u(); if (g[i * (4 + DRAWS) + 4 + k] !== ubits[0]) mismatches++; }
+      }
+      return { n, mismatches };
+    });
+    check('(a) pcg4d + uniforms: WGSL = JS, bit-exact', a.mismatches === 0, `${a.n.toLocaleString()} values compared, ${a.mismatches} mismatches`);
 
-    // ---- (c)+(d) GPU frame stage vs CPU frame stage ----
-    const cd = await page.evaluate(async () => simGpuSelfTestFrames(await getGpuEngine()));
+    // ---- (c) GPU splat = CPU splat, (d) GPU noise = CPU noise ----
+    const cd = await page.evaluate(async () => {
+      const engine = await getGpuEngine();
+      const cfg = readPsfConfigFromUI(), kstack = await getOrBuildPsfKernelStack(cfg);
+      const W = 64, H = 64, n = 6, rng = mulberry32(4242);
+      const camRad = Math.max(1, Math.ceil(cfg.halfWidthPx / cfg.oversample));
+      const frameEvents = Array.from({ length: n }, (_, fi) => Array.from({ length: 14 }, (_, k) =>
+        [k < 3 ? [-3.2, 0.4, 66.1][k] : 2 + rng() * 60, 2 + rng() * 60, (rng() - 0.5) * 900, 0.3 + rng()]));
+      const offsetMap = new Float32Array(W * H).map(() => 100 + 2 * rng());
+      const bgMap = new Float32Array(W * H).map(() => 3 + 4 * rng());
+      const out = { splat: [], noise: [] };
+      for (const mode of ['nearest', 'linear', 'cubic']) for (const withMap of [false, true]) {
+        const zks = { planes: null, nx: kstack.nx, ny: kstack.ny, oversample: cfg.oversample, camRad, interpMode: mode,
+                      focusIndex: kstack.focusIndex, zStepNm: kstack.zStepNm, nz: kstack.nz };
+        prepareSimKernelPlanes(zks, kstack.slices, frameEvents);
+        const ctx = { w: W, h: H, n, bg: 5, bgMap: withMap ? bgMap : null, bgDecay: withMap ? 40 : 0, frameEvents, driftPx: 1.5, ddx: 0.6, ddy: 0.8,
+                      photPerFrame: 2000, sigma: 1.3, rad: 4, zKernelStack: zks, zKernel: null, offsetMap, simGain: 0.8, readNoiseE: 1.6,
+                      cam: { type: 'scmos' }, noiseSeed: 99, onProgress: () => {} };
+        const gClean = await gpuSimFrames(engine, { ...simGpuSpecFromMovie(ctx), doNoise: false });
+        let peak = 0, maxd = 0, sc = 0, sg = 0;
+        for (let fi = 0; fi < n; fi++) {
+          const dmag = fi / (n - 1) * ctx.driftPx;
+          const cpu = splatSimFrame(W, H, withMap ? { map: bgMap, scale: simBgScale(fi, 40) } : 5, frameEvents[fi], dmag * 0.6, dmag * 0.8, 2000, 1.3, 4, zks, null).img;
+          for (let i = 0; i < cpu.length; i++) { peak = Math.max(peak, cpu[i]); maxd = Math.max(maxd, Math.abs(cpu[i] - gClean.frames[fi][i])); sc += cpu[i]; sg += gClean.frames[fi][i]; }
+        }
+        out.splat.push({ label: `${mode.padEnd(7)} ${withMap ? 'bg map' : 'flat bg'}`, relMax: maxd / peak, relSum: Math.abs(sc - sg) / sc });
+        if (mode !== 'cubic') continue;
+        for (const cam of [{ type: 'scmos' }, { type: 'emccd', qe: 0.9, emGain: 300, cic: 0.005, bitDepth: 16 }]) {
+          const c2 = { ...ctx, cam };
+          const gNoisy = await gpuSimFrames(engine, simGpuSpecFromMovie(c2));
+          let close = 0, tot = 0, maxAbs = 0;
+          for (let fi = 0; fi < n; fi++) {
+            const img = Float32Array.from(gClean.frames[fi]);
+            applySimCameraNoise(img, offsetMap, c2.simGain, c2.readNoiseE, c2.noiseSeed, fi, cam);
+            for (let i = 0; i < img.length; i++) { const d = Math.abs(img[i] - gNoisy.frames[fi][i]); tot++; if (d <= 1e-3) close++; maxAbs = Math.max(maxAbs, d); }
+          }
+          out.noise.push({ label: `${cam.type}${withMap ? ', bg map' : ''}`, fracClose: close / tot, maxAbs });
+        }
+      }
+      return out;
+    });
     for (const r of cd.splat)
       check(`(c) GPU splat = CPU splat  ${r.label}`, r.relMax < 2e-5 && r.relSum < 1e-5,
         `max|Δ|/peak ${r.relMax.toExponential(2)}, Δsum ${r.relSum.toExponential(2)}`);
@@ -152,9 +221,46 @@ try {
       check(`(d) GPU noise = CPU noise  ${r.label}`, r.fracClose >= 0.999,
         `${(100 * r.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${r.maxAbs.toExponential(2)}`);
 
-    // ---- (e) GPU PSF (direct) vs CPU direct ----
-    const e = await page.evaluate(async () => simGpuSelfTestPsf(await getGpuEngine()));
-    check('(e) GPU direct PSF = CPU direct PSF', e.relMax < 1e-4, `max|Δ|/peak ${e.relMax.toExponential(2)} over ${e.nz} planes`);
+    // ---- (e) GPU PSF (direct) = CPU direct, 3 planes ----
+    const e = await page.evaluate(async () => {
+      const engine = await getGpuEngine(), cfg = readPsfConfigFromUI();
+      cfg.evalMethod = 'direct'; cfg.nz = 2; cfg.halfWidthPx = 60; delete cfg.fftDk;   // 121² kernel: ~1 s of single-thread CPU
+      const nx = 2 * cfg.halfWidthPx + 1;
+      let t = performance.now(); const cpu = await buildPsfPlanesSerial(cfg, nx, nx); const tCpu = performance.now() - t;
+      t = performance.now(); const gpu = await buildPsfPlanesGpu(engine, cfg, nx, nx); const tGpu = performance.now() - t;
+      let rel = 0;
+      for (let z = 0; z < cfg.nz; z++) { let pk = 0, d = 0;
+        for (let i = 0; i < cpu.slices[z].length; i++) { pk = Math.max(pk, cpu.slices[z][i]); d = Math.max(d, Math.abs(cpu.slices[z][i] - gpu.slices[z][i])); }
+        rel = Math.max(rel, d / pk); }
+      return { relMax: rel, nz: cfg.nz, tCpu, tGpu };
+    });
+    const f = await page.evaluate(async () => {
+      const set = (id, v) => { const el = document.getElementById(id); if (el.type === 'checkbox') el.checked = !!v; else el.value = v; el.dispatchEvent(new Event('change')); };
+      set('simulation_seed', 31); set('simulation_fov', 64); set('frames', 20); set('simulation_3d', true); set('simulation_zRange', 300);
+      set('dens', 0.4); set('simbg', 8); set('simulation_bgCellContrast', 3); set('simulation_hazeRatio', 0.5);
+      const out = [];
+      for (const camType of ['scmos', 'emccd']) {
+        set('simulation_cameraType', camType);
+        const movies = [];
+        for (const g of [false, true]) {
+          set('useGpu', g); set('simulation_gpu', g ? 'always' : 'off');
+          const st = await generateSynthetic();
+          movies.push({ path: lastSimTimings.path, frames: await st.getFrames(0, st.n) });
+        }
+        let close = 0, tot = 0, maxAbs = 0;
+        for (let fi = 0; fi < movies[0].frames.length; fi++) for (let i = 0; i < movies[0].frames[fi].length; i++) {
+          const d = Math.abs(movies[0].frames[fi][i] - movies[1].frames[fi][i]); tot++; if (d <= 1e-3) close++; if (d > maxAbs) maxAbs = d; }
+        out.push({ camType, paths: movies.map(m => m.path).join('/'), fracClose: close / tot, maxAbs });
+      }
+      set('useGpu', false); set('simulation_gpu', 'auto'); set('simulation_hazeRatio', 0); set('simulation_bgCellContrast', 1); set('simbg', 0);
+      return out;
+    });
+    for (const r of f)
+      check(`(f) seeded movie CPU = GPU  ${r.camType} (3D, haze, bg field)`, r.paths === 'cpu/gpu' && r.fracClose >= 0.999,
+        `paths ${r.paths}, ${(100 * r.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${r.maxAbs.toExponential(2)}`);
+
+    check('(e) GPU direct PSF = CPU direct PSF', e.relMax < 1e-4,
+      `max|Δ|/peak ${e.relMax.toExponential(2)} over ${e.nz} planes (single-thread CPU ${e.tCpu.toFixed(0)} ms, GPU ${e.tGpu.toFixed(0)} ms incl. compile)`);
   }
 } finally {
   await browser.close();

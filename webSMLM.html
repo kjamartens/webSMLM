@@ -17,11 +17,11 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21b; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21c; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          3770   PARAMS registry, single source of truth for params;
+    params          3795   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMemoryConstrainedDevice() (worker-pool size cap +
                            MOBILE_MEM_DEFAULTS, a stricter memBudgetGB/memgb/
@@ -49,7 +49,7 @@
                            own blank-line separator — otherwise a command and
                            its own first result line print with a spurious
                            blank line between them
-    in/out          5204   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
+    in/out          5234   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Budget raw movies (memgb);
                            tiffScaleHint()'s pixel-size branch now sanity-
@@ -62,7 +62,7 @@
                            frame-interval estimate (MM_HINT_SAMPLE=25 evenly
                            -spaced frames, not every one) — wired alongside
                            tiffScaleHint() at all 3 load call sites
-    simulation      5503   synthetic stack generator ("Simulate movie");
+    simulation      5533   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -91,15 +91,17 @@
                            into generateSynthetic()'s own emitter render loop
                            — simulation_psfModel='zernike' splats each
                            emitter from the cached kernel via
-                           splatZernikeEmitter()/sampleKernelAt()
+                           splatZernikeEmitter()/simSplatSetup()
                            (simulation_psfInterp: nearest/linear/cubic
                            (default)/fft — 'fft' is an opt-in Fourier-shift-
-                           theorem placement, splatZernikeEmitterFFT()/
-                           fftShiftKernelTile() reusing fft2d() from MODULE:
-                           locprecision, kept only for comparison against
-                           'cubic' per docs/VECTORIAL_PSF_SIMULATION.md §3/§4),
-                           summing (not averaging — photon-mass-conserving)
-                           oversample² sub-cell samples per camera pixel; 2D
+                           theorem placement via fftShiftKernelTile()
+                           reusing fft2d() from MODULE: locprecision, kept
+                           only for comparison against 'cubic' per
+                           docs/VECTORIAL_PSF_SIMULATION.md §3/§4), summing
+                           (not averaging — photon-mass-conserving) the
+                           oversample² sub-cells per camera pixel, computed
+                           as ONE interpolation of buildSummedKernel()'s
+                           block sums (same result, ~16x fewer reads); 2D
                            only for now (one fixed simulation_psfDepth per
                            movie, see that doc section for the 3D follow-up);
                            buildPsfKernelStack()/getOrBuildPsfKernelStack()
@@ -127,24 +129,25 @@
                            frames out across a dedicated worker pool
                            (getSimWorkerPool()/simulateFramesParallel(),
                            MODULE: workers) when available, falling back to
-                           simulateFramesSerial() otherwise — simFrameSeed()
-                           gives each frame its own independent noise stream
-                           so simulation_seed reproducibility holds either way;
+                           simulateFramesSerial() otherwise — camera noise
+                           is counter-based (makeSimNoiseRng(): pcg4d over
+                           seed/frame/pixel/counter) so simulation_seed
+                           reproducibility holds on any path, GPU included;
                            generateCalibrationStack()'s own per-z-plane splat+
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      8326   score localizations against the simulator's own
+    validation      8445   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z; controls
                            live in their own sidebar section (validationBox),
                            popup hint-validation
-    detect          8954   per-frame band-pass + local-maxima detection
+    detect          9073   per-frame band-pass + local-maxima detection
                            (detectSpots() and its three filters) — CPU only; a
                            WebGPU port was tried and REMOVED (measured 2x slower
                            than the worker pool), see MODULE: gpu
-    fit             9266   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    fit             9385   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -174,7 +177,7 @@
                            every fit dispatch site incl. the GPU result loop;
                            mergeNearbyMaxima() (detection_mergeRadius, MODULE:
                            detect) reaches every Localize detect site
-    render          10089  accumulate to offscreen buffer; view/colour/blur;
+    render          10208  accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -213,7 +216,7 @@
                            print their own line, several back-to-back in the
                            log for no actionable reason; the final render
                            still logs it
-    workers         11883  frame-parallel detect/fit worker pool; dedicated
+    workers         12002  frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -229,17 +232,16 @@
                            family — splatSimFrame()/applySimCameraNoise()
                            (MODULE: simulation) shared verbatim between the
                            worker and the simulateFramesSerial() fallback;
-                           simFrameSeed() derives a per-frame-independent
-                           mulberry32() seed so a seeded Simulate movie run
-                           reproduces byte-identical frames regardless of
-                           worker availability/dispatch order); the SAME sim
+                           counter-based noise reproduces byte-identical
+                           frames regardless of worker availability/dispatch
+                           order); the SAME sim
                            worker pool also splats+noises
                            generateCalibrationStack()'s own bead z-planes
                            (splatBeadsFrame()/simulateCalibFramesParallel(),
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    gpu             12564  shared WebGPU compute engine (experimental,
+    gpu             12681  shared WebGPU compute engine (experimental,
                            opt-in via "Use GPU acceleration"); covers fit (all
                            4 MLE methods plus phasor/phasor3d — the one
                            non-iterative kernel, a closed-form Fourier
@@ -283,8 +285,15 @@
                            between the two, since CPU-side detection (not
                            fit) dominates a Run's wall time regardless of
                            method (see CLAUDE.md's own fit-module paragraph)
-    export          15027  ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  15379  astigmatic sigma_x/sigma_y vs z bead curves;
+                           Simulation too: simulateFramesGpu()/
+                           simulateCalibFramesGpu()/gpuSimFrames() (fused
+                           splat + counter-based camera noise,
+                           WGSL_SIM_FRAMES/WGSL_SIM_NOISE_FNS) and
+                           buildPsfPlanesGpu() ('direct' PSF, WGSL_PSF_DIRECT),
+                           gated by useGpu + simulation_gpu (auto/always/off,
+                           GPU_SIM_CROSSOVER).
+    export          15525  ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  15877  astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
@@ -295,7 +304,7 @@
                            parity-strict (step-by-2), never cached in
                            _projCache (that cache is the whole-stack average
                            locateBeadsForCalib() reuses)
-    drift           15861  AIM drift correction (2D+z); drift-vs-frame or
+    drift           16359  AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -319,9 +328,9 @@
                            settings hidden while correlation is selected;
                            smFRET's own new "Apply drift correction?" is a
                            thin caller over whichever method is configured
-    locprecision    16793  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    17291  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           17767  spectrally resolved SMLM pair-finding; renamed
+    sSMLM           18265  spectrally resolved SMLM pair-finding; renamed
                            "Pairing (sSMLM & FRET)"; merged Show
                            histograms (sSmlmHistBtn/sSmlmHistModeBtn); Pair
                            & plot sSMLM/Unpair share a row (Fit dist. &
@@ -531,7 +540,7 @@
                            "E/S histogram" title (button stays the
                            exception); getSmfretTimeTraces() now refreshes
                            an already-showing E/S histogram too
-    spt             21528  single particle tracking, trackpy-inspired;
+    spt             22026  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -562,7 +571,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        23067  top-level orchestration, *Core()/wrapper split;
+    pipeline        23565  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; run() also
@@ -652,7 +661,7 @@
                            never have fit results back in time; the ring lets
                            the preview fall back to the newest frame that IS
                            ready instead
-    liveStreaming   24646  Micro-Manager/pycromanager camera bridge
+    liveStreaming   25144  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -706,14 +715,14 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           27940  localizations table, filtering, histograms;
+    table           28450  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms);
                            tempClusteringMemory (gap-frame tolerance, incl.
                            unlimited/"inf") in clusterEvents(); tableFiltersCore()
                            (config.tableFilters) replays a whole committed-filter
                            session (typed clauses/crop/clustering) headlessly —
                            every commitFilter()/crop logCmd()s the full array
-    headless API    28695  window.webSMLM.analyze()/analyzeBatch();
+    headless API    29205  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2796,7 +2805,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3310,6 +3319,13 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
               <option value="fft">FFT phase-shift (slow, for comparison)</option>
             </select>
           </label>
+          <label class="row" id="simGpuRow" style="display:none" title="Only applies with Use GPU acceleration checked (Memory &amp; streaming). Auto: splat + camera noise (and the Direct-quadrature PSF build) go to the GPU when the job is large enough to repay GPU setup; the threshold was measured on an integrated GPU. Always: use the GPU whenever it can run the job, for a dedicated GPU that pays off much earlier. Off: never. FFT phase-shift placement and the Gaussian PSF model always run on the CPU.">GPU for simulation
+            <select id="simulation_gpu" class="sel">
+              <option value="auto" selected>Auto</option>
+              <option value="always">Always</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
           <label class="row" id="psfPreviewBtnRow" style="display:none"><button type="button" id="psfPreviewBtn">Preview PSF</button></label>
           <label class="row" id="genCalBtnRow" style="display:none" title="Builds a bead z-stack from the SAME PSF kernel as Preview PSF above (PSF z range/step), focus exactly on the centre frame, and writes z-step/z=0 ref frame straight into the 3D calibration section below — Localize/3D calibration → Calibrate then needs no other setting changed."><button type="button" id="genCalBtn">Simulate calib. stack</button></label>
           <button type="button" class="infobtn">more info…</button>
@@ -3334,16 +3350,25 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           microscope's nominal working distance) before the z sweep is built, so <b>PSF z range</b>/<b>PSF z
           step</b> probe symmetrically AROUND the emitter's own actual focus, not around the coverslip's
           nominal focus offset by the depth. <b>PSF evaluation method</b> chooses how the pupil phase is
-          turned into an intensity image: <code>Direct quadrature</code> (default) is the original polar
-          -grid sum; <code>FFT / chirp-Z</code> is a mathematically exact reformulation (not an
+          turned into an intensity image: <code>Direct quadrature</code> is the original polar-grid sum,
+          the reference; <code>FFT / chirp-Z</code> (default) is a mathematically exact reformulation (not an
           approximation — Bluestein's algorithm computes the identical sum via 3 FFTs instead of a direct
-          loop) measured 76x-970x faster depending on kernel size, kept opt-in since it evaluates the same
-          physics on a differently-discretized (Cartesian, not polar) grid and so converges to the same PSF
-          as its own internal resolution increases rather than matching the direct method bit-for-bit
-          (residual difference well under 1% at its shipped resolution). <b>Preview PSF</b> builds this
-          (cached, oversampled) kernel and shows it as a z-scrollable slice in the raw panel — this is a
-          preview/validation step only; "Simulate movie" itself still always renders the plain Gaussian PSF
-          for now (see <code>docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md</code> for the full roadmap).</p>
+          loop) measured 76x-970x faster on the CPU depending on kernel size; it evaluates the same physics
+          on a differently-discretized (Cartesian, not polar) grid and so converges to the same PSF as its
+          own internal resolution increases rather than matching the direct method bit-for-bit (residual
+          difference well under 1% at its shipped resolution). <b>Preview PSF</b> builds this (cached,
+          oversampled) kernel and shows it as a z-scrollable slice in the raw panel; with <b>PSF model</b> set
+          to Zernike-aberrated, "Simulate movie" splats every emitter from this same kernel.</p>
+          <p><b>GPU for simulation</b> only matters with <b>Use GPU acceleration</b> checked (Memory &amp;
+          streaming). It lets the per-frame splat and camera noise of "Simulate movie" and "Simulate calib.
+          stack", and a <code>Direct quadrature</code> PSF build, run on the GPU. <code>Auto</code> (default)
+          uses the GPU once a job is large enough to repay its setup — a threshold measured on an integrated
+          laptop GPU, where the GPU was still 4-17x faster than the CPU workers on every movie tested;
+          <code>Always</code> uses it whenever it can, for a dedicated GPU; <code>Off</code> never. The GPU
+          draws exactly the same random numbers as the CPU, so a seeded movie comes out the same on either
+          (up to float rounding). FFT phase-shift placement and the Gaussian PSF model always run on the CPU.
+          With the GPU on, <code>Direct quadrature</code> is also the faster evaluator of the two (about
+          1.5x the CPU's FFT / chirp-Z at 41 planes on an integrated GPU).</p>
         </div>
         </details>
         <button type="button" class="infobtn">more info…</button>
@@ -4565,6 +4590,11 @@ const PARAMS = {
   // §3/§4's own analysis of why it was NOT chosen as the default; kept opt-in purely so it can be
   // compared against 'cubic' directly).
   simulation_psfInterp: { type:'enum', id:'simulation_psfInterp', label:'PSF placement interpolation', options:['nearest','linear','cubic','fft'], default:'cubic' },
+  // simulation_gpu = whether the Zernike simulator's splat + camera noise (and a 'direct' PSF build)
+  // may run on the GPU (MODULE: gpu, "Simulation on the GPU"). Only consulted with useGpu checked.
+  // 'auto' goes by GPU_SIM_CROSSOVER, measured on an integrated GPU; 'always' is for a dedicated
+  // GPU, where the device pays off at far smaller jobs than that threshold assumes.
+  simulation_gpu: { type:'enum', id:'simulation_gpu', label:'GPU for simulation', options:['auto','always','off'], default:'auto' },
 
   // ---- pipeline behaviour (a Run/Calibrate config knob, not a scientific parameter) ----
   // liveUpdate = re-detect/re-fit the scrubbed frame live on every settings change, without a full Run
@@ -6393,11 +6423,23 @@ async function generateSynthetic(){
   // the FTM module's own "both paths call the same shared function" convention.
   const simCtx={w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,
                 offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(simSeed),onProgress:setProg};
+  // The same stage can instead run on the GPU (simulateFramesGpu(), MODULE: gpu) — opt-in via
+  // useGpu + simulation_gpu, Zernike model only, and in 'auto' only above GPU_SIM_CROSSOVER.
   const simPool=await getSimWorkerPool();
-  const {frames,zClampedCount,zTotalCount} = simPool && simPool.length>1
-    ? await simulateFramesParallel(simPool, simCtx)
-    : await simulateFramesSerial(simCtx);
+  const kFrames=zKernelStack||zKernel;
+  const frameStage=newStageTimings(), tFrames=performance.now(), gpuWasCold=_gpuEngine===undefined;
+  const {frames,zClampedCount,zTotalCount} = await runStage('simFrames', {useGpu:simGpuWanted(), stageTimings:frameStage, onLog:log},
+    () => simPool && simPool.length>1 ? simulateFramesParallel(simPool, simCtx) : simulateFramesSerial(simCtx),
+    kFrames && kFrames.interpMode!=='fft' ? async () => simulateFramesGpu(await getGpuEngine(), simCtx) : null,
+    kFrames && kFrames.interpMode!=='fft'
+      ? () => simGpuEligibility('frames', simFramesWork(frameEvents.reduce((a,l)=>a+l.length,0), kFrames.camRad, kFrames.interpMode, w, h, n))
+      : null);
   setProg(null);
+  lastSimTimings={frames:performance.now()-tFrames, path:frameStage.simFrames.path, stage:frameStage.simFrames};
+  log(`Simulate movie: splat + noise ${lastSimTimings.frames.toFixed(0)} ms on the `+
+      (lastSimTimings.path==='gpu' ? 'GPU'+(gpuWasCold?' (including the one-time GPU start-up of this page session)':'')
+        : simPool && simPool.length>1 ? `CPU (${simPool.length} workers)` : 'CPU (single thread)')+
+      (frameStage.simFrames.reasons.includes('below-crossover') ? ' — GPU skipped: job below the auto threshold (GPU for simulation: Always overrides it)' : '')+'.');
   groundTruth=gt;
   // GT localizations for "View GT localizations" — one entry per simulated blink (matches
   // groundTruthEvents' own per-blink shape), not one per structure site, so it's the fair thing
@@ -6513,10 +6555,15 @@ async function generateCalibrationStack(){
                   kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,planes,
                   offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(0),onProgress:setProg};
   const calibPool=await getSimWorkerPool();
-  const {frames} = calibPool && calibPool.length>1
-    ? await simulateCalibFramesParallel(calibPool, calibCtx)
-    : await simulateCalibFramesSerial(calibCtx);
+  const calStage=newStageTimings(), tCal=performance.now();
+  const {frames} = await runStage('simFrames', {useGpu:simGpuWanted(), stageTimings:calStage, onLog:log},
+    () => calibPool && calibPool.length>1 ? simulateCalibFramesParallel(calibPool, calibCtx) : simulateCalibFramesSerial(calibCtx),
+    interpMode!=='fft' ? async () => simulateCalibFramesGpu(await getGpuEngine(), calibCtx) : null,
+    interpMode!=='fft' ? () => simGpuEligibility('frames', simFramesWork(nz*beadXY.length, camRad, interpMode, w, h, nz)) : null);
   setProg(null);
+  lastSimTimings={frames:performance.now()-tCal, path:calStage.simFrames.path, stage:calStage.simFrames};
+  log(`Simulated calibration stack: splat + noise ${lastSimTimings.frames.toFixed(0)} ms on the `+
+      (lastSimTimings.path==='gpu' ? 'GPU' : calibPool && calibPool.length>1 ? `CPU (${calibPool.length} workers)` : 'CPU (single thread)')+'.');
   groundTruth=null; groundTruthEvents=null; simTrueDrift=null; groundTruthLocs=null;   // no filament ground truth / drift / GT locs to score for a calibration stack
   log(`Simulated calibration stack: ${nz} z-planes × ${zStepNm}nm (focus @ frame ${focusIndex+1}/${nz}), `+
       `${beadXY.length} bead(s) at fixed x,y.`);
@@ -6987,12 +7034,17 @@ async function buildPsfKernelStack(cfg){
       `eval=${cfg.evalMethod}${cfg.evalMethod==='fft'?` (Cartesian grid ${PSF_FFT_M}×${PSF_FFT_M}, dk=${cfg.fftDk.toExponential(3)})`:''}`+
       (pool?`, using ${pool.length} PSF worker(s)`:', running single-threaded (no worker pool available)'));
   const t0=performance.now();
-  const {slices, globalMax} = pool ? await buildPsfPlanesParallel(cfg, nx, ny, pool)
-                                    : await buildPsfPlanesSerial(cfg, nx, ny);
+  // 'direct' can run on the GPU instead (buildPsfPlanesGpu(), MODULE: gpu); 'fft' has no kernel.
+  const psfStage=newStageTimings(), gpuDirect=cfg.evalMethod==='direct', gpuWasCold=_gpuEngine===undefined;
+  const {slices, globalMax} = await runStage('simPsf', {useGpu:simGpuWanted(), stageTimings:psfStage, onLog:log},
+    () => pool ? buildPsfPlanesParallel(cfg, nx, ny, pool) : buildPsfPlanesSerial(cfg, nx, ny),
+    gpuDirect ? async () => buildPsfPlanesGpu(await getGpuEngine(), cfg, nx, ny) : null,
+    gpuDirect ? () => simGpuEligibility('psf', cfg.nz*nx*ny*PSF_N_RHO*PSF_N_PHI) : null);
   setProg(null);
-  const totalMs=performance.now()-t0;
+  const totalMs=performance.now()-t0, onGpu=psfStage.simPsf.path==='gpu';
+  lastPsfBuildTimings={ms:totalMs, path:psfStage.simPsf.path, nz:cfg.nz, evalMethod:cfg.evalMethod};
   log(`PSF build done: ${cfg.nz} planes in ${totalMs.toFixed(0)}ms (${(totalMs/cfg.nz).toFixed(1)}ms/plane`+
-      (pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
+      (onGpu?(gpuWasCold?', GPU, including its one-time start-up':', GPU'):pool?`, ${pool.length} workers`:'')+`), globalMax=${globalMax.toExponential(3)}`);
   if(globalMax<=0) log(`PSF build WARNING: every plane came back all-zero — check NA/ns (bMax=min(1,ns/NA) must stay positive) and the Zernike coefficients before trusting this preview.`);
   const zStepNm=cfg.zStep*1e9;
   const zUsableNm=psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, cfg.oversample);
@@ -7131,6 +7183,9 @@ function psfZCramerRao(slices, nx, ny, oversample, focusIndex, zStepNm, cameraPx
   return out.length ? out : null;
 }
 let _psfKernelCacheKey=null, _psfKernelCache=null;
+// Last Simulate movie / calibration stack frame-stage and PSF-build timings, with the path that
+// ran — read by tests/gpu/bench-simulation.mjs and handy from the log terminal.
+let lastSimTimings=null, lastPsfBuildTimings=null;
 async function getOrBuildPsfKernelStack(cfg){
   const key=JSON.stringify(cfg);
   if(key===_psfKernelCacheKey && _psfKernelCache){ log('PSF build: parameters unchanged, reusing cached kernel.'); return _psfKernelCache; }
@@ -7277,24 +7332,29 @@ function fftShiftKernelTile(kernel, nx, ny, shiftX, shiftY){
 // nearest-neighbour into the block sums of the shifted kernel. Kept for comparison against 'cubic'
 // (docs/VECTORIAL_PSF_SIMULATION.md §3/§4 for why it is not the default: per-emitter FFT cost, and
 // periodic-boundary ringing risk on a non-periodic tile); it has no GPU path.
-function splatZernikeEmitter(img, w, h, mx, my, photons, kernelObj, camRad, interpMode){
-  const {nx, ny, oversample:os}=kernelObj;
+// Everything about one emitter's splat that does not depend on the camera pixel: its centre
+// pixel (X0,Y0), the block-sum index (bx,by) of pixel (X0,Y0)'s first interpolation tap, and the
+// shared tap weights. ONE function so the GPU packer (packSimEmitters(), MODULE: gpu) hands the
+// device exactly the indices and weights the CPU splat uses. Not for 'fft' mode.
+function simSplatSetup(mx, my, nx, ny, os, interpMode){
   const kcx=(nx-1)/2, kcy=(ny-1)/2;
   const X0=Math.round(mx), Y0=Math.round(my);
   const tx=kcx+(X0-mx-0.5)*os+0.5, ty=kcy+(Y0-my-0.5)*os+0.5;
-  let S=kernelObj.sum, bx, by, wx, wy;
+  if(interpMode==='nearest') return {X0, Y0, tx, ty, bx:Math.floor(tx+0.5), by:Math.floor(ty+0.5), wx:[1], wy:[1]};
+  const bx=Math.floor(tx), by=Math.floor(ty), fx=tx-bx, fy=ty-by;
+  if(interpMode==='cubic') return {X0, Y0, tx, ty, bx:bx-1, by:by-1, wx:catmullRomWeights(fx), wy:catmullRomWeights(fy)};   // taps -1..2
+  return {X0, Y0, tx, ty, bx, by, wx:[1-fx,fx], wy:[1-fy,fy]};                                                                 // 'linear'
+}
+function splatZernikeEmitter(img, w, h, mx, my, photons, kernelObj, camRad, interpMode){
+  const {nx, ny, oversample:os}=kernelObj;
+  let S=kernelObj.sum, X0, Y0, bx, by, wx, wy;
   if(interpMode==='fft'){
-    const rx=Math.round(tx), ry=Math.round(ty);
-    S=buildSummedKernel(fftShiftKernelTile(kernelObj.kernel, nx, ny, tx-rx, ty-ry), nx, ny, os);
+    const st=simSplatSetup(mx, my, nx, ny, os, 'nearest');
+    X0=st.X0; Y0=st.Y0;
+    const rx=Math.round(st.tx), ry=Math.round(st.ty);
+    S=buildSummedKernel(fftShiftKernelTile(kernelObj.kernel, nx, ny, st.tx-rx, st.ty-ry), nx, ny, os);
     bx=rx; by=ry; wx=wy=[1];
-  } else if(interpMode==='nearest'){
-    bx=Math.floor(tx+0.5); by=Math.floor(ty+0.5); wx=wy=[1];
-  } else {
-    bx=Math.floor(tx); by=Math.floor(ty);
-    const fx=tx-bx, fy=ty-by;
-    if(interpMode==='cubic'){ bx--; by--; wx=catmullRomWeights(fx); wy=catmullRomWeights(fy); }   // taps -1..2
-    else { wx=[1-fx,fx]; wy=[1-fy,fy]; }                                                            // 'linear'
-  }
+  } else ({X0, Y0, bx, by, wx, wy}=simSplatSetup(mx, my, nx, ny, os, interpMode));
   const {B,bw,bh,off}=S, nt=wx.length;
   for(let dy=-camRad; dy<=camRad; dy++){
     const Y=Y0+dy; if(Y<0||Y>=h) continue;
@@ -12487,7 +12547,7 @@ const SIM_WORKER_PRELUDE="let _simCtx=null;\nlet _calibCtx=null;";
 function simWorkerSource(){
   const body=[
     pcg4dInto.toString(), makeSimNoiseRng.toString(), simNoiseGauss.toString(), simNoisePoisson.toString(),
-    simNoiseGamma.toString(), simBgScale.toString(), catmullRomWeights.toString(), buildSummedKernel.toString(),
+    simNoiseGamma.toString(), simBgScale.toString(), catmullRomWeights.toString(), buildSummedKernel.toString(), simSplatSetup.toString(),
     nextPow2.toString(), fft1d.toString(), fft2d.toString(), fftShiftKernelTile.toString(),
     splatZernikeEmitter.toString(),
     splatSimFrame.toString(), splatBeadsFrame.toString(), applySimCameraNoise.toString(),
@@ -12690,6 +12750,8 @@ const STAGE_META = {
   ssmlm:     {label:'sSMLM pairing',       lane:'main'},
   spt:       {label:'SPT linking',         lane:'main'},
   exportCsv: {label:'Table / export',      lane:'main'},
+  simPsf:    {label:'Sim PSF build',       lane:'worker'},
+  simFrames: {label:'Sim splat + noise',   lane:'worker'},
 };
 
 function newStageTimings(){ return {}; }
@@ -15078,6 +15140,385 @@ async function fitBatchGpuFlatRotFree(engine, seedsA, seedsB, windows, frameIdx,
     }
   }
   return out;
+}
+
+/* ---- Simulation on the GPU: the movie/calibration frame stage and the 'direct' PSF build ----
+   Two stages of MODULE: simulation have a device path, each chosen through runStage() like
+   every other stage here, and each gated twice: the master Use GPU acceleration (useGpu) and
+   simulation_gpu ('auto' = only above GPU_SIM_CROSSOVER, 'always', 'off').
+
+   simFrames — splat + camera noise, fused into ONE kernel with one thread per (pixel, frame).
+   It is a GATHER: each thread walks its own frame's emitter list and adds the ones whose splat
+   footprint covers it, in list order — no atomics, and the same summation order as the CPU's
+   per-emitter loop. The CPU does everything that is per-emitter rather than per-pixel
+   (simSplatSetup(): centre pixel, block-sum index, the shared interpolation weights), so the
+   device reads the same indices and weights the CPU splat uses and the same Float32 block sums
+   (buildSummedKernel()); the only differences are f32 accumulation and f32 transcendentals in
+   the noise. The noise is the counter-based stream of makeSimNoiseRng(): WGSL_SIM_NOISE_FNS is
+   a line-for-line port and produces the same u32s (tests/gpu/test-sim-gpu.mjs checks it).
+   'fft' placement and the Gaussian PSF model have no kernel and stay on the CPU.
+
+   simPsf — computePsfIntensityPlane() (the polar-quadrature 'direct' evaluator) as one thread
+   per kernel pixel per plane. The pupil is still built on the CPU (cheap, and it is where all
+   the physics lives); only the nx*ny*800 sin/cos reduction moves. The default 'fft' evaluator
+   is already worker-parallel and has no GPU path.
+   --------------------------------------------------------------------------- */
+const WGSL_SIM_NOISE_FNS=`
+var<private> rseed:vec3u;
+var<private> rbuf:vec4u;
+var<private> rk:u32;
+var<private> rctr:u32;
+fn pcg4d(v0:vec4u)->vec4u {
+  var v=v0*1664525u+1013904223u;
+  v.x+=v.y*v.w; v.y+=v.z*v.x; v.z+=v.x*v.y; v.w+=v.y*v.z;
+  v^=v>>vec4u(16u);
+  v.x+=v.y*v.w; v.y+=v.z*v.x; v.z+=v.x*v.y; v.w+=v.y*v.z;
+  return v;
+}
+fn rngStart(seed:u32, frame:u32, pixel:u32){ rseed=vec3u(seed,frame,pixel); rctr=0u; rk=4u; }
+fn uni()->f32 {
+  if(rk==4u){ rbuf=pcg4d(vec4u(rseed,rctr)); rctr+=1u; rk=0u; }
+  let x=rbuf[rk]; rk+=1u;
+  return (f32(x>>9u)+0.5)*1.1920928955078125e-7;
+}
+fn gaussN()->f32 { let r=sqrt(-2.0*log(uni())); return r*cos(6.283185307179586*uni()); }
+fn poissonN(l:f32)->f32 {
+  if(l>60.0){ return max(0.0, floor(l+sqrt(l)*gaussN()+0.5)); }
+  if(!(l>0.0)){ return 0.0; }
+  let L=exp(-l); var k=0u; var q=1.0;
+  loop { k+=1u; q*=uni(); if(!(q>L && k<1000u)){ break; } }
+  return f32(k-1u);
+}
+fn gammaN(k:f32)->f32 {
+  let d=k-1.0/3.0; let c=1.0/sqrt(9.0*d);
+  for(var it=0; it<1000; it++){
+    let x=gaussN(); let t=1.0+c*x;
+    if(t<=0.0){ continue; }
+    let v=t*t*t; let w=uni();
+    if(w<1.0-0.0331*x*x*x*x){ return d*v; }
+    if(log(w)<0.5*x*x+d*(1.0-v+log(v))){ return d*v; }
+  }
+  return d;
+}`;
+const WGSL_SIM_FRAMES=`
+struct P {
+  w:u32, h:u32, nFrames:u32, frameBase:u32,
+  camRad:i32, os:i32, nt:u32, bw:i32,
+  bh:i32, off:i32, strideX:u32, noiseSeed:u32,
+  doNoise:u32, emccd:u32, hasBgMap:u32, pad0:u32,
+  simGain:f32, readNoiseE:f32, qe:f32, cic:f32,
+  readE:f32, maxAdu:f32, pad1:f32, pad2:f32,
+}
+struct Em { X0:i32, Y0:i32, bx:i32, by:i32, base:u32, ph:f32, p0:f32, p1:f32, wx:vec4f, wy:vec4f }
+@group(0) @binding(0) var<uniform> p:P;
+@group(0) @binding(1) var<storage,read> planes:array<f32>;
+@group(0) @binding(2) var<storage,read> ems:array<Em>;
+@group(0) @binding(3) var<storage,read> frameOff:array<u32>;
+@group(0) @binding(4) var<storage,read> frameBg:array<f32>;
+@group(0) @binding(5) var<storage,read> bgMap:array<f32>;
+@group(0) @binding(6) var<storage,read> offsetMap:array<f32>;
+@group(0) @binding(7) var<storage,read_write> outF:array<f32>;
+override WG:u32=64u;
+${WGSL_SIM_NOISE_FNS}
+@compute @workgroup_size(WG)
+fn main(@builtin(global_invocation_id) id:vec3u){
+  let N=p.w*p.h;
+  let g=id.x+id.y*p.strideX;
+  if(g>=N*p.nFrames){ return; }
+  let f=g/N; let pix=g-f*N;
+  let X=i32(pix%p.w); let Y=i32(pix/p.w);
+  var v:f32;
+  if(p.hasBgMap==1u){ v=bgMap[pix]*frameBg[f]; } else { v=frameBg[f]; }
+  let e1=frameOff[f+1u];
+  for(var e=frameOff[f]; e<e1; e++){
+    let m=ems[e];
+    let dx=X-m.X0; let dy=Y-m.Y0;
+    if(abs(dx)>p.camRad || abs(dy)>p.camRad){ continue; }
+    let r0=m.by+dy*p.os+p.off; let c0=m.bx+dx*p.os+p.off;
+    var sum=0.0;
+    for(var j=0u; j<p.nt; j++){
+      let r=r0+i32(j);
+      if(r<0 || r>=p.bh){ continue; }
+      let rb=m.base+u32(r*p.bw);
+      var row=0.0;
+      for(var i=0u; i<p.nt; i++){ let c=c0+i32(i); if(c>=0 && c<p.bw){ row+=m.wx[i]*planes[rb+u32(c)]; } }
+      sum+=m.wy[j]*row;
+    }
+    v+=m.ph*sum;
+  }
+  if(p.doNoise==1u){
+    rngStart(p.noiseSeed, p.frameBase+f, pix);
+    if(p.emccd==1u){
+      let ne=poissonN(p.qe*v+p.cic);
+      var o=0.0; if(ne>0.0){ o=gammaN(ne); }
+      v=clamp(floor(offsetMap[pix]+(o+p.readE*gaussN())/p.simGain+0.5), 0.0, p.maxAdu);
+    } else {
+      let ne=poissonN(v);
+      v=max(offsetMap[pix]+(ne+p.readNoiseE*gaussN())/p.simGain, 0.0);
+    }
+  }
+  outF[g]=v;
+}`;
+const WGSL_PSF_DIRECT=`
+struct PP { nx:u32, ny:u32, nPlanes:u32, strideX:u32, x0:f32, y0:f32, resUm:f32, pad:f32 }
+@group(0) @binding(0) var<uniform> p:PP;
+@group(0) @binding(1) var<storage,read> pupil:array<vec2f>;
+@group(0) @binding(2) var<storage,read> kr:array<f32>;
+@group(0) @binding(3) var<storage,read> cs:array<vec2f>;
+@group(0) @binding(4) var<storage,read_write> outI:array<f32>;
+override WG:u32=64u;
+override NRHO:u32=20u;
+override NPHI:u32=40u;
+@compute @workgroup_size(WG)
+fn main(@builtin(global_invocation_id) id:vec3u){
+  let N=p.nx*p.ny;
+  let g=id.x+id.y*p.strideX;
+  if(g>=N*p.nPlanes){ return; }
+  let pl=g/N; let pix=g-pl*N;
+  let dx=(f32(pix%p.nx)-p.x0)*p.resUm; let dy=(f32(pix/p.nx)-p.y0)*p.resUm;
+  let base=pl*NRHO*NPHI;
+  var sr=0.0; var si=0.0;
+  for(var ir=0u; ir<NRHO; ir++){
+    let k=kr[ir];
+    for(var ip=0u; ip<NPHI; ip++){
+      let t=cs[ip];
+      let sp=k*(dx*t.x+dy*t.y);
+      let c=cos(sp); let s=sin(sp);
+      let q=pupil[base+ir*NPHI+ip];
+      sr+=q.x*c-q.y*s; si+=q.x*s+q.y*c;
+    }
+  }
+  outI[g]=sr*sr+si*si;
+}`;
+// 2D dispatch for `threads` invocations: WebGPU caps each dimension at
+// maxComputeWorkgroupsPerDimension (65535 at the spec minimum), which a 512² x 16-frame batch
+// already exceeds at 64 threads per group. strideX tells the kernel how to flatten id.xy back.
+function gpuDispatch2D(engine, threads){
+  const wg=engine.wg1D, groups=Math.ceil(threads/wg), maxG=engine.limits.maxComputeWorkgroupsPerDimension;
+  const gx=Math.min(groups, maxG), gy=Math.ceil(groups/gx);
+  if(gy>maxG) throw new Error(`${threads.toLocaleString()} GPU threads exceed this adapter's dispatch limits`);
+  return {gx, gy, strideX:gx*wg};
+}
+// Warm = this page session has already compiled the pipeline and run it once, so the crossover
+// below no longer has to amortize compilation. Same idea as _gpuRenderWarmModes.
+let _gpuSimWarm=false, _gpuPsfWarm=false;
+// Work above which 'auto' sends a stage to the GPU, from tests/gpu/bench-simulation.mjs on an
+// Intel Iris Xe (see CLAUDE.md, MODULE: simulation, "Simulation on the GPU"). Units:
+//   frames — splat taps (emitters x footprint pixels x taps^2) + 10 x noisy pixels;
+//   psf    — kernel pixels x 800 quadrature points.
+// Measured there: the CPU worker pool splats ~150M frame units/s and the GPU wins 5-12x on every
+// movie from 128² x 100 frames up, so the only thing the threshold has to repay is dispatch
+// overhead (tens of ms) warm and the pipeline compile (~60-100 ms) cold. CPU 'direct' PSF runs
+// ~20M units/s against a ~200 ms first compile. Engine start-up itself is not counted: with
+// useGpu on, the eligibility check starts the engine anyway, and every GPU stage shares it.
+// A discrete GPU crosses over earlier still; simulation_gpu='always' skips the check.
+const GPU_SIM_CROSSOVER={ frames:{warm:1e7, cold:3e7}, psf:{warm:5e6, cold:2e7} };
+function simGpuWanted(){ return !!paramValue('useGpu') && paramValue('simulation_gpu')!=='off'; }
+async function simGpuEligibility(kind, work){
+  const engine=await getGpuEngine();
+  if(!engine || !engine.available) return {eligible:false, reason:'unavailable'};
+  if(paramValue('simulation_gpu')==='always') return {eligible:true, reason:'selected'};
+  const c=GPU_SIM_CROSSOVER[kind], warm = kind==='psf' ? _gpuPsfWarm : _gpuSimWarm;
+  const eligible = work >= (warm ? c.warm : c.cold);
+  return {eligible, reason:eligible?'selected':'below-crossover'};
+}
+// Splat work of a movie/calibration stack, in the units above.
+function simFramesWork(nEmitterFrames, camRad, interpMode, w, h, n){
+  const taps = interpMode==='cubic' ? 16 : interpMode==='linear' ? 4 : 1, fp=(2*camRad+1)**2;
+  return nEmitterFrames*fp*taps + 10*w*h*n;
+}
+// Packs one batch of frames' emitters into the Em layout of WGSL_SIM_FRAMES (16 words each).
+function packSimEmitters(spec, f0, f1, planeBase){
+  const {nx, ny, os, interpMode}=spec;
+  const lists=[]; let total=0, clamped=0, counted=0;
+  for(let fi=f0; fi<f1; fi++){ const r=spec.emitters(fi); lists.push(r.list); total+=r.list.length; clamped+=r.clamped; counted+=r.counted; }
+  const buf=new ArrayBuffer(Math.max(64, total*64)), I=new Int32Array(buf), U=new Uint32Array(buf), F=new Float32Array(buf);
+  const frameOff=new Uint32Array(f1-f0+1), frameBg=new Float32Array(f1-f0);
+  let e=0;
+  for(let k=0; k<lists.length; k++){
+    frameOff[k]=e; frameBg[k]=spec.bgOf(f0+k);
+    for(const [mx,my,ph,zi] of lists[k]){
+      const st=simSplatSetup(mx, my, nx, ny, os, interpMode), o=e*16;
+      I[o]=st.X0; I[o+1]=st.Y0; I[o+2]=st.bx; I[o+3]=st.by; U[o+4]=planeBase[zi]; F[o+5]=ph;
+      for(let t=0;t<st.wx.length;t++){ F[o+8+t]=st.wx[t]; F[o+12+t]=st.wy[t]; }
+      e++;
+    }
+  }
+  frameOff[lists.length]=e;
+  return {buf, frameOff, frameBg, clamped, counted, taps: interpMode==='cubic' ? 4 : interpMode==='linear' ? 2 : 1};
+}
+// The frame stage on the device, for any list of frames given as a `spec`:
+//   {w, h, n, planes (sparse array of {sum}), nx, ny, os, camRad, interpMode,
+//    emitters(fi) -> {list:[[mx,my,photons,planeIndex],...], clamped, counted},
+//    bgOf(fi) -> the flat background, or bgMap's scale for this frame when bgMap is set,
+//    bgMap|null, offsetMap, simGain, readNoiseE, cam, noiseSeed, doNoise, onProgress}
+// Returns {frames, zClampedCount, zTotalCount} like simulateFramesParallel(). Frames are batched
+// so each output buffer stays within 64 MB and the adapter's own limits; batch k+1 is packed
+// and submitted before batch k is read back, so CPU packing overlaps GPU work.
+function gpuSimFrames(engine, spec){
+  return runGpuExclusive(()=>withGpuErrorScopes(engine.device,'GPU simulation',()=>gpuSimFramesNow(engine, spec)));
+}
+async function gpuSimFramesNow(engine, spec){
+  const {w, h, n, planes, os, camRad, interpMode, bgMap, offsetMap, simGain, readNoiseE, cam, noiseSeed, onProgress}=spec;
+  if(interpMode==='fft') throw new Error("'fft' PSF placement has no GPU kernel");
+  const device=engine.device, U=GPUBufferUsage, lim=engine.limits;
+  const maxBind=Math.min(lim.maxStorageBufferBindingSize, lim.maxBufferSize);
+  // Plane storage: every used plane's Float32 block sums, back to back.
+  const used=[]; for(let i=0;i<planes.length;i++) if(planes[i]) used.push(i);
+  if(!used.length) throw new Error('no PSF planes to splat from');
+  const {bw, bh, off}=planes[used[0]].sum, planeLen=bw*bh;
+  const planeBytes=used.length*planeLen*4;
+  if(planeBytes>maxBind) throw new Error(`the ${used.length} PSF planes this simulation uses need ${fmtBytes(planeBytes)} on the GPU, over this adapter's ${fmtBytes(maxBind)} buffer limit`);
+  const planeBase=new Uint32Array(planes.length);
+  const planeData=new Float32Array(used.length*planeLen);
+  used.forEach((zi,k)=>{ planeBase[zi]=k*planeLen; planeData.set(planes[zi].sum.B, k*planeLen); });
+  const created=[];
+  const mk=(size,usage,label)=>{ const b=engine.mkBuf(size,usage,label); created.push(b); return b; };
+  const frameBytes=w*h*4, maxOut=Math.min(64*1024*1024, maxBind);
+  if(frameBytes>maxOut) throw new Error(`one ${w}×${h} frame exceeds this adapter's buffer limit`);
+  const batchFrames=Math.max(1, Math.floor(maxOut/frameBytes));
+  const frames=new Array(n);
+  let zClampedCount=0, zTotalCount=0;
+  try{
+    const planeBuf=mk(planeData.byteLength, U.STORAGE|U.COPY_DST, 'sim:planes'); engine.write(planeBuf,0,planeData);
+    const offBuf=mk(offsetMap.byteLength, U.STORAGE|U.COPY_DST, 'sim:offset-map'); engine.write(offBuf,0,offsetMap);
+    const bgBuf=mk(bgMap?bgMap.byteLength:4, U.STORAGE|U.COPY_DST, 'sim:bg-map'); if(bgMap) engine.write(bgBuf,0,bgMap);
+    const pipe=await engine.compilePipeline('sim-frames', WGSL_SIM_FRAMES, 'main', {WG:engine.wg1D});
+    const emccd = cam && cam.type==='emccd';
+    const readBack=async(slot)=>{
+      await slot.staging.mapAsync(GPUMapMode.READ);
+      const all=new Float32Array(slot.staging.getMappedRange().slice(0));
+      slot.staging.unmap();
+      for(let k=0;k<slot.nb;k++) frames[slot.f0+k]=all.subarray(k*w*h,(k+1)*w*h);
+      slot.bufs.forEach(b=>{ try{ b.destroy(); }catch(_){} });
+      if(onProgress) onProgress(100*(slot.f0+slot.nb)/n);
+    };
+    let pending=null;
+    for(let f0=0; f0<n; f0+=batchFrames){
+      const f1=Math.min(n, f0+batchFrames), nb=f1-f0;
+      const pk=packSimEmitters(spec, f0, f1, planeBase);
+      zClampedCount+=pk.clamped; zTotalCount+=pk.counted;
+      const bufs=[];
+      const mkb=(size,usage,label)=>{ const b=engine.mkBuf(size,usage,label); bufs.push(b); return b; };
+      const emBuf=mkb(pk.buf.byteLength, U.STORAGE|U.COPY_DST, 'sim:emitters'); engine.write(emBuf,0,new Uint8Array(pk.buf));
+      const foBuf=mkb(pk.frameOff.byteLength, U.STORAGE|U.COPY_DST, 'sim:frame-offsets'); engine.write(foBuf,0,pk.frameOff);
+      const fbBuf=mkb(pk.frameBg.byteLength, U.STORAGE|U.COPY_DST, 'sim:frame-bg'); engine.write(fbBuf,0,pk.frameBg);
+      const outBuf=mkb(nb*frameBytes, U.STORAGE|U.COPY_SRC, 'sim:frames');
+      const staging=mkb(nb*frameBytes, U.MAP_READ|U.COPY_DST, 'sim:frames-readback');
+      const d=gpuDispatch2D(engine, nb*w*h);
+      const raw=new ArrayBuffer(96), pu=new Uint32Array(raw), pi=new Int32Array(raw), pf=new Float32Array(raw);
+      pu[0]=w; pu[1]=h; pu[2]=nb; pu[3]=f0; pi[4]=camRad; pi[5]=os; pu[6]=pk.taps; pi[7]=bw;
+      pi[8]=bh; pi[9]=off; pu[10]=d.strideX; pu[11]=noiseSeed>>>0;
+      pu[12]=spec.doNoise===false?0:1; pu[13]=emccd?1:0; pu[14]=bgMap?1:0;
+      pf[16]=simGain; pf[17]=readNoiseE; pf[18]=emccd?cam.qe:1; pf[19]=emccd?cam.cic:0;
+      pf[20]=emccd?readNoiseE/Math.max(1,cam.emGain):0; pf[21]=emccd?Math.pow(2,cam.bitDepth)-1:0;
+      const pBuf=mkb(96, U.UNIFORM|U.COPY_DST, 'sim:params'); engine.write(pBuf,0,new Uint8Array(raw));
+      const bg=engine.bindGroup({label:'sim:frames-bg', layout:pipe.getBindGroupLayout(0),
+        entries:[pBuf,planeBuf,emBuf,foBuf,fbBuf,bgBuf,offBuf,outBuf].map((buffer,binding)=>({binding,resource:{buffer}}))});
+      const enc=device.createCommandEncoder({label:'sim:frames'});
+      const pass=enc.beginComputePass({label:'sim:frames'});
+      pass.setPipeline(pipe); pass.setBindGroup(0,bg); pass.dispatchWorkgroups(d.gx,d.gy); pass.end();
+      enc.copyBufferToBuffer(outBuf,0,staging,0,nb*frameBytes);
+      engine.submit([enc.finish()]);
+      const slot={f0, nb, staging, bufs};
+      if(pending) await readBack(pending);
+      pending=slot;
+    }
+    if(pending) await readBack(pending);
+    _gpuSimWarm=true;
+    return {frames, zClampedCount, zTotalCount};
+  } finally {
+    created.forEach(b=>{ try{ b.destroy(); }catch(_){} });
+  }
+}
+// generateSynthetic()'s simCtx as a gpuSimFrames() spec: the same drift, per-frame background
+// scale and nearest-plane rule splatSimFrame() applies (the zi/clamp lines are copied from it).
+function simGpuSpecFromMovie(ctx){
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,zKernelStack:zks,zKernel,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
+  const k=zks||zKernel;
+  return { w, h, n, nx:k.nx, ny:k.ny, os:k.oversample, camRad:k.camRad, interpMode:k.interpMode,
+    planes: zks ? zks.planes : [{sum:zKernel.sum}], bgMap, offsetMap, simGain, readNoiseE, cam, noiseSeed, onProgress,
+    bgOf: fi => bgMap ? simBgScale(fi,bgDecay) : bg,
+    emitters: fi => {
+      const dmag = n>1 ? fi/(n-1)*driftPx : 0, drx=dmag*ddx, dry=dmag*ddy, list=[];
+      let clamped=0;
+      for(const [ex,ey,ez,ov] of frameEvents[fi]){
+        let zi=0;
+        if(zks){
+          zi=zks.focusIndex+Math.round(ez/zks.zStepNm);
+          if(zi<0){ zi=0; clamped++; } else if(zi>=zks.nz){ zi=zks.nz-1; clamped++; }
+        }
+        list.push([ex+drx, ey+dry, photPerFrame*ov, zi]);
+      }
+      return {list, clamped, counted: zks ? list.length : 0};
+    } };
+}
+function simulateFramesGpu(engine, ctx){ return gpuSimFrames(engine, simGpuSpecFromMovie(ctx)); }
+// generateCalibrationStack()'s calibCtx as a spec: frame z shows every bead through plane z.
+function simulateCalibFramesGpu(engine, ctx){
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,planes,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
+  return gpuSimFrames(engine, { w, h, n:nz, nx:kernelNx, ny:kernelNy, os:oversample, camRad, interpMode,
+    planes, bgMap:null, offsetMap, simGain, readNoiseE, cam, noiseSeed, onProgress, bgOf:()=>bg,
+    emitters: z => ({list: beadXY.map(([x,y])=>[x,y,photPerFrame,z]), clamped:0, counted:0}) });
+}
+// computePsfIntensityPlane() for every plane of cfg, on the device. Returns {slices, globalMax}
+// like buildPsfPlanesParallel(). Planes go in small dispatches (~1.5e8 sin/cos each): one long
+// dispatch can trip the OS GPU watchdog (Windows TDR, ~2 s) on an integrated GPU, which loses
+// the device for the whole session.
+function buildPsfPlanesGpu(engine, cfg, nx, ny){
+  return runGpuExclusive(()=>withGpuErrorScopes(engine.device,'GPU PSF build',()=>buildPsfPlanesGpuNow(engine, cfg, nx, ny)));
+}
+async function buildPsfPlanesGpuNow(engine, cfg, nx, ny){
+  const device=engine.device, U=GPUBufferUsage, N=nx*ny, NQ=PSF_N_RHO*PSF_N_PHI;
+  const per=Math.max(1, Math.min(cfg.nz, Math.floor(1.5e8/(N*NQ)), Math.floor(Math.min(64*1024*1024, engine.limits.maxStorageBufferBindingSize)/(N*4))));
+  const created=[];
+  const mk=(size,usage,label)=>{ const b=engine.mkBuf(size,usage,label); created.push(b); return b; };
+  const slices=new Array(cfg.nz); let globalMax=0;
+  try{
+    const pipe=await engine.compilePipeline('psf-direct', WGSL_PSF_DIRECT, 'main', {WG:engine.wg1D, NRHO:PSF_N_RHO, NPHI:PSF_N_PHI});
+    const p0=computePsfPupilForZPlane(0, cfg.nz, cfg);
+    // Micrometres rather than metres: k·r is the same number, the operands are nearer 1.
+    const kr=new Float32Array(PSF_N_RHO); for(let i=0;i<PSF_N_RHO;i++) kr[i]=p0.krAt[i]*1e-6;
+    const cs=new Float32Array(2*PSF_N_PHI); for(let i=0;i<PSF_N_PHI;i++){ cs[2*i]=p0.cosPhiAt[i]; cs[2*i+1]=p0.sinPhiAt[i]; }
+    const krBuf=mk(kr.byteLength, U.STORAGE|U.COPY_DST, 'psf:kr'); engine.write(krBuf,0,kr);
+    const csBuf=mk(cs.byteLength, U.STORAGE|U.COPY_DST, 'psf:cos-sin'); engine.write(csBuf,0,cs);
+    const pupilBuf=mk(per*NQ*8, U.STORAGE|U.COPY_DST, 'psf:pupil');
+    const outBuf=mk(per*N*4, U.STORAGE|U.COPY_SRC, 'psf:planes');
+    const staging=mk(per*N*4, U.MAP_READ|U.COPY_DST, 'psf:planes-readback');
+    const pBuf=mk(32, U.UNIFORM|U.COPY_DST, 'psf:params');
+    const bg=engine.bindGroup({label:'psf:direct-bg', layout:pipe.getBindGroupLayout(0),
+      entries:[pBuf,pupilBuf,krBuf,csBuf,outBuf].map((buffer,binding)=>({binding,resource:{buffer}}))});
+    for(let z0=0; z0<cfg.nz; z0+=per){
+      const nb=Math.min(per, cfg.nz-z0), pupil=new Float32Array(nb*NQ*2);
+      for(let k=0;k<nb;k++){
+        const pp = z0+k===0 ? p0 : computePsfPupilForZPlane(z0+k, cfg.nz, cfg);
+        for(let q=0;q<NQ;q++){ pupil[(k*NQ+q)*2]=pp.pupilRe[q]; pupil[(k*NQ+q)*2+1]=pp.pupilIm[q]; }
+      }
+      engine.write(pupilBuf,0,pupil);
+      const d=gpuDispatch2D(engine, nb*N);
+      const raw=new ArrayBuffer(32), pu=new Uint32Array(raw), pf=new Float32Array(raw);
+      pu[0]=nx; pu[1]=ny; pu[2]=nb; pu[3]=d.strideX; pf[4]=(nx-1)/2; pf[5]=(ny-1)/2; pf[6]=cfg.resLateralM*1e6;
+      engine.write(pBuf,0,new Uint8Array(raw));
+      const enc=device.createCommandEncoder({label:'psf:direct'});
+      const pass=enc.beginComputePass({label:'psf:direct'});
+      pass.setPipeline(pipe); pass.setBindGroup(0,bg); pass.dispatchWorkgroups(d.gx,d.gy); pass.end();
+      enc.copyBufferToBuffer(outBuf,0,staging,0,nb*N*4);
+      engine.submit([enc.finish()]);
+      await staging.mapAsync(GPUMapMode.READ);
+      const all=new Float32Array(staging.getMappedRange().slice(0,nb*N*4));
+      staging.unmap();
+      for(let k=0;k<nb;k++){
+        const sl=new Float64Array(N); let mx=0;
+        for(let i=0;i<N;i++){ const v=all[k*N+i]; sl[i]=v; if(v>mx) mx=v; }
+        slices[z0+k]=sl; if(mx>globalMax) globalMax=mx;
+      }
+      setProg(100*(z0+nb)/cfg.nz); await tick();
+    }
+    _gpuPsfWarm=true;
+    return {slices, globalMax};
+  } finally {
+    created.forEach(b=>{ try{ b.destroy(); }catch(_){} });
+  }
 }
 
 /* ===========================================================================
@@ -26080,7 +26521,7 @@ updateMethodUI();
 
 // Simulation PSF model rows (simBox) — same "one selector, a list of rows toggled together"
 // pattern as updateMethodUI() above, just for the Zernike-only fields.
-const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfMaskTypeRow','psfEvalMethodRow','psfInterpRow','psfPreviewBtnRow','genCalBtnRow'];
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfMaskTypeRow','psfEvalMethodRow','psfInterpRow','simGpuRow','psfPreviewBtnRow','genCalBtnRow'];
 function updatePsfModelUI(){
   const on = paramValue('simulation_psfModel')==='zernike';
   for(const id of PSF_ZERNIKE_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
@@ -27752,7 +28193,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21b — Simulate movie is ~10x faster on the CPU: each
+log(`webSMLM v0.12.8-dev · build 2026-09-21c — Simulation on the GPU. With Use GPU acceleration
+checked, Simulate movie and Simulate calib. stack splat and add camera noise on the GPU, and a
+Direct-quadrature PSF build runs there too; new setting GPU for simulation (Auto / Always / Off)
+under PSF placement interpolation — Always is for a dedicated GPU. Measured on an integrated
+Intel Iris Xe: 4-17x faster than the CPU workers per movie, 43x for a Direct PSF build (1.5x
+faster than the CPU FFT evaluator). GPU and CPU draw the same random numbers, so a seeded movie
+matches across the two up to float rounding.
+— and from build 2026-09-21b: Simulate movie is ~10x faster on the CPU: each
 camera pixel now reads one interpolation of a pre-summed PSF kernel instead of summing
 oversample² interpolations (same result to 3e-8). Camera noise now draws from a counter-based
 RNG shared with the coming GPU path, so seeded movies differ from earlier builds' (still

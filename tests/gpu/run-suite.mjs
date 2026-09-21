@@ -24,6 +24,7 @@ const TESTS = [
   ['gpu:test:frc', 'test-frc-gpu.mjs'],
   ['gpu:test:candidate-audit', 'test-candidate-audit.mjs'],
   ['gpu:test:report', 'test-report-generation.mjs'],
+  ['gpu:test:simulation', 'test-sim-gpu.mjs'],
 ];
 
 const BENCHES = [
@@ -31,6 +32,7 @@ const BENCHES = [
   ['gpu:bench:fit', 'bench-fit.mjs'],
   ['gpu:bench:render', 'bench-render.mjs'],
   ['gpu:bench:frc', 'bench-frc.mjs'],
+  ['gpu:bench:simulation', 'bench-simulation.mjs', full ? ['--full'] : []],
   ['gpu:bench:stages', 'bench-gpu-stages.mjs'],
   ['gpu:bench:drift', 'bench-drift.mjs'],
   ['gpu:bench:real', 'bench-real-data.mjs', full ? ['--full'] : []],

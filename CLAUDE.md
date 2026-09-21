@@ -155,8 +155,19 @@ in a module.
   position before SUMMING (not averaging — each kernel entry is a probability mass, so summing is
   what conserves photon count) the sub-cell samples down to the camera pixel grid — the "oversample
   once, downsample everywhere" placement both `docs/VECTORIAL_PSF_SIMULATION.md` and the Zernike
-  implementation doc's own §5 call for. Downstream of filling `img` (Poisson shot noise, read
-  noise, gain/offset) is identical for both PSF paths.
+  implementation doc's own §5 call for. **It computes that in swapped order**: every sub-cell of
+  one emitter sits at the same fraction between kernel grid points (they are whole grid steps
+  apart), so they share one set of interpolation weights, and "interpolate each of the os²
+  sub-cells, then sum" equals "sum each os×os kernel block once per plane (`buildSummedKernel()`),
+  then interpolate that once per camera pixel" — 16 reads instead of 256 for cubic at oversample
+  4. It matches the old per-sub-cell algorithm to 3e-8 of peak in all four modes, edges included
+  (`tests/gpu/test-sim-gpu.mjs` (b), which carries the old algorithm as its reference), and made a
+  64 px × 50-frame movie 569 → 50 ms (2D cubic) and 1309 → 148 ms (3D). `simSplatSetup()` is the
+  one place the per-emitter indices and weights are computed, shared with the GPU packer. Block
+  sums are Float32 (what the GPU holds too), and only the planes some emitter uses are prepared
+  (`prepareSimKernelPlanes()`, a sparse array) — preparing all 401 used to structured-clone
+  ~186 MB into each of up to 12 sim workers. Downstream of filling `img` (shot noise, read noise,
+  gain/offset — `applySimCameraNoise()`) is identical for both PSF paths.
 
   **`simulation_fov`** (default 128px, square) replaced a previously-hardcoded `w=128,h=128` at
   BOTH `generateSynthetic()`'s and `generateCalibrationStack()`'s own top — the one true source
@@ -304,23 +315,75 @@ in a module.
   (a separate FFT convolution layer was planned and dropped: at the depths where it would pay off
   the PSF is wider than half the frame, which the static haze already covers).
   **The rule all of this obeys: with every new parameter at its default, a seeded movie is
-  byte-identical to the 2026-09-08b build.** New random draws therefore live ONLY in branches the
-  defaults never enter (the original single-blink loop is kept verbatim beside the new one for
-  exactly this reason), and background/haze each draw from their OWN stream derived from the seed,
-  after all emitter draws — so switching them on never moves an in-focus emitter, and their effect
-  can be measured on otherwise identical data. Re-check with a pixel hash after touching any of it.
+  byte-identical to the 2026-09-21b build** (the baseline moved once, deliberately, when camera
+  noise went counter-based — see below; before that it was 2026-09-08b). New random draws
+  therefore live ONLY in branches the defaults never enter (the original single-blink loop is kept
+  verbatim beside the new one for exactly this reason), and background/haze each draw from their
+  OWN stream derived from the seed, after all emitter draws — so switching them on never moves an
+  in-focus emitter, and their effect can be measured on otherwise identical data. Re-check with a
+  pixel hash after touching any of it. **Camera noise is its own, counter-based stream**:
+  `makeSimNoiseRng()` addresses every draw by (noise seed, frame, pixel, counter) through pcg4d
+  (Jarzynski & Olano, JCGT 2020), so a pixel's noise depends on nothing but its address — any
+  worker, batch order or GPU thread gives the same pixel, and `WGSL_SIM_NOISE_FNS` (MODULE: gpu)
+  reproduces the u32 stream bit for bit. The draws (`simNoiseGauss`/`simNoisePoisson`/
+  `simNoiseGamma`: plain two-uniform Box-Muller, inversion up to λ=60 then normal,
+  Marsaglia-Tsang) are written once in JS and mirrored line for line in WGSL; change one, change
+  both. The old per-frame mulberry32 noise stream could not be ported (Poisson inversion, a
+  rejecting Box-Muller and the `_g` spare made pixel i's numbers depend on every earlier pixel).
+  The emitter/event stream is untouched (`mulberry32(simulation_seed)`); an unseeded run draws a
+  random noise seed.
   **EMCCD (2026-09-20).** `simulation_cameraType` (`'scmos'` default, `'emccd'`) switches
   `applySimCameraNoise()`'s first two steps: photons → photoelectrons (`simulation_qe`) plus
-  `simulation_cic`, Poisson, then the gain register as `gammaSample(n, 1)` (Marsaglia-Tsang, new,
-  and in `simWorkerSource()`'s own function list — forget that and the pool dies on a
-  ReferenceError), read noise divided by `simulation_emGain`, integer ADU clipped at
+  `simulation_cic`, Poisson, then the gain register as `simNoiseGamma(n)` (Marsaglia-Tsang, scale
+  1, in `simWorkerSource()`'s own function list — forget a noise helper there and the pool dies on
+  a ReferenceError), read noise divided by `simulation_emGain`, integer ADU clipped at
   2^`simulation_bitDepth`−1. **Poisson compounded with Gamma has variance 2λ** — that IS the √2
   excess noise, not an added fudge (measured: variance/mean 2.00 vs 1.08 on sCMOS). Scale 1
   instead of a literal EM gain keeps `simulation_gain` meaning photons/ADU end-to-end and the ADU
   scale comparable across sensor types. The whole sensor model travels as ONE `cam` bundle
-  (`readSimCameraModel()`) through `simCtx`/`calibCtx` and both init messages, and
-  `cam.type==='scmos'` leaves the original one-line expression untouched — that is what keeps the
-  default byte-identical.
+  (`readSimCameraModel()`) through `simCtx`/`calibCtx`, both init messages and the GPU spec.
+
+  **Simulation on the GPU (2026-09-21).** Two stages have a device path, each through
+  `runStage()` (`STAGE_META` `simFrames`/`simPsf`) and gated twice: the master `useGpu` and
+  `simulation_gpu` (`auto` | `always` | `off`, a row under PSF placement interpolation).
+  **Frames**: `WGSL_SIM_FRAMES` fuses splat and camera noise, one thread per (pixel, frame), as a
+  GATHER over that frame's emitter list in list order — no atomics, and the CPU's own summation
+  order. The CPU packs each emitter with `simSplatSetup()`'s indices and weights, so the device
+  interpolates the same Float32 block sums with the same weights. Batches keep each output
+  ≤64 MB, and batch k+1 is packed and submitted before k is read back. `simulateFramesGpu()` and
+  `simulateCalibFramesGpu()` are thin spec builders over one `gpuSimFrames()`. 'fft' placement
+  and the Gaussian model have no kernel. **PSF**: `WGSL_PSF_DIRECT` is
+  `computePsfIntensityPlane()` (the 'direct' polar quadrature) per kernel pixel per plane, the
+  pupil still built on the CPU; dispatches are capped at ~1.5e8 sin/cos, since one long dispatch
+  can trip the Windows GPU watchdog and lose the device. The default 'fft' evaluator has no GPU
+  path. **Agreement** (`tests/gpu/test-sim-gpu.mjs`): pcg4d and the uniforms bit-exact over 393k
+  values; GPU splat = CPU to 1.3e-7 of peak; GPU noise = CPU noise on 100% of pixels within
+  1e-3 ADU (sCMOS: f32 read noise, ≤1.7e-4 ADU; EMCCD: identical); the same seeded 3D movie with
+  haze and a structured background generated on the CPU pool and on the GPU agrees on 100%
+  (sCMOS) / 99.999% (EMCCD: one pixel one count apart, an f32/f64 Poisson boundary) of pixels;
+  GPU direct PSF = CPU direct to 5e-6. **Measured** (`tests/gpu/bench-simulation.mjs`, i7-1355U +
+  Intel Iris Xe, warm, median of 3, against the NEW CPU splat on 8 workers):
+
+  | Case | CPU ms | GPU ms | Speedup |
+  |---|---|---|---|
+  | 2D cubic 128² × 100 | 321 | 47 | 6.9× |
+  | 3D cubic 128² × 100 | 653 | 60 | 10.8× |
+  | 2D linear 128² × 100 | 273 | 36 | 7.6× |
+  | 2D 0.3 em/µm², 128² × 50 | 843 | 54 | 15.6× |
+  | 2D 256² × 50, bg 20 | 1155 | 67 | 17.1× |
+  | EMCCD 128² × 100 | 435 | 35 | 12.6× |
+  | Calibration stack 128², 41 planes | 152 | 34 | 4.4× |
+  | PSF direct, 121² kernel, 11 planes | 5543 | 129 | 43× (1.9× vs CPU 'fft') |
+  | PSF direct, 241² kernel, 41 planes | — | 1182 | 1.5× vs CPU 'fft' (1779) |
+
+  Cold (first use per page session) adds the pipeline compile, ~60–100 ms here, plus, once, the
+  engine's own start-up (~1–2 s, shared by every GPU stage; the log line says when a stage paid
+  it). On an integrated GPU the speedups are real but the absolute savings are small at these
+  sizes, which is why `GPU_SIM_CROSSOVER` is low (warm 1e7 / cold 3e7 work units for frames) and
+  `always` exists: a dedicated GPU should win far earlier, and the headroom is in the heavy cases
+  (`--full`: default 300-frame movies, dense, 512², the 401-plane PSF) this laptop was not run
+  on. A GPU 'direct' PSF build beats even the CPU 'fft' default while being the reference
+  evaluator; the default evaluator was deliberately left alone.
 
   **The analysis-side companion is `PARAMS.cameraExcessNoise` (F², MODULE: fit)**: a Poisson
   likelihood cannot express Var = F²·N, so `runCore()` hands the fitters `gain/F²` (fitting in

@@ -811,7 +811,7 @@ lookup, e.g. by **Time traces and FRET**'s own **Apply drift correction**
 
 Compares the localizations against the simulator's own ground truth — the
 question a synthetic dataset exists to answer, and one webSMLM recorded the
-data for but never asked. **Score vs truth** (Localization precision panel)
+data for but never asked. **Score vs truth** (a sub-section of Simulation settings)
 is enabled only for data generated in the same session; there is no ground
 truth for a loaded file.
 
@@ -1853,15 +1853,15 @@ elapsed time instead.
 | `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `phot` | Simulated photons/emitter/frame | number (int) | 0 | 50000 | 50 | 900 |
 | `simlifetime` | Simulated ON lifetime (frames, mean) | number | 0.1 | 20 | 0.1 | 1 |
-| `simulation_blinkBleachProb` | Bleach probability per blink | number | 0.01 | 1 | 0.01 | 1 |
+| `simulation_blinkBleachProb` | Bleach probability per blink | number | 0.01 | 1 | 0.01 | 0.2 |
 | `simulation_offLifetime` | Dark-state lifetime (frames, mean) | number | 0.1 | 5000 | 1 | 20 |
-| `simulation_photCV` | Photon rate spread (CV) | number | 0 | 2 | 0.05 | 0 |
-| `simulation_densityPreset` | Emitter density preset | enum (`low`, `med`, `high`, `custom`) | — | — | — | `low` |
-| `simulation_realism` | Realism/compute preset | enum (`min`, `med`, `max`, `custom`) | — | — | — | `min` |
-| `simulation_bgCellContrast` | Background: cell contrast (×) | number | 1 | 20 | 0.5 | 1 |
-| `simulation_bgHazeWeight` | Background: out-of-focus haze (weight) | number | 0 | 10 | 0.1 | 0 |
+| `simulation_photCV` | Photon rate spread (CV) | number | 0 | 2 | 0.05 | 0.5 |
+| `simulation_densityPreset` | Emitter density preset | enum (`low` 0.05, `med` 0.2, `high` 0.5, `veryhigh` 2, `custom`) | — | — | — | `low` |
+| `simulation_realism` | Realism/compute preset | enum (`min`, `med`, `max`, `custom`) | — | — | — | `med` |
+| `simulation_bgCellContrast` | Background: cell contrast (×) | number | 1 | 20 | 0.5 | 3 |
+| `simulation_bgHazeWeight` | Background: out-of-focus haze (weight) | number | 0 | 10 | 0.1 | 1 |
 | `simulation_bgHazeWidth` | Background: haze blur σ (nm) | number | 100 | 5000 | 50 | 800 |
-| `simulation_bgDecayFrames` | Background: fade time constant (frames) | number | 0 | 100000 | 10 | 0 |
+| `simulation_bgDecayFrames` | Background: fade time constant (frames) | number | 0 | 100000 | 10 | 150 |
 | `simulation_hazeRatio` | Out-of-focus emitters (per in-focus emitter) | number | 0 | 10 | 0.1 | 0 |
 | `simulation_hazeDepth` | Out-of-focus depth (± nm) | number | 300 | 5000 | 50 | 1500 |
 | `simulation_gain` | Simulation camera gain (photons/ADU) | number | 0.001 | 1000 | 0.01 | 0.34 |
@@ -1878,11 +1878,11 @@ elapsed time instead.
 | `simulation_emGain` | EM gain (×, EMCCD) | number | 1 | 2000 | 10 | 300 |
 | `simulation_cic` | Clock-induced charge (e⁻/px/frame) | number | 0 | 1 | 0.001 | 0.002 |
 | `simulation_bitDepth` | Camera bit depth (EMCCD) | number | 8 | 16 | 1 | 16 |
-| `simbg` | Simulation background (photons/px) | number | 0 | 500 | 1 | 0 |
+| `simbg` | Simulation background (photons/px) | number | 0 | 500 | 1 | 10 |
 | `driftpx` | Simulated total drift (px) | number | 0 | 30 | 0.5 | 0 |
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
 | `simulation_3d` | 3D simulation? | bool | — | — | — | off |
-| `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
+| `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 500 |
 | `simulation_structureType` | Structure type | enum (`filaments_ring`, `nup`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `filaments_ring` |
 | `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
 | `simulation_nup_radius` | NPC ring radius (nm) | number | 20 | 150 | 0.5 | 53.5 |
@@ -1891,7 +1891,7 @@ elapsed time instead.
 | `simulation_nup_linkerLengthMin` | Linker length, min (nm) | number | 0 | 30 | 0.5 | 2 |
 | `simulation_nup_linkerLengthMax` | Linker length, max (nm) | number | 0 | 30 | 0.5 | 5 |
 | `simulation_nup_membraneType` | Membrane orientation | enum (`topdown`/`sideways`) | — | — | — | `topdown` |
-| `simulation_nup_count` | Number of NPCs | number (int) | 1 | 500 | 1 | 20 |
+| `simulation_nup_count` | Number of NPCs | number (int) | 1 | 500 | 1 | 100 |
 | `simulation_nup_minSpacing` | Min. NPC-NPC spacing (nm) | number | 0 | 2000 | 10 | 200 |
 | `simulation_nup_curvature` | Membrane curvature amplitude (nm) | number | 0 | 2000 | 10 | 150 |
 The sidebar's Simulation settings panel splits these into 5 groups — a flat
@@ -2165,8 +2165,9 @@ simulated structure, physically modelled blinking, shot/read/offset camera noise
 real vectorial PSF — for validating and teaching the rest of the pipeline against known-correct
 answers. Settings above are grouped into <b>User parameters</b> (the everyday knobs), <b>Simulation
 type</b> (2D/3D structure, drift, seed), <b>Fluorophore parameters</b> (photon output and blinking
-kinetics), <b>Camera parameters</b> (sensor noise model), and <b>PSF parameters</b> (Gaussian vs.
-physically modelled optics) — see each group's own "more info…" for detail.</p>
+kinetics), <b>Camera parameters</b> (sensor noise model), <b>PSF parameters</b> (Gaussian vs.
+physically modelled optics), and <b>Score vs truth</b> (scoring a Localize result against this
+simulation's ground truth) — see each group's own "more info…" for detail.</p>
 <!-- /HINT:simulation -->
 
 `dens` is a **physical areal density** (ON emitters/µm²/frame), not tied to
@@ -2243,7 +2244,7 @@ scoring drift correction. See the **simulation** module.
 | `validation_borderMode` | Score: edge handling | enum | `dontcare`, `exclude` | | | `dontcare` |
 
 **In-app "more info…" popup** (`hint-validation` in `webSMLM.html`, the
-**Score vs truth** sidebar section; synced by `tools/sync_hints.mjs` — edit
+**Score vs truth** sub-section of Simulation settings; synced by `tools/sync_hints.mjs` — edit
 here, then run the script, never edit the `.hint` div directly):
 
 <!-- HINT:validation -->

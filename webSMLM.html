@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21e; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21f; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -140,7 +140,7 @@
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z; controls
-                           live in their own sidebar section (validationBox),
+                           live in Simulation settings (subsim validationBox),
                            popup hint-validation
     detect          8947   per-frame band-pass + local-maxima detection
                            (detectSpots() and its three filters) — CPU only; a
@@ -2802,7 +2802,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21e</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3056,44 +3056,16 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <p><i>NeNA and FRC are new in 0.8.0 and still <b>experimental</b> — cross-check against established tools before relying on the numbers; FSC 3D is not yet implemented.</i></p>
         </div>
       </details>
-      <details class="sim" id="validationBox">
-        <summary>Score vs truth</summary>
-        <div class="btnrow">
-          <button id="truthBtn" disabled title="Compare the localizations against the simulator's own ground truth: detection rate, lateral bias/RMSE, and axial bias/RMSE versus true depth. Simulated data only.">Score vs truth</button>
-        </div>
-        <label class="row" id="validationPresetRow" title="webSMLM's own conventions, or the SMLM Challenge 2016 assessment rules so the numbers can be compared with published ones. Writes the four settings below.">Convention <select id="validation_preset" class="sel"><option value="webSMLM">webSMLM</option><option value="challenge2016">Challenge 2016</option><option value="custom">Custom…</option></select></label>
-        <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
-        <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
-        <label class="row" id="validationMinPhotRow" title="A simulated emitter only counts in a frame where it delivered at least this many photons. Dimmer emitter-frames are ignored either way: detecting one is not a false positive, missing one is not a miss. 0 = count everything.">Min photons/frame <input type="number" id="validation_minPhotons" min="0" max="100000" step="10" value="100" class="num"></label>
-        <label class="row" id="validationBorderRow" title="Emitters this close to the frame edge are ignored: the fitter cannot localize there by construction. -1 = use the Run's own detection border.">Edge exclusion (px) <input type="number" id="validation_border" min="-1" max="100" step="1" value="-1" class="num"></label>
-        <label class="row" id="validationCrowdRow" title="An emitter is 'crowded' when another counted emitter is ON within this distance in the same frame. Reported as a separate isolated/crowded split. 0 = off.">Crowding radius (nm) <input type="number" id="validation_crowdRadius" min="0" max="5000" step="10" value="300" class="num"></label>
-        <label class="row" id="validationMatchModeRow" title="Lateral (recommended): pair on x/y only, so the axial error being measured cannot bias its own pairing. Cylinder 3D: sort candidates by 3D distance inside a lateral+axial cylinder, as the challenge does.">Matching <select id="validation_matchMode" class="sel"><option value="lateral">Lateral only</option><option value="cylinder3D">3D cylinder</option></select></label>
-        <label class="row" id="validationAxialTolRow" style="display:none;padding-left:40px" title="Height of the matching cylinder: a pair further apart than this in z is not a pair.">Axial tolerance (nm) <input type="number" id="validation_axialTol" min="20" max="5000" step="10" value="500" class="num"></label>
-        <label class="row" id="validationPhotModeRow" title="Absolute: count an emitter-frame from Min photons/frame upward. Quantile: instead leave out the dimmest N% of emitter-frames, which is the challenge's own rule.">Photon threshold <select id="validation_photonMode" class="sel"><option value="absolute">Absolute</option><option value="quantile">Quantile</option></select></label>
-        <label class="row" id="validationPhotQuantRow" style="display:none;padding-left:40px" title="The dimmest this percent of in-field emitter-frames are not counted either way.">Dimmest % not counted <input type="number" id="validation_photonQuantile" min="0" max="90" step="5" value="25" class="num"></label>
-        <label class="row" id="validationBorderModeRow" title="Don't care: match everything, then leave edge emitters out of the tally. Exclude: cut the border from truth AND localizations before matching, the challenge's order.">Edge handling <select id="validation_borderMode" class="sel"><option value="dontcare">Don't care</option><option value="exclude">Exclude before matching</option></select></label>
-        <button type="button" class="infobtn">more info…</button>
-        <div class="hint" hidden id="hint-validation"><span class="pill">module: validation</span>
-          <p><b>Score vs truth</b> compares a Localize result against the simulator's own ground truth — so it works only on data made with <b>Simulate movie</b> in this session. It reports detection (recall, precision, Jaccard), lateral and axial error against true depth, a per-molecule view, and the depth range over which at least half the emitters are found.</p>
-          <ul>
-          <li><b>Convention</b> — webSMLM's own rules (default), or the SMLM Challenge 2016 assessment rules so the numbers can be laid beside published ones. Pick <b>Custom…</b> to set the individual rules yourself.</li>
-          <li><b>Match radius</b> — how close (laterally) a localization must be to a true emitter in the same frame to count as its detection. Matching is lateral-only by default, so the axial error being measured cannot bias its own pairing.</li>
-          <li><b>Min photons/frame</b> and <b>Edge exclusion</b> — emitter-frames too dim, or too close to the edge, to be found are "don't care": detecting one is not a false positive, missing one is not a miss.</li>
-          <li><b>Crowding radius</b> splits the result into isolated and crowded emitters; <b>Score z bins</b> sets the depth resolution of the plots.</li>
-          </ul>
-          <p>The raw-panel toggle cycles the plot between z error vs depth, fitted vs true z, the lateral error histogram and recall vs photons. Median and percentiles are the headline numbers, not RMSE — the axial error has heavy tails.</p>
-        </div>
-      </details>
       <details class="sim" id="simBox">
         <summary>Simulation settings</summary>
         <label class="row">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="300" class="num"></label>
         <label class="row">FOV (pixels) <input type="number" id="simulation_fov" min="32" max="1024" step="8" value="128" class="num"></label>
         <label class="row" title="The pixel size of the SIMULATED camera. The always-visible Pixel size (nm) above is the analysis one, used for the scale bar and exports; it is synced to this after a movie is generated, and the two are separate so a mismatch can be simulated on purpose.">Simulated pixel size (nm) <input type="number" id="simulation_pxnm" min="10" max="500" step="1" value="100" class="num"></label>
-        <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. Maximal: also adds blinking out-of-focus emitters rendered with the real defocused PSF (Zernike PSF model only) — roughly doubles the simulation time. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min" selected>Minimal (fastest)</option><option value="med">Medium</option><option value="max">Maximal (slowest)</option><option value="custom">Custom</option></select></label>
-        <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), med 0.5 (typical SMLM), high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.5)</option><option value="high">High (2)</option><option value="custom">Custom</option></select></label>
+        <label class="row" title="How much physics — and compute — a simulation spends. Minimal: every molecule blinks once at constant brightness on a flat background (the original model, fastest). Medium: molecules blink repeatedly and bleach, brightness varies, and the background is a fading cell-shaped field with out-of-focus haze — nearly free per frame. Maximal: also adds blinking out-of-focus emitters rendered with the real defocused PSF (Zernike PSF model only) — roughly doubles the simulation time. It only writes the fields in Fluorophore and Background below; edit any of them and this switches to Custom. The PSF model is a separate choice.">Realism/compute <select id="simulation_realism" class="sel"><option value="min">Minimal (fastest)</option><option value="med" selected>Medium</option><option value="max">Maximal (slowest)</option><option value="custom">Custom</option></select></label>
+        <label class="row" title="Shorthand that sets the emitter density below: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Editing the density by hand switches this to Custom.">Density preset <select id="simulation_densityPreset" class="sel"><option value="low" selected>Low (0.05)</option><option value="med">Medium (0.2)</option><option value="high">High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
         <label class="row">Emitter density (µm⁻²·frame⁻¹) <input type="number" id="dens" min="0" max="5" step="0.01" value="0.05" class="num"></label>
         <label class="row">Labeling efficiency (%) <input type="number" id="simulation_labelEfficiency" min="0" max="100" step="1" value="70" class="num"></label>
-        <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="0" class="num"></label>
+        <label class="row">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="10" class="num"></label>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation-user"><span class="pill">module: simulation</span>
           <p><b>Frames</b> is the length of the simulated movie; <b>FOV (pixels)</b> is the simulated camera's
@@ -3113,7 +3085,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row">Structure type <select id="simulation_structureType" class="sel"><option value="filaments_ring" selected>Filaments + ring</option><option value="nup">Nuclear pore complex (NPC)</option><option value="tiltedPlane">Tilted plane</option><option value="uniform3D">Uniform 3D volume</option><option value="shell">Spherical shell</option></select></label>
           <label class="row" id="structureSizeRow" style="display:none" title="Radius of the spherical shell structure, in nm.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
           <label class="row">3D simulation? <input type="checkbox" id="simulation_3d"></label>
-          <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
+          <label class="row" id="simulation_zRangeRow" style="display:none">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="500" class="num"></label>
           <label class="row">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
           <label class="row" title="0 = unseeded (a fresh random layout every Simulate movie click, the original behaviour). Any other value makes emitter positions, ON/OFF timing, drift direction and all simulated noise exactly reproducible across runs — so e.g. two Simulate-movie runs with the same seed and only PSF placement interpolation changed are directly comparable pixel-for-pixel, differing ONLY in the PSF placement itself.">Random seed (0 = random) <input type="number" id="simulation_seed" min="0" max="2147483647" step="1" value="0" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
@@ -3138,7 +3110,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="nupLinkerMinRow" style="display:none">Linker length, min (nm) <input type="number" id="simulation_nup_linkerLengthMin" min="0" max="30" step="0.5" value="2" class="num"></label>
           <label class="row" id="nupLinkerMaxRow" style="display:none">Linker length, max (nm) <input type="number" id="simulation_nup_linkerLengthMax" min="0" max="30" step="0.5" value="5" class="num"></label>
           <label class="row" id="nupMembraneTypeRow" style="display:none">Membrane orientation <select id="simulation_nup_membraneType" class="sel"><option value="topdown" selected>Top-down (rings face-on)</option><option value="sideways">Sideways (rings edge-on)</option></select></label>
-          <label class="row" id="nupCountRow" style="display:none">Number of NPCs <input type="number" id="simulation_nup_count" min="1" max="500" step="1" value="20" class="num"></label>
+          <label class="row" id="nupCountRow" style="display:none">Number of NPCs <input type="number" id="simulation_nup_count" min="1" max="500" step="1" value="100" class="num"></label>
           <label class="row" id="nupMinSpacingRow" style="display:none">Min. NPC-NPC spacing (nm) <input type="number" id="simulation_nup_minSpacing" min="0" max="2000" step="10" value="200" class="num"></label>
           <label class="row" id="nupCurvatureRow" style="display:none">Membrane curvature amplitude (nm) <input type="number" id="simulation_nup_curvature" min="0" max="2000" step="10" value="150" class="num"></label>
           <label class="row" id="nupDebugBtnRow" style="display:none" title="Temporary debug aid: shows one synthetic NPC's 64 attachment/emitter points (top view and side view), using the current NUP parameters above. Not tied to Simulate movie.">
@@ -3179,9 +3151,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="How the excitation beam falls off across the field of view. Normalised to mean 1, so the average emitter still emits Photons/emitter/frame — only its dependence on position changes.">Illumination <select id="simulation_illumProfile" class="sel"><option value="flat">Flat</option><option value="gaussian">Gaussian</option><option value="sigmoid">Flat-top</option></select></label>
           <label class="row" id="illumWidthRow" style="display:none;padding-left:40px" title="Beam width as a percentage of the field of view: FWHM for the Gaussian, full width of the flat top for the disc.">Beam width (% of FOV) <input type="number" id="simulation_illumFwhmPct" min="10" max="300" step="5" value="60" class="num"></label>
           <label class="row">ON lifetime (frames, mean) <input type="number" id="simlifetime" min="0.1" max="20" step="0.1" value="1" class="num"></label>
-          <label class="row" title="Chance that an ON period ends in bleaching instead of a return to the dark state. 1 = a molecule blinks exactly once (the original model); 0.2 = five blinks on average. The emitter density setting keeps its meaning either way.">Bleach prob. per blink <input type="number" id="simulation_blinkBleachProb" min="0.01" max="1" step="0.01" value="1" class="num"></label>
+          <label class="row" title="Chance that an ON period ends in bleaching instead of a return to the dark state. 1 = a molecule blinks exactly once (the original model); 0.2 = five blinks on average. The emitter density setting keeps its meaning either way.">Bleach prob. per blink <input type="number" id="simulation_blinkBleachProb" min="0.01" max="1" step="0.01" value="0.2" class="num"></label>
           <label class="row" title="Mean time a molecule spends dark between two of its blinks. Only matters when the bleach probability is below 1.">Dark lifetime (frames, mean) <input type="number" id="simulation_offLifetime" min="0.1" max="5000" step="1" value="20" class="num"></label>
-          <label class="row" title="Blink-to-blink brightness spread: each blink's photon rate is log-normal around Photons/emitter/frame with this coefficient of variation. 0 = every blink equally bright.">Photon rate spread (CV) <input type="number" id="simulation_photCV" min="0" max="2" step="0.05" value="0" class="num"></label>
+          <label class="row" title="Blink-to-blink brightness spread: each blink's photon rate is log-normal around Photons/emitter/frame with this coefficient of variation. 0 = every blink equally bright.">Photon rate spread (CV) <input type="number" id="simulation_photCV" min="0" max="2" step="0.05" value="0.5" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-fluorophore"><span class="pill">module: simulation</span>
           <p>A <b>molecule</b> activates at a random time (drawn from well before frame 0, so the movie
@@ -3207,12 +3179,12 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         </details>
         <details class="subsim" id="backgroundBox">
           <summary>Background</summary>
-          <label class="row" title="How many times brighter the background is inside the simulated cell outline than outside it. 1 = flat. Background (photons/px) above stays the mean over the whole field of view.">Cell contrast (×) <input type="number" id="simulation_bgCellContrast" min="1" max="20" step="0.5" value="1" class="num"></label>
-          <label class="row" title="Static out-of-focus haze: the labelled structure's own projected density, blurred wide, relative to the flat/cell part. 0 = none.">Out-of-focus haze (weight) <input type="number" id="simulation_bgHazeWeight" min="0" max="10" step="0.1" value="0" class="num"></label>
+          <label class="row" title="How many times brighter the background is inside the simulated cell outline than outside it. 1 = flat. Background (photons/px) above stays the mean over the whole field of view.">Cell contrast (×) <input type="number" id="simulation_bgCellContrast" min="1" max="20" step="0.5" value="3" class="num"></label>
+          <label class="row" title="Static out-of-focus haze: the labelled structure's own projected density, blurred wide, relative to the flat/cell part. 0 = none.">Out-of-focus haze (weight) <input type="number" id="simulation_bgHazeWeight" min="0" max="10" step="0.1" value="1" class="num"></label>
           <label class="row" title="How wide the haze is blurred (Gaussian σ).">Haze blur σ (nm) <input type="number" id="simulation_bgHazeWidth" min="100" max="5000" step="50" value="800" class="num"></label>
           <label class="row" title="A second, blinking population on the same structure, 0.3–2 µm out of focus, rendered with the real defocused PSF. Per in-focus emitter; 0 = none. Needs the Zernike-aberrated PSF model. These emitters are in the movie but never in the score.">Out-of-focus emitters (×) <input type="number" id="simulation_hazeRatio" min="0" max="10" step="0.1" value="0" class="num"></label>
           <label class="row" title="How far from focus the out-of-focus emitters reach. Capped at the PSF z range.">Out-of-focus depth (± nm) <input type="number" id="simulation_hazeDepth" min="300" max="5000" step="50" value="1500" class="num"></label>
-          <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="0" class="num"></label>
+          <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="150" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-background"><span class="pill">module: simulation</span>
           <p><b>Background (photons/px)</b> above stays the mean over the whole field of view; this
@@ -3350,6 +3322,34 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           the CPU.</p>
         </div>
         </details>
+        <details class="subsim" id="validationBox">
+          <summary>Score vs truth</summary>
+          <div class="btnrow">
+            <button id="truthBtn" disabled title="Compare the localizations against the simulator's own ground truth: detection rate, lateral bias/RMSE, and axial bias/RMSE versus true depth. Simulated data only.">Score vs truth</button>
+          </div>
+          <label class="row" id="validationPresetRow" title="webSMLM's own conventions, or the SMLM Challenge 2016 assessment rules so the numbers can be compared with published ones. Writes the four settings below.">Convention <select id="validation_preset" class="sel"><option value="webSMLM">webSMLM</option><option value="challenge2016">Challenge 2016</option><option value="custom">Custom…</option></select></label>
+          <label class="row" id="validationMatchRow">Match radius (nm) <input type="number" id="validation_matchRadius" min="20" max="2000" step="10" value="250" class="num"></label>
+          <label class="row" id="validationBinsRow">Score z bins <input type="number" id="validation_zBins" min="4" max="100" step="1" value="20" class="num"></label>
+          <label class="row" id="validationMinPhotRow" title="A simulated emitter only counts in a frame where it delivered at least this many photons. Dimmer emitter-frames are ignored either way: detecting one is not a false positive, missing one is not a miss. 0 = count everything.">Min photons/frame <input type="number" id="validation_minPhotons" min="0" max="100000" step="10" value="100" class="num"></label>
+          <label class="row" id="validationBorderRow" title="Emitters this close to the frame edge are ignored: the fitter cannot localize there by construction. -1 = use the Run's own detection border.">Edge exclusion (px) <input type="number" id="validation_border" min="-1" max="100" step="1" value="-1" class="num"></label>
+          <label class="row" id="validationCrowdRow" title="An emitter is 'crowded' when another counted emitter is ON within this distance in the same frame. Reported as a separate isolated/crowded split. 0 = off.">Crowding radius (nm) <input type="number" id="validation_crowdRadius" min="0" max="5000" step="10" value="300" class="num"></label>
+          <label class="row" id="validationMatchModeRow" title="Lateral (recommended): pair on x/y only, so the axial error being measured cannot bias its own pairing. Cylinder 3D: sort candidates by 3D distance inside a lateral+axial cylinder, as the challenge does.">Matching <select id="validation_matchMode" class="sel"><option value="lateral">Lateral only</option><option value="cylinder3D">3D cylinder</option></select></label>
+          <label class="row" id="validationAxialTolRow" style="display:none;padding-left:40px" title="Height of the matching cylinder: a pair further apart than this in z is not a pair.">Axial tolerance (nm) <input type="number" id="validation_axialTol" min="20" max="5000" step="10" value="500" class="num"></label>
+          <label class="row" id="validationPhotModeRow" title="Absolute: count an emitter-frame from Min photons/frame upward. Quantile: instead leave out the dimmest N% of emitter-frames, which is the challenge's own rule.">Photon threshold <select id="validation_photonMode" class="sel"><option value="absolute">Absolute</option><option value="quantile">Quantile</option></select></label>
+          <label class="row" id="validationPhotQuantRow" style="display:none;padding-left:40px" title="The dimmest this percent of in-field emitter-frames are not counted either way.">Dimmest % not counted <input type="number" id="validation_photonQuantile" min="0" max="90" step="5" value="25" class="num"></label>
+          <label class="row" id="validationBorderModeRow" title="Don't care: match everything, then leave edge emitters out of the tally. Exclude: cut the border from truth AND localizations before matching, the challenge's order.">Edge handling <select id="validation_borderMode" class="sel"><option value="dontcare">Don't care</option><option value="exclude">Exclude before matching</option></select></label>
+          <button type="button" class="infobtn">more info…</button>
+          <div class="hint" hidden id="hint-validation"><span class="pill">module: validation</span>
+          <p><b>Score vs truth</b> compares a Localize result against the simulator's own ground truth — so it works only on data made with <b>Simulate movie</b> in this session. It reports detection (recall, precision, Jaccard), lateral and axial error against true depth, a per-molecule view, and the depth range over which at least half the emitters are found.</p>
+          <ul>
+          <li><b>Convention</b> — webSMLM's own rules (default), or the SMLM Challenge 2016 assessment rules so the numbers can be laid beside published ones. Pick <b>Custom…</b> to set the individual rules yourself.</li>
+          <li><b>Match radius</b> — how close (laterally) a localization must be to a true emitter in the same frame to count as its detection. Matching is lateral-only by default, so the axial error being measured cannot bias its own pairing.</li>
+          <li><b>Min photons/frame</b> and <b>Edge exclusion</b> — emitter-frames too dim, or too close to the edge, to be found are "don't care": detecting one is not a false positive, missing one is not a miss.</li>
+          <li><b>Crowding radius</b> splits the result into isolated and crowded emitters; <b>Score z bins</b> sets the depth resolution of the plots.</li>
+          </ul>
+          <p>The raw-panel toggle cycles the plot between z error vs depth, fitted vs true z, the lateral error histogram and recall vs photons. Median and percentiles are the headline numbers, not RMSE — the axial error has heavy tails.</p>
+        </div>
+        </details>
         <button type="button" class="infobtn">more info…</button>
         <div class="hint" hidden id="hint-simulation"><span class="pill">module: simulation</span>
           <p>"Simulate movie" builds a fully synthetic ground-truth stack — random emitter placement along a
@@ -3357,8 +3357,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           real vectorial PSF — for validating and teaching the rest of the pipeline against known-correct
           answers. Settings above are grouped into <b>User parameters</b> (the everyday knobs), <b>Simulation
           type</b> (2D/3D structure, drift, seed), <b>Fluorophore parameters</b> (photon output and blinking
-          kinetics), <b>Camera parameters</b> (sensor noise model), and <b>PSF parameters</b> (Gaussian vs.
-          physically modelled optics) — see each group's own "more info…" for detail.</p>
+          kinetics), <b>Camera parameters</b> (sensor noise model), <b>PSF parameters</b> (Gaussian vs.
+          physically modelled optics), and <b>Score vs truth</b> (scoring a Localize result against this
+          simulation's ground truth) — see each group's own "more info…" for detail.</p>
         </div>
       </details>
       <details class="sim" id="memBox">
@@ -4286,7 +4287,7 @@ const PARAMS = {
   // untouched, so a seeded run reproduces byte-for-byte. `dens` keeps its meaning (mean ON emitters
   // per µm² per frame) whatever this is set to: the molecule activation rate is scaled down by the
   // mean blink count, otherwise the density presets would mean different things per kinetics.
-  simulation_blinkBleachProb: { type:'number', id:'simulation_blinkBleachProb', label:'Bleach probability per blink', min:0.01, max:1, step:0.01, default:1, int:false },
+  simulation_blinkBleachProb: { type:'number', id:'simulation_blinkBleachProb', label:'Bleach probability per blink', min:0.01, max:1, step:0.01, default:0.2, int:false },
   // simulation_offLifetime = mean dark-state duration (frames, exponential) between two blinks of
   // the same molecule. Only matters when the bleach probability is below 1.
   simulation_offLifetime: { type:'number', id:'simulation_offLifetime', label:'Dark-state lifetime (frames, mean)', min:0.1, max:5000, step:1, default:20, int:false },
@@ -4295,12 +4296,12 @@ const PARAMS = {
   // the original model. Log-normal because brightness is a product of many positive factors
   // (excitation at that spot, orientation, local environment), is never negative, and has the
   // long bright tail real photon-count histograms show.
-  simulation_photCV: { type:'number', id:'simulation_photCV', label:'Photon rate spread (CV)', min:0, max:2, step:0.05, default:0, int:false },
-  // simulation_densityPreset = low/med/high shorthand that WRITES `dens` (0.05 / 0.5 / 2) and
+  simulation_photCV: { type:'number', id:'simulation_photCV', label:'Photon rate spread (CV)', min:0, max:2, step:0.05, default:0.5, int:false },
+  // simulation_densityPreset = low/med/high/veryhigh shorthand that WRITES `dens` (0.05 / 0.2 / 0.5 / 2) and
   // nothing else; `dens` stays the single source of truth, and editing it by hand flips this to
-  // 'custom'. Roughly: sparse enough that PSFs never overlap / typical SMLM / dense enough that
+  // 'custom'. Roughly: sparse enough that PSFs never overlap / moderate / typical SMLM / dense enough that
   // single-emitter fitting visibly breaks down (compare the isolated/crowded split in Score vs truth).
-  simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','custom'], default:'low' },
+  simulation_densityPreset: { type:'enum', id:'simulation_densityPreset', label:'Emitter density preset', options:['low','med','high','veryhigh','custom'], default:'low' },
   // ---- structured ("biological") background. `simbg` stays the FOV-MEAN photons/px throughout:
   // everything below only reshapes the field in space and time around that mean (see
   // buildSimBackgroundMap()/simBgScale()), so an existing simbg value keeps its meaning. ----
@@ -4311,15 +4312,15 @@ const PARAMS = {
   // because the band-pass removes it before the mean+k·sigma threshold ever sees it. What it does
   // cost is precision — 5.7 -> 7.1 nm median lateral — through the extra shot noise inside the
   // cell. So this tests the FITTER's background handling, not the detector's threshold.
-  simulation_bgCellContrast: { type:'number', id:'simulation_bgCellContrast', label:'Background: cell contrast (×)', min:1, max:20, step:0.5, default:1, int:false },
+  simulation_bgCellContrast: { type:'number', id:'simulation_bgCellContrast', label:'Background: cell contrast (×)', min:1, max:20, step:0.5, default:3, int:false },
   // simulation_bgHazeWeight = strength of the static out-of-focus haze — the labelled structure's
   // own projected density, blurred to simulation_bgHazeWidth — relative to the flat/cell part.
   // 0 = none. Static: it fluctuates only through shot noise.
-  simulation_bgHazeWeight: { type:'number', id:'simulation_bgHazeWeight', label:'Background: out-of-focus haze (weight)', min:0, max:10, step:0.1, default:0, int:false },
+  simulation_bgHazeWeight: { type:'number', id:'simulation_bgHazeWeight', label:'Background: out-of-focus haze (weight)', min:0, max:10, step:0.1, default:1, int:false },
   simulation_bgHazeWidth: { type:'number', id:'simulation_bgHazeWidth', label:'Background: haze blur σ (nm)', min:100, max:5000, step:50, default:800, int:false },
   // simulation_bgDecayFrames = time constant (frames) of the background fading to a 30% floor over
   // the movie, as autofluorescence and the out-of-focus pool bleach. 0 = constant.
-  simulation_bgDecayFrames: { type:'number', id:'simulation_bgDecayFrames', label:'Background: fade time constant (frames)', min:0, max:100000, step:10, default:0, int:false },
+  simulation_bgDecayFrames: { type:'number', id:'simulation_bgDecayFrames', label:'Background: fade time constant (frames)', min:0, max:100000, step:10, default:150, int:false },
   // simulation_realism = min/med/max shorthand for how much physics (and compute) a Simulate movie
   // run spends, written into the ordinary parameters by wirePreset() exactly like the density
   // preset: 'min' is the original model (blink once, constant brightness, flat background) and the
@@ -4336,10 +4337,10 @@ const PARAMS = {
   simulation_hazeRatio: { type:'number', id:'simulation_hazeRatio', label:'Out-of-focus emitters (per in-focus emitter)', min:0, max:10, step:0.1, default:0, int:false },
   // simulation_hazeDepth = how far from focus (nm) that population reaches; capped at the PSF z range.
   simulation_hazeDepth: { type:'number', id:'simulation_hazeDepth', label:'Out-of-focus depth (± nm)', min:300, max:5000, step:50, default:1500, int:false },
-  simulation_realism: { type:'enum', id:'simulation_realism', label:'Realism/compute preset', options:['min','med','max','custom'], default:'min' },
+  simulation_realism: { type:'enum', id:'simulation_realism', label:'Realism/compute preset', options:['min','med','max','custom'], default:'med' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
-  simbg: { type:'number', id:'simbg', label:'Simulation background (photons/px)', min:0, max:500, step:1, default:0, int:false },
+  simbg: { type:'number', id:'simbg', label:'Simulation background (photons/px)', min:0, max:500, step:1, default:10, int:false },
   // simulation_gain = forward-model photons→ADU conversion factor (ADU = offset + photons/gain),
   // the inverse direction of the fit-side `gain`; deliberately a separate param so simulated ground
   // truth and the fit's assumed camera model can be matched or intentionally mismatched for testing
@@ -4409,7 +4410,7 @@ const PARAMS = {
   // are additionally offset from one another, so they reach ~1.5x it; tiltedPlane ramps linearly
   // across x; uniform3D draws uniformly from it. The
   // shell ignores it entirely and uses simulation_structureSize as its radius instead.
-  simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:1000, int:false },
+  simulation_zRange: { type:'number', id:'simulation_zRange', label:'Structure Z range (± nm)', min:0, max:5000, step:10, default:500, int:false },
   // simulation_structureType = which buildStructure() dispatches to: 'filaments_ring' (default,
   // the original 3-sine-filament + 1-ring layout, unchanged), 'nup' (nuclear pore complex, see
   // the "---- NUP structure ----" section below), or one of three geometric objects that sample
@@ -4458,7 +4459,7 @@ const PARAMS = {
   // et al. 2019's own side-view NPC images).
   simulation_nup_membraneType: { type:'enum', id:'simulation_nup_membraneType', label:'Membrane orientation', options:['topdown','sideways'], default:'topdown' },
   // simulation_nup_count = number of NPCs scattered across the simulated FOV's membrane patch.
-  simulation_nup_count: { type:'number', id:'simulation_nup_count', label:'Number of NPCs', min:1, max:500, step:1, default:20, int:true },
+  simulation_nup_count: { type:'number', id:'simulation_nup_count', label:'Number of NPCs', min:1, max:500, step:1, default:100, int:true },
   // simulation_nup_minSpacing = minimum centre-to-centre distance (nm) enforced between NPCs
   // during placement (rejection sampling), so rings don't overlap.
   simulation_nup_minSpacing: { type:'number', id:'simulation_nup_minSpacing', label:'Min. NPC-NPC spacing (nm)', min:0, max:2000, step:10, default:200, int:false },
@@ -26341,8 +26342,8 @@ function wirePreset(presetId, table){
       const same = (el.type==='checkbox'||isText) ? have===want : (have===want || Math.abs(have-want)<1e-9);
       if(!same) $(presetId).value='custom'; }); }
 }
-wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.5}, high:{dens:2} });
-// 'min' is, field for field, the defaults — i.e. the original model, byte-identical for a seed.
+wirePreset('simulation_densityPreset', { low:{dens:0.05}, med:{dens:0.2}, high:{dens:0.5}, veryhigh:{dens:2} });
+// 'med' is, field for field, the defaults; 'min' is the original model (byte-identical for a seed).
 // The two score conventions, as plain parameter values (see PARAMS.validation_preset). The
 // challenge numbers are its own assessment settings: 250 nm lateral / 500 nm axial tolerance,
 // the dimmest 25% of emitter-frames not counted, and a 450 nm border — 4.5 px at a 100 nm pixel,
@@ -27939,7 +27940,10 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21e — The Direct quadrature PSF evaluator is gone, and with
+log(`webSMLM v0.12.8-dev · build 2026-09-21f — Simulation defaults: Realism/compute now
+starts at Medium, Structure Z range at ±500 nm and Number of NPCs at 100. Density presets are
+Low 0.05, Medium 0.2, High 0.5, Very high 2. Score vs truth moved into Simulation settings.
+— and from build 2026-09-21e: The Direct quadrature PSF evaluator is gone, and with
 it the PSF evaluation method setting: every PSF is now built with the chirp-Z transform, which
 matches an ideal Airy disk to the kernel edge. Direct aliased beyond ~1.6 µm and dimmed every
 simulated emitter by ~17-20% on the default kernel. A settings file that still names

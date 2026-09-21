@@ -314,9 +314,14 @@ in a module.
   adds a second blinking population 0.3–2 µm out of focus through the ordinary kernel-stack splat
   (a separate FFT convolution layer was planned and dropped: at the depths where it would pay off
   the PSF is wider than half the frame, which the static haze already covers).
-  **The rule all of this obeys: with every new parameter at its default, a seeded movie is
-  byte-identical to the 2026-09-21b build** (the baseline moved once, deliberately, when camera
-  noise went counter-based — see below; before that it was 2026-09-08b). New random draws
+  **The rule all of this obeys: with the Realism preset on `min` and every other new parameter
+  at its old default, a seeded movie is byte-identical to the 2026-09-21b build** (the baseline
+  moved once, deliberately, when camera noise went counter-based — see below; before that it was
+  2026-09-08b). Since 2026-09-21f the shipped defaults are the `med` preset's values
+  (`simulation_realism:'med'`, so bleach 0.2, CV 0.5, `simbg` 10, cell contrast 3, haze 1, fade
+  150), `simulation_zRange` 500 and `simulation_nup_count` 100 — the byte-identity baseline is
+  therefore NOT the out-of-the-box state any more; select Minimal (and zRange 1000 / 20 NPCs where
+  relevant) to reproduce it. The density preset is `low`/`med`/`high`/`veryhigh` = 0.05/0.2/0.5/2. New random draws
   therefore live ONLY in branches the defaults never enter (the original single-blink loop is kept
   verbatim beside the new one for exactly this reason), and background/haze each draw from their
   OWN stream derived from the seed, after all emitter draws — so switching them on never moves an
@@ -480,9 +485,9 @@ in a module.
   `scoreTruthCore()` stays global-free: frame size, the Run's detection border and the Run's own
   frame range (`firstIdx`/`lastIdx`/`stopped`, so a restricted or stopped Run is not scored as
   missing everything it never looked at) come in through `truthScoreConfig(cfg, det, run)`, the
-  one helper both the button and `analyze()` use. Its controls have their own sidebar section,
-  `validationBox` ("Score vs truth", right after Drift correction & precision), since upstream
-  v0.12.7 folded the Localization precision box they used to live in into the Drift box.
+  one helper both the button and `analyze()` use. Its controls live in `validationBox` ("Score vs
+  truth"), a `details.subsim` inside Simulation settings, last after PSF parameters — it only works
+  on simulated data, so it sits with the simulator.
 - **detect** — per-frame band-pass, one of three filters selectable via `#detFilter`: à trous
   B-spline **wavelet** (default), **DoG** (both thresholded by local maxima above `mean+k·σ`), or a
   **uniform box filter** (difference of two box averages, thresholded by a plain intensity value plus

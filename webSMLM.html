@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21a; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21b; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -2796,7 +2796,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -5521,37 +5521,79 @@ function gauss(rng=Math.random){ if(_g!==null){const g=_g;_g=null;return g;}
 // per-draw cost scales with l, too slow for a bright simulated pixel).
 function poisson(l, rng=Math.random){ if(l>60) return Math.max(0,Math.round(l+Math.sqrt(l)*gauss(rng)));
   const L=Math.exp(-l); let k=0,p=1; do{k++;p*=rng();}while(p>L); return k-1; }
-// Gamma(shape=k, scale=1) sample, Marsaglia-Tsang (2000) — the EMCCD electron-multiplying
-// register's output for k input electrons. O(1) in k, unlike summing k exponentials (a bright
-// pixel carries hundreds of electrons). Only called on the EMCCD path, and only for k>=1, which
-// is the regime MT's own rejection loop is written for. Draws from the SAME `rng`/gauss() stream
-// as every other per-frame draw, so a seeded movie stays reproducible.
-function gammaSample(k, rng=Math.random){
-  const d=k-1/3, c=1/Math.sqrt(9*d);
-  for(;;){
-    const x=gauss(rng), t=1+c*x;
-    if(t<=0) continue;
-    const v=t*t*t, u=rng();
-    if(u<1-0.0331*x*x*x*x) return d*v;
-    if(Math.log(u)<0.5*x*x+d*(1-v+Math.log(v))) return d*v;
-  }
-}
-
-// Derives a per-FRAME-independent 32-bit seed from generateSynthetic()'s own simulation_seed and
-// a frame index, via a splitmix32-style bit mix — NOT cryptographic, just decorrelated enough
-// that adjacent frame indices don't produce visibly-related noise. This is what lets the camera
-// -noise step (see applySimCameraNoise() below) run on ANY frame, in ANY order — worker-parallel,
-// batched across a pool, or the single-threaded fallback — and still reproduce byte-identical
-// output for a given simulation_seed: each frame draws from its OWN independent mulberry32()
-// stream instead of continuing one shared sequential stream (which only reproduces when frames
-// are drawn strictly in ascending order, impossible to guarantee once frames dispatch to a
-// worker pool). Only used when simulation_seed>0 — see PARAMS.simulation_seed and
-// generateSynthetic()'s own seeding comment.
+// A splitmix32-style bit mix of a seed and an index — NOT cryptographic, just decorrelated
+// enough that adjacent inputs give unrelated outputs. simNoiseSeed() below uses it to derive the
+// camera-noise seed from simulation_seed, so the noise stream is not the same numbers as the
+// emitter/event stream mulberry32(simulation_seed) draws.
 function simFrameSeed(baseSeed, fi){
   let h=((baseSeed>>>0)+0x9e3779b9+Math.imul(fi>>>0,0x85ebca6b))>>>0;
   h=Math.imul(h^(h>>>16), 0x45d9f3b)>>>0;
   h=Math.imul(h^(h>>>16), 0x45d9f3b)>>>0;
   return (h^(h>>>16))>>>0;
+}
+
+// ---- Camera-noise RNG: counter-based, shared bit-for-bit by the CPU and the GPU ----
+// Every pixel of every frame draws from its OWN stream, addressed by (seed, frame, pixel, counter)
+// and hashed with pcg4d (Jarzynski & Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020).
+// Why counter-based: the old per-frame mulberry32 stream ran pixel after pixel, and Poisson
+// inversion, a rejecting Box-Muller and a Gamma rejection loop all consume a VARIABLE number of
+// draws — so pixel i's numbers depended on every earlier pixel and no GPU thread could reproduce
+// them. Here a pixel's draws depend on nothing but its own address, so a worker, a batch or a GPU
+// thread all produce the same pixel. pcg4d is pure u32 multiply/add/xor/shift, which Math.imul and
+// WGSL's u32 arithmetic compute identically — the uniforms below are the same bits on both, and
+// uniform = ((x>>>9)+0.5)·2⁻²³ is exact in f32 (24 significant bits), so they stay identical after
+// conversion too. What can still differ is the f32 vs f64 transcendental that follows (log, exp,
+// cos): a pixel whose Poisson draw sits within ~1e-7 of a boundary may land one count apart.
+// The transforms below are written ONCE here and mirrored line for line in WGSL_SIM_NOISE
+// (MODULE: gpu); change one, change both.
+function pcg4dInto(a,b,c,d,out){
+  a=(Math.imul(a,1664525)+1013904223)>>>0; b=(Math.imul(b,1664525)+1013904223)>>>0;
+  c=(Math.imul(c,1664525)+1013904223)>>>0; d=(Math.imul(d,1664525)+1013904223)>>>0;
+  a=(a+Math.imul(b,d))>>>0; b=(b+Math.imul(c,a))>>>0; c=(c+Math.imul(a,b))>>>0; d=(d+Math.imul(b,c))>>>0;
+  a=(a^(a>>>16))>>>0; b=(b^(b>>>16))>>>0; c=(c^(c>>>16))>>>0; d=(d^(d>>>16))>>>0;
+  a=(a+Math.imul(b,d))>>>0; b=(b+Math.imul(c,a))>>>0; c=(c+Math.imul(a,b))>>>0; d=(d+Math.imul(b,c))>>>0;
+  out[0]=a; out[1]=b; out[2]=c; out[3]=d;
+}
+// A ()=>(0,1) uniform source for one frame; u.pixel(p) rewinds it to pixel p's own stream.
+function makeSimNoiseRng(seed, frame){
+  const buf=new Uint32Array(4); let pix=0, ctr=0, k=4;
+  const u=()=>{
+    if(k===4){ pcg4dInto(seed>>>0, frame>>>0, pix, ctr, buf); ctr=(ctr+1)>>>0; k=0; }
+    return ((buf[k++]>>>9)+0.5)*1.1920928955078125e-7;
+  };
+  u.pixel=p=>{ pix=p>>>0; ctr=0; k=4; };
+  return u;
+}
+// Plain Box-Muller (no rejection, no cached spare): exactly two uniforms per normal, in this order.
+function simNoiseGauss(u){ const r=Math.sqrt(-2*Math.log(u())); return r*Math.cos(6.283185307179586*u()); }
+// Same model as poisson() above: inversion up to l=60, normal approximation beyond. The iteration
+// cap is unreachable in practice (P(k>1000 | l<=60) is astronomically small) and exists so the GPU
+// loop is provably bounded; the CPU carries the same cap so both stop at the same count.
+function simNoisePoisson(l, u){
+  if(l>60) return Math.max(0, Math.floor(l+Math.sqrt(l)*simNoiseGauss(u)+0.5));
+  if(!(l>0)) return 0;
+  const L=Math.exp(-l); let k=0, p=1;
+  do{ k++; p*=u(); }while(p>L && k<1000);
+  return k-1;
+}
+// Gamma(shape k>=1, scale 1), Marsaglia-Tsang (2000) — the EMCCD gain register's output for k
+// input electrons. Bounded loop for the same reason as above.
+function simNoiseGamma(k, u){
+  const d=k-1/3, c=1/Math.sqrt(9*d);
+  for(let it=0; it<1000; it++){
+    const x=simNoiseGauss(u), t=1+c*x;
+    if(t<=0) continue;
+    const v=t*t*t, w=u();
+    if(w<1-0.0331*x*x*x*x) return d*v;
+    if(Math.log(w)<0.5*x*x+d*(1-v+Math.log(v))) return d*v;
+  }
+  return d;
+}
+// The run's noise seed: derived from simulation_seed when one is set (so a seeded movie is
+// reproducible), a fresh random u32 otherwise (so an unseeded run can still go through the GPU,
+// which needs SOME integer seed — Math.random has no GPU counterpart).
+function simNoiseSeed(simSeed){
+  return simSeed>0 ? simFrameSeed(simSeed, 0x4e4f4953) : ((Math.random()*4294967296)>>>0);
 }
 
 // Candidate emitter-site positions for the synthetic sample: three sine-wave
@@ -5937,7 +5979,8 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
       zTotal++;
       let zi=zKernelStack.focusIndex + Math.round(ez/zKernelStack.zStepNm);
       if(zi<0){ zi=0; zClamped++; } else if(zi>=zKernelStack.nz){ zi=zKernelStack.nz-1; zClamped++; }
-      const kernelObj={kernel:zKernelStack.norm[zi], nx:zKernelStack.nx, ny:zKernelStack.ny, oversample:zKernelStack.oversample};
+      const pl=zKernelStack.planes[zi];   // sparse: only planes some emitter uses (prepareSimKernelPlanes())
+      const kernelObj={kernel:pl.kernel, sum:pl.sum, nx:zKernelStack.nx, ny:zKernelStack.ny, oversample:zKernelStack.oversample};
       splatZernikeEmitter(img, w, h, mx, my, photPerFrame*ov, kernelObj, zKernelStack.camRad, zKernelStack.interpMode);
     }
   } else if(zKernel){
@@ -5955,6 +5998,24 @@ function splatSimFrame(w, h, bg, evList, drx, dry, photPerFrame, sigma, rad, zKe
   }
   return {img, zClamped, zTotal};
 }
+// Normalizes and block-sums (simKernelPlane()) ONLY the kernel planes some emitter will actually
+// be splatted from, into a sparse array indexed exactly like the full stack — the same nearest-plane
+// rule splatSimFrame() applies, so every lookup it makes lands on a filled entry. The full stack is
+// 401 planes at the defaults (~186 MB as Float64) while a movie typically touches a fraction of
+// them, and the whole array is structured-cloned into every sim worker; preparing all of them used
+// to hand each of up to 12 workers the full 186 MB.
+function prepareSimKernelPlanes(zks, slices, frameEvents){
+  const used=new Set();
+  for(const ev of frameEvents) for(const e of ev){
+    let zi=zks.focusIndex+Math.round(e[2]/zks.zStepNm);
+    if(zi<0) zi=0; else if(zi>=zks.nz) zi=zks.nz-1;
+    used.add(zi);
+  }
+  const planes=new Array(zks.nz);
+  for(const zi of used) planes[zi]=simKernelPlane(normalizePsfPlane(slices[zi]).norm, zks.nx, zks.ny, zks.oversample, zks.interpMode);
+  zks.planes=planes;
+  return used.size;
+}
 // The simulated sensor's own model as one bundle, so the three frame-producing paths (serial,
 // worker pool, calibration stack) each carry one object instead of five more positional
 // parameters. type 'scmos' (the default) leaves applySimCameraNoise() on its original
@@ -5965,16 +6026,13 @@ function readSimCameraModel(){
            bitDepth:paramValue('simulation_bitDepth') };
 }
 // Shot noise (Poisson) + read noise (Gaussian, electrons) + the fixed per-pixel camera offset,
-// converting a frame's emitter-photon-expectation image to ADU, in place — same physical order
-// (noise combines in the electron domain, THEN gain) as generateCalibrationStack()'s own copy of
-// this formula. `rng` must be a stream local to (i.e. never shared/continued across) this ONE
-// frame — gauss()'s Box-Muller cache (_g) is reset first so a spare value drawn for a
-// differently-seeded previous frame can never leak into this one; that's what makes the
-// worker-parallel path (simulateFramesParallel) reproduce the exact same pixels as the serial
-// fallback for a given simulation_seed, regardless of which frame either one happens to process
-// first.
-function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng, cam){
-  _g=null;
+// converting a frame's emitter-photon-expectation image to ADU, in place — noise combines in the
+// electron domain, THEN gain. Each pixel draws from its own counter stream (makeSimNoiseRng(),
+// addressed by noiseSeed, frame index and pixel index), so the result does not depend on which
+// worker, batch or GPU thread handles the frame, or in what order. WGSL_SIM_NOISE (MODULE: gpu)
+// is the same function on the device; keep the two in step.
+function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, noiseSeed, frame, cam){
+  const u=makeSimNoiseRng(noiseSeed, frame);
   // EMCCD: photons -> photoelectrons (QE) + clock-induced charge, Poisson; the gain register as
   // Gamma(shape=electrons, scale=1) (see PARAMS.simulation_cameraType for why scale 1); read
   // noise referred back through the register, which is the whole point of an EMCCD; then integer
@@ -5983,15 +6041,18 @@ function applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng, cam){
   if(cam && cam.type==='emccd'){
     const readE=readNoiseE/Math.max(1,cam.emGain), maxAdu=Math.pow(2,cam.bitDepth)-1;
     for(let i=0;i<img.length;i++){
-      const ne=poisson(cam.qe*img[i]+cam.cic, rng);
-      const out=ne>0 ? gammaSample(ne, rng) : 0;
-      const adu=Math.round(offsetMap[i]+(out+readE*gauss(rng))/simGain);
+      u.pixel(i);
+      const ne=simNoisePoisson(cam.qe*img[i]+cam.cic, u);
+      const out=ne>0 ? simNoiseGamma(ne, u) : 0;
+      const adu=Math.floor(offsetMap[i]+(out+readE*simNoiseGauss(u))/simGain+0.5);
       img[i]=adu<0?0:(adu>maxAdu?maxAdu:adu);
     }
     return;
   }
   for(let i=0;i<img.length;i++){
-    const adu=offsetMap[i]+(poisson(img[i], rng)+readNoiseE*gauss(rng))/simGain;
+    u.pixel(i);
+    const ne=simNoisePoisson(img[i], u);
+    const adu=offsetMap[i]+(ne+readNoiseE*simNoiseGauss(u))/simGain;
     img[i]=adu<0?0:adu;
   }
 }
@@ -6005,14 +6066,10 @@ function splatBeadsFrame(w, h, bg, beadXY, photPerFrame, kernelObj, camRad, inte
   return img;
 }
 // Single-threaded fallback for the movie's per-frame splat+noise stage — used when no worker
-// pool is available. Loops fi in order but, unlike the pre-parallelization version, draws each
-// frame's camera noise from its OWN simFrameSeed(baseSeed,fi)-derived stream rather than
-// continuing one shared sequential rng — the same convention simulateFramesParallel() below
-// uses, so a given simulation_seed reproduces byte-identical output whether or not a worker pool
-// happened to be available. baseSeed===0 keeps the original unseeded behaviour (each frame just
-// draws from Math.random()).
+// pool is available. The same splatSimFrame()/applySimCameraNoise() pair the workers run, and the
+// noise is addressed by (noiseSeed, frame, pixel), so this produces the same pixels as the pool.
 async function simulateFramesSerial(ctx){
-  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,onProgress}=ctx;
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
   const driftAt=fi=> n>1 ? fi/(n-1)*driftPx : 0;
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, lastYield=performance.now();
@@ -6021,27 +6078,22 @@ async function simulateFramesSerial(ctx){
     const frameBg = bgMap ? {map:bgMap, scale:simBgScale(fi,bgDecay)} : bg;   // flat scalar unless a field was built
     const {img,zClamped,zTotal}=splatSimFrame(w,h,frameBg,frameEvents[fi],drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
     zClampedCount+=zClamped; zTotalCount+=zTotal;
-    const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
-    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, rng, cam);
+    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, noiseSeed, fi, cam);
     frames[fi]=img;
     if(performance.now()-lastYield>50){ onProgress(100*fi/n); await tick(); lastYield=performance.now(); }
   }
   return {frames, zClampedCount, zTotalCount};
 }
 // Single-threaded fallback for generateCalibrationStack()'s own per-z-plane splat+noise stage.
-// Unlike generateSynthetic()'s frames, calibration z-planes were never seeded/reproducible to
-// begin with (the original serial loop always called poisson()/gauss() with the default
-// Math.random()) — so, unlike simulateFramesSerial()'s simFrameSeed() scheme, there's no
-// reproducibility contract to preserve here; each plane just draws from Math.random() same as
-// before, whether this fallback or simulateCalibFramesParallel() below ends up running it.
+// Calibration stacks have no seed control; noiseSeed is a fresh random u32 per stack.
 async function simulateCalibFramesSerial(ctx){
-  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,cam,onProgress}=ctx;
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,planes,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
   const frames=new Array(nz);
   let lastYield=performance.now();
   for(let z=0; z<nz; z++){
-    const kernelObj={kernel:norm[z], nx:kernelNx, ny:kernelNy, oversample};
+    const kernelObj={kernel:planes[z].kernel, sum:planes[z].sum, nx:kernelNx, ny:kernelNy, oversample};
     const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
-    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random, cam);
+    applySimCameraNoise(img, offsetMap, simGain, readNoiseE, noiseSeed, z, cam);
     frames[z]=img;
     if(performance.now()-lastYield>50){ onProgress(100*z/nz); await tick(); lastYield=performance.now(); }
   }
@@ -6054,8 +6106,8 @@ async function simulateCalibFramesSerial(ctx){
 // its batch entry instead of a one-time simInit — beadXY/offsetMap/etc are still shared and DO go
 // through calibInit, sent once per worker before any batch).
 async function simulateCalibFramesParallel(pool, ctx){
-  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,norm,offsetMap,simGain,readNoiseE,cam,onProgress}=ctx;
-  pool.forEach(wk=>wk.postMessage({calibInit:true,w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx:kernelNx,ny:kernelNy,oversample,offsetMap,simGain,readNoiseE,cam}));
+  const {w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,kernelNx,kernelNy,oversample,planes,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({calibInit:true,w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx:kernelNx,ny:kernelNy,oversample,offsetMap,simGain,readNoiseE,cam,noiseSeed}));
   const frames=new Array(nz);
   let done=0, err=null;
   const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(nz/(pool.length*paramValue('workerBatchTarget')))));
@@ -6066,7 +6118,7 @@ async function simulateCalibFramesParallel(pool, ctx){
       if(err||next>=nz){ finish(); return; }
       const s=next, e=Math.min(nz,s+BATCH); next=e;
       inflight++;
-      const batch=[]; for(let z=s; z<e; z++) batch.push({z, kernel:norm[z]});
+      const batch=[]; for(let z=s; z<e; z++) batch.push({z, kernel:planes[z].kernel, sum:planes[z].sum});
       wk.onmessage=ev=>{
         const d=ev.data, N=w*h;
         for(let i=0;i<d.count;i++) frames[s+i]=d.buf.subarray(i*N,(i+1)*N);
@@ -6148,24 +6200,19 @@ async function generateSynthetic(){
   // Both stay null when the Gaussian model (default) is selected, leaving the existing fixed-sigma
   // render loop below untouched for that case — a Gaussian PSF has no z-dependent width to vary.
   const psfModel=paramValue('simulation_psfModel');
-  let zKernel=null, zKernelStack=null;
+  let zKernel=null, zKernelStack=null, kernelStack=null;
   // Out-of-focus emitters need a z-dependent PSF even in a 2D simulation, so they force the full
   // kernel stack too; the in-focus emitters then simply all use its focal plane (their z is 0).
   const hazeRatio=paramValue('simulation_hazeRatio'), hazeDepth=paramValue('simulation_hazeDepth');
   if(psfModel==='zernike' && (is3d || hazeRatio>0)){
     const cfg=readPsfConfigFromUI();
-    const kstack=await getOrBuildPsfKernelStack(cfg);
-    const norm=new Array(kstack.nz);
-    for(let z=0; z<kstack.nz; z++){
-      const slice=kstack.slices[z]; let ksum=0; for(let i=0;i<slice.length;i++) ksum+=slice[i];
-      const n=ksum>0 ? new Float64Array(slice.length) : slice;
-      if(ksum>0) for(let i=0;i<slice.length;i++) n[i]=slice[i]/ksum;
-      norm[z]=n;
-    }
-    // zUsableNm rides along purely so generateSynthetic() can warn below; splatSimFrame() never
-    // reads it. It is a plain number, so the whole object stays structured-clonable for the
+    kernelStack=await getOrBuildPsfKernelStack(cfg);
+    const kstack=kernelStack;
+    // `planes` is filled by prepareSimKernelPlanes() once the events are known (only the planes
+    // they use). zUsableNm rides along purely so generateSynthetic() can warn below; splatSimFrame()
+    // never reads it. It is a plain number, so the whole object stays structured-clonable for the
     // simInit postMessage to the sim worker pool.
-    zKernelStack={ norm, nx:kstack.nx, ny:kstack.ny, oversample:cfg.oversample,
+    zKernelStack={ planes:null, nx:kstack.nx, ny:kstack.ny, oversample:cfg.oversample,
                    camRad:Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample)),
                    interpMode:paramValue('simulation_psfInterp'), focusIndex:kstack.focusIndex,
                    zStepNm:kstack.zStepNm, nz:kstack.nz, zUsableNm:kstack.zUsableNm };
@@ -6175,13 +6222,11 @@ async function generateSynthetic(){
   } else if(psfModel==='zernike'){
     const cfg=readPsfConfigForSimulation();
     const stack=await getOrBuildPsfKernelStack(cfg);
-    const slice=stack.slices[0];
-    let ksum=0; for(let i=0;i<slice.length;i++) ksum+=slice[i];
-    const norm=ksum>0 ? new Float64Array(slice.length) : slice;
-    if(ksum>0) for(let i=0;i<slice.length;i++) norm[i]=slice[i]/ksum;
-    zKernel={ kernel:norm, nx:stack.nx, ny:stack.ny, oversample:cfg.oversample,
-              camRad:Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample)),
-              interpMode:paramValue('simulation_psfInterp') };
+    const {norm, ksum}=normalizePsfPlane(stack.slices[0]);
+    const interpMode=paramValue('simulation_psfInterp');
+    zKernel={ ...simKernelPlane(norm, stack.nx, stack.ny, cfg.oversample, interpMode),
+              nx:stack.nx, ny:stack.ny, oversample:cfg.oversample,
+              camRad:Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample)), interpMode };
     log(`Simulate movie: Zernike PSF kernel ready (${stack.nx}×${stack.ny}px oversampled, `+
         `camRad=${zKernel.camRad}px, interp=${zKernel.interpMode}, kernel sum=${ksum.toExponential(3)}).`);
   } else if(is3d){
@@ -6300,6 +6345,10 @@ async function generateSynthetic(){
   } else if(hazeRatio>0)
     log(`Out-of-focus emitters need the Zernike-aberrated PSF model — a fixed-σ Gaussian looks the same at every depth, `+
         `so they would just be extra in-focus emitters. Skipped; the static haze still applies.`);
+  if(zKernelStack){
+    const nUsed=prepareSimKernelPlanes(zKernelStack, kernelStack.slices, frameEvents);
+    log(`Simulate movie: ${nUsed} of ${zKernelStack.nz} PSF z-planes are used by an emitter — only those are prepared and sent to the workers/GPU.`);
+  }
   groundTruthEvents = events.map(e=>{
     const s=Math.max(e.tStart,0), t=Math.min(e.tEnd,n);
     // rate = this blink's photons per FULL frame of ON time; a frame it only partly overlaps gets
@@ -6343,7 +6392,7 @@ async function generateSynthetic(){
   // there is exactly one implementation of the actual per-frame math to keep in sync, mirroring
   // the FTM module's own "both paths call the same shared function" convention.
   const simCtx={w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,
-                offsetMap,simGain,readNoiseE,cam,baseSeed:simSeed,onProgress:setProg};
+                offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(simSeed),onProgress:setProg};
   const simPool=await getSimWorkerPool();
   const {frames,zClampedCount,zTotalCount} = simPool && simPool.length>1
     ? await simulateFramesParallel(simPool, simCtx)
@@ -6434,13 +6483,8 @@ async function generateCalibrationStack(){
   // readPsfConfigForSimulation()'s 2D path already uses, so a bead's TOTAL photon count per
   // frame stays exactly photPerFrame regardless of distance from focus — physically the PSF
   // just spreads out (dims at the peak) with defocus, it doesn't lose energy.
-  const norm=new Array(nz);
-  for(let z=0;z<nz;z++){
-    const slice=kstack.slices[z]; let ksum=0; for(let i=0;i<slice.length;i++) ksum+=slice[i];
-    const n=ksum>0 ? new Float64Array(slice.length) : slice;
-    if(ksum>0) for(let i=0;i<slice.length;i++) n[i]=slice[i]/ksum;
-    norm[z]=n;
-  }
+  const planes=new Array(nz);
+  for(let z=0;z<nz;z++) planes[z]=simKernelPlane(normalizePsfPlane(kstack.slices[z]).norm, kstack.nx, kstack.ny, cfg.oversample, interpMode);
   const camRad=Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample));
 
   // A small grid of ALWAYS-ON fixed beads (unlike generateSynthetic()'s own blinking Poisson
@@ -6464,10 +6508,10 @@ async function generateCalibrationStack(){
   // generateSynthetic() uses (simulateCalibFramesParallel(), MODULE: workers), each worker
   // computing its own batch's beads through its own kernel plane; falls back to
   // simulateCalibFramesSerial() otherwise. See that function's own comment for why this path has
-  // no seeded-reproducibility scheme to preserve (there never was one here).
+  // no seed control (its noise seed is a fresh random u32 per stack).
   const calibCtx={w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,
-                  kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,norm,
-                  offsetMap,simGain,readNoiseE,cam,onProgress:setProg};
+                  kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,planes,
+                  offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(0),onProgress:setProg};
   const calibPool=await getSimWorkerPool();
   const {frames} = calibPool && calibPool.length>1
     ? await simulateCalibFramesParallel(calibPool, calibCtx)
@@ -7101,12 +7145,12 @@ async function getOrBuildPsfKernelStack(cfg){
    readPsfConfigForSimulation() forces cfg.nz=1, one fixed emitter depth for the whole movie; see
    §10 of the implementation doc for exactly how to extend this to per-emitter 3D), then EVERY
    emitter placement resamples that single cached, photon-normalized kernel — no per-emitter physics
-   re-evaluation. sampleKernelAt() interpolates the kernel at a continuous (fractional) index;
-   splatZernikeEmitter() calls it oversample^2 times per output camera pixel and SUMS them (each
-   kernel entry is a probability mass, not a density, so downsampling must conserve total mass by
-   summation, not averaging — see that function's own comment), which is the literal "interpolate
-   for sub-pixel placement, then box-downsample" pipeline both docs describe — the interpolation
-   mode only controls how each individual sub-cell sample is read off the oversampled grid. */
+   re-evaluation. The pipeline both docs describe is "interpolate for sub-pixel placement, then
+   box-downsample" — sample the kernel at oversample^2 sub-cell positions inside each camera pixel
+   and SUM them (each kernel entry is a probability mass, not a density, so downsampling must
+   conserve total mass by summation, not averaging). splatZernikeEmitter() computes exactly that,
+   in the reordered form buildSummedKernel() explains: box-sum first, once per plane, then one
+   interpolation per camera pixel. */
 // Reads the same simulation_psf* UI fields buildPsfKernelStack() previewing consumes
 // (readPsfConfigFromUI()), but forces a single z-plane: an actual movie applies one fixed emitter
 // depth (simulation_psfDepth) to every emitter, so there is nothing to sweep — this is the 2D
@@ -7117,44 +7161,64 @@ function readPsfConfigForSimulation(){
   cfg.nz=1;
   return cfg;
 }
-// Samples kernel[iy*nx+ix] at a continuous (fractional) coordinate (x,y), where integer (x,y)
-// lands exactly on grid samples. Out-of-array reads are treated as 0 — physically correct here,
-// since halfWidthPx is chosen to already cover the PSF's real extent (docs/
-// VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5), so genuine signal never reaches the array edge.
-function psfKernelAt(kernel, nx, ny, ix, iy){
-  if(ix<0||iy<0||ix>=nx||iy>=ny) return 0;
-  return kernel[iy*nx+ix];
-}
-function sampleKernelNearest(kernel, nx, ny, x, y){
-  return psfKernelAt(kernel, nx, ny, Math.round(x), Math.round(y));
-}
-function sampleKernelBilinear(kernel, nx, ny, x, y){
-  const x0=Math.floor(x), y0=Math.floor(y), fx=x-x0, fy=y-y0;
-  const v00=psfKernelAt(kernel,nx,ny,x0,y0),   v10=psfKernelAt(kernel,nx,ny,x0+1,y0);
-  const v01=psfKernelAt(kernel,nx,ny,x0,y0+1), v11=psfKernelAt(kernel,nx,ny,x0+1,y0+1);
-  return (v00*(1-fx)+v10*fx)*(1-fy) + (v01*(1-fx)+v11*fx)*fy;
-}
 // Catmull-Rom cubic convolution kernel (a=-0.5, the standard "bicubic" choice used by e.g. Photoshop
 // /most image-resize implementations) — 1D weights for the 4 taps at offsets -1,0,1,2 from x0=floor(t).
 function catmullRomWeights(f){
   const f2=f*f, f3=f2*f;
   return [ -0.5*f3+f2-0.5*f, 1.5*f3-2.5*f2+1, -1.5*f3+2*f2+0.5*f, 0.5*f3-0.5*f2 ];
 }
-// Separable bicubic: 4x4 taps, 1D Catmull-Rom weights applied along x then y.
-function sampleKernelBicubic(kernel, nx, ny, x, y){
-  const x0=Math.floor(x), y0=Math.floor(y), wx=catmullRomWeights(x-x0), wy=catmullRomWeights(y-y0);
-  let acc=0;
-  for(let j=-1;j<=2;j++){
-    let row=0;
-    for(let i=-1;i<=2;i++) row+=wx[i+1]*psfKernelAt(kernel,nx,ny,x0+i,y0+j);
-    acc+=wy[j+1]*row;
+// The oversample x oversample block sums of one photon-normalized kernel plane:
+//   B[a][b] = sum over sy,sx in [0,os) of K[a+sy][b+sx],   K = 0 outside the array.
+// Why this is all a camera pixel needs. The splat samples the kernel at the os^2 sub-cell centres
+// of a camera pixel, t = t0 + (sx,sy) with integer sx,sy — so every sample sits at the SAME
+// fraction (fx,fy) between kernel grid points and uses the same interpolation weights w. Summing
+// over the sub-cells:
+//   sum_{sy,sx} sum_{j,i} w_j(fy) w_i(fx) K[y0+sy+j][x0+sx+i]  =  sum_{j,i} w_j(fy) w_i(fx) B[y0+j][x0+i]
+// — the two sums just swap order. One interpolation of B per camera pixel therefore replaces os^2
+// interpolations of K: 16 reads instead of 256 for cubic at the default oversample 4, with the
+// same result up to floating-point rounding order (measured: see tests/gpu/test-sim-gpu.mjs).
+// It holds for nearest and linear too (same argument, 1 and 4 taps).
+// Out-of-array kernel reads count as 0 — physically correct, since halfWidthPx is chosen to cover
+// the PSF's real extent (docs/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §5), so genuine signal never
+// reaches the edge. B keeps that: it spans a in [-(os-1), ny-1] (every block that overlaps K at
+// all), stored with offset off=os-1; splatZernikeEmitter() reads anything outside it as 0.
+// Float32 on purpose: it is what the GPU holds too, so CPU and GPU interpolate the same numbers,
+// and it halves what the sim workers are sent. The 1e-7 relative rounding is far below any
+// photon count's Poisson noise.
+function buildSummedKernel(kernel, nx, ny, os){
+  const off=os-1, bw=nx+off, bh=ny+off;
+  const H=new Float64Array(bw*ny);                       // horizontal block sums, one row per kernel row
+  for(let y=0;y<ny;y++){
+    const kr=y*nx, hr=y*bw;
+    for(let bi=0; bi<bw; bi++){
+      const b=bi-off, x0=b<0?0:b, x1=Math.min(nx-1, b+off);
+      let acc=0; for(let x=x0; x<=x1; x++) acc+=kernel[kr+x];
+      H[hr+bi]=acc;
+    }
   }
-  return acc;
+  const B=new Float32Array(bw*bh);
+  for(let ai=0; ai<bh; ai++){
+    const a=ai-off, y0=a<0?0:a, y1=Math.min(ny-1, a+off);
+    for(let bi=0; bi<bw; bi++){
+      let acc=0; for(let y=y0; y<=y1; y++) acc+=H[y*bw+bi];
+      B[ai*bw+bi]=acc;
+    }
+  }
+  return {B, bw, bh, off};
 }
-function sampleKernelAt(mode, kernel, nx, ny, x, y){
-  if(mode==='nearest') return sampleKernelNearest(kernel,nx,ny,x,y);
-  if(mode==='cubic')   return sampleKernelBicubic(kernel,nx,ny,x,y);
-  return sampleKernelBilinear(kernel,nx,ny,x,y);   // 'linear' (default)
+// One plane ready for splatting: its block sums, plus the normalized kernel itself only for the
+// 'fft' placement mode (which shifts the raw kernel per emitter and so needs it; every other mode
+// reads only the sums — sending both would double what each sim worker receives).
+function simKernelPlane(norm, nx, ny, os, interpMode){
+  return { sum: buildSummedKernel(norm, nx, ny, os), kernel: interpMode==='fft' ? norm : null };
+}
+// Photon-normalizes one PSF plane to sum 1 (a probability mass per oversampled cell).
+function normalizePsfPlane(slice){
+  let ksum=0; for(let i=0;i<slice.length;i++) ksum+=slice[i];
+  if(!(ksum>0)) return {norm:slice, ksum};
+  const n=new Float64Array(slice.length);
+  for(let i=0;i<slice.length;i++) n[i]=slice[i]/ksum;
+  return {norm:n, ksum};
 }
 function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
 // FFT phase-shift placement (opt-in 'fft' mode, kept for comparison against 'cubic' — see
@@ -7163,7 +7227,7 @@ function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
 // kernel tile by a continuous (shiftX,shiftY), in kernel-grid units, via the Fourier shift theorem —
 // reuses fft2d() (MODULE: locprecision) on a zero-padded square buffer. Padding to >=2x the tile's
 // own size keeps the kernel's own near-zero edge energy (genuine PSF signal never reaches the
-// array edge, see psfKernelAt()'s comment) from wrapping around and contaminating itself.
+// array edge, see buildSummedKernel()'s comment) from wrapping around and contaminating itself.
 function fftShiftKernelTile(kernel, nx, ny, shiftX, shiftY){
   const N=nextPow2(2*Math.max(nx,ny));
   const re=new Float64Array(N*N), im=new Float64Array(N*N);
@@ -7173,7 +7237,7 @@ function fftShiftKernelTile(kernel, nx, ny, shiftX, shiftY){
   // a discrete signal so g(i)=f(i+shift) multiplies its spectrum by exp(+2*pi*i*k*shift/N), using
   // the WRAPPED (fftfreq-style, k>=N/2 -> k-N) frequency index so a non-integer shift keeps the
   // result real (conjugate-symmetric input times conjugate-symmetric phase). Sign verified against
-  // sampleKernelBilinear() at a known sub-pixel offset before shipping.
+  // bilinear interpolation at a known sub-pixel offset before shipping.
   const half=N/2;
   for(let ky=0; ky<N; ky++){
     const kyy = ky<half ? ky : ky-N;
@@ -7191,37 +7255,6 @@ function fftShiftKernelTile(kernel, nx, ny, shiftX, shiftY){
   for(let y=0;y<ny;y++){ const so=y*N, doo=y*nx; for(let x=0;x<nx;x++) out[doo+x]=re[so+x]*norm; }
   return out;
 }
-// FFT-mode counterpart to the main splatZernikeEmitter() loop below. Every (dx,sx)/(dy,sy) sub-cell
-// tap in the whole splat samples the underlying continuous kernel at positions that differ only by
-// EXACT INTEGER steps from one shared reference position — so unlike the point-sampled interpolation
-// modes (one interpolated lookup per tap), this needs only ONE Fourier shift per emitter (aligning
-// that shared fractional offset onto the integer grid), after which every tap is a plain integer
-// array lookup. Same "sum not average" photon-conservation rule as splatZernikeEmitter() itself.
-function splatZernikeEmitterFFT(img, w, h, mx, my, photons, kernelObj, camRad){
-  const {kernel, nx, ny, oversample}=kernelObj;
-  const kcx=(nx-1)/2, kcy=(ny-1)/2;
-  const X0=Math.round(mx), Y0=Math.round(my);
-  const refX=kcx+(X0-mx-0.5)*oversample+0.5, refY=kcy+(Y0-my-0.5)*oversample+0.5;
-  const shiftX=refX-Math.round(refX), shiftY=refY-Math.round(refY);
-  const shifted=fftShiftKernelTile(kernel, nx, ny, shiftX, shiftY);
-  for(let dy=-camRad; dy<=camRad; dy++){
-    const Y=Y0+dy; if(Y<0||Y>=h) continue;
-    const baseY=kcy+(Y-my-0.5)*oversample;
-    for(let dx=-camRad; dx<=camRad; dx++){
-      const X=X0+dx; if(X<0||X>=w) continue;
-      const baseX=kcx+(X-mx-0.5)*oversample;
-      let sum=0;
-      for(let sy=0; sy<oversample; sy++){
-        const iy=Math.round(baseY+sy+0.5-shiftY);
-        for(let sx=0; sx<oversample; sx++){
-          const ix=Math.round(baseX+sx+0.5-shiftX);
-          sum+=psfKernelAt(shifted, nx, ny, ix, iy);
-        }
-      }
-      img[Y*w+X]+=photons*sum;
-    }
-  }
-}
 // Splats `photons` worth of a single emitter, centred at continuous camera-pixel position (mx,my),
 // into img (w x h, row-major) using kernelObj's photon-normalized (sum=1) oversampled PSF. Each
 // kernel array entry is a probability MASS (the whole array sums to 1), not a density — so
@@ -7230,27 +7263,53 @@ function splatZernikeEmitterFFT(img, w, h, mx, my, photons, kernelObj, camRad){
 // leaks away by a factor of oversample^2 (a real bug caught here: an earlier version divided by
 // oversample^2, recovering only 1/16th of every emitter's requested photons at the default 4x
 // oversampling). Camera pixel X is treated as centred at integer coordinate X (spanning
-// [X-0.5,X+0.5)), matching the existing Gaussian path's own convention (x0=Math.round(mx) there);
-// baseX/baseY below map that sub-cell's physical centre straight into the kernel's own
-// (oversampled-pixel) index space relative to the emitter position — not rounded to a whole camera
-// pixel first, which is what gives genuine sub-pixel placement.
+// [X-0.5,X+0.5)), matching the existing Gaussian path's own convention (x0=Math.round(mx) there).
+// That sum is read off kernelObj.sum (buildSummedKernel()) with ONE interpolation per camera pixel;
+// see that function for why this equals interpolating every sub-cell and summing.
+//
+// tx,ty is the kernel-grid coordinate of camera pixel (X0,Y0)'s first sub-cell centre — mapped
+// straight from the emitter position, never rounded to a whole camera pixel first, which is what
+// gives genuine sub-pixel placement. Pixel (X0+dx,Y0+dy)'s is tx+dx*os, an integer step away, so
+// the fraction — and every interpolation weight — is shared by the whole splat.
+//
+// interpMode 'fft' aligns that shared fraction onto the grid with ONE Fourier shift of the raw
+// kernel per emitter (fftShiftKernelTile()), after which each sub-cell is an integer lookup — i.e.
+// nearest-neighbour into the block sums of the shifted kernel. Kept for comparison against 'cubic'
+// (docs/VECTORIAL_PSF_SIMULATION.md §3/§4 for why it is not the default: per-emitter FFT cost, and
+// periodic-boundary ringing risk on a non-periodic tile); it has no GPU path.
 function splatZernikeEmitter(img, w, h, mx, my, photons, kernelObj, camRad, interpMode){
-  if(interpMode==='fft') return splatZernikeEmitterFFT(img, w, h, mx, my, photons, kernelObj, camRad);
-  const {kernel, nx, ny, oversample}=kernelObj;
+  const {nx, ny, oversample:os}=kernelObj;
   const kcx=(nx-1)/2, kcy=(ny-1)/2;
   const X0=Math.round(mx), Y0=Math.round(my);
+  const tx=kcx+(X0-mx-0.5)*os+0.5, ty=kcy+(Y0-my-0.5)*os+0.5;
+  let S=kernelObj.sum, bx, by, wx, wy;
+  if(interpMode==='fft'){
+    const rx=Math.round(tx), ry=Math.round(ty);
+    S=buildSummedKernel(fftShiftKernelTile(kernelObj.kernel, nx, ny, tx-rx, ty-ry), nx, ny, os);
+    bx=rx; by=ry; wx=wy=[1];
+  } else if(interpMode==='nearest'){
+    bx=Math.floor(tx+0.5); by=Math.floor(ty+0.5); wx=wy=[1];
+  } else {
+    bx=Math.floor(tx); by=Math.floor(ty);
+    const fx=tx-bx, fy=ty-by;
+    if(interpMode==='cubic'){ bx--; by--; wx=catmullRomWeights(fx); wy=catmullRomWeights(fy); }   // taps -1..2
+    else { wx=[1-fx,fx]; wy=[1-fy,fy]; }                                                            // 'linear'
+  }
+  const {B,bw,bh,off}=S, nt=wx.length;
   for(let dy=-camRad; dy<=camRad; dy++){
     const Y=Y0+dy; if(Y<0||Y>=h) continue;
-    const baseY=kcy + (Y-my-0.5)*oversample;
+    const r0=by+dy*os+off, rowOut=Y*w;
     for(let dx=-camRad; dx<=camRad; dx++){
       const X=X0+dx; if(X<0||X>=w) continue;
-      const baseX=kcx + (X-mx-0.5)*oversample;
+      const c0=bx+dx*os+off;
       let sum=0;
-      for(let sy=0; sy<oversample; sy++){
-        const ky=baseY+sy+0.5;
-        for(let sx=0; sx<oversample; sx++) sum+=sampleKernelAt(interpMode, kernel, nx, ny, baseX+sx+0.5, ky);
+      for(let j=0;j<nt;j++){
+        const r=r0+j; if(r<0||r>=bh) continue;
+        const rb=r*bw; let row=0;
+        for(let i=0;i<nt;i++){ const c=c0+i; if(c>=0&&c<bw) row+=wx[i]*B[rb+c]; }
+        sum+=wy[j]*row;
       }
-      img[Y*w+X]+=photons*sum;
+      img[rowOut+X]+=photons*sum;
     }
   }
 }
@@ -12422,16 +12481,15 @@ async function getPsfWorkerPool(){
    overlap, and each worker has exactly one onmessage property, not a
    queue — this file's own Web Worker gotcha).
    --------------------------------------------------------------------------- */
-// _g is gauss()'s own Box-Muller spare-value cache (MODULE: simulation) — reset by
-// applySimCameraNoise() itself before every frame, so its initial value here never matters.
-const SIM_WORKER_PRELUDE="let _g=null;\nlet _simCtx=null;\nlet _calibCtx=null;";
+// The camera-noise draws (makeSimNoiseRng() and friends, MODULE: simulation) keep no module state,
+// so the only globals a sim worker needs are its two one-time context slots.
+const SIM_WORKER_PRELUDE="let _simCtx=null;\nlet _calibCtx=null;";
 function simWorkerSource(){
   const body=[
-    gauss.toString(), poisson.toString(), gammaSample.toString(), mulberry32.toString(), simFrameSeed.toString(), simBgScale.toString(),
-    psfKernelAt.toString(), sampleKernelNearest.toString(), sampleKernelBilinear.toString(),
-    catmullRomWeights.toString(), sampleKernelBicubic.toString(), sampleKernelAt.toString(),
+    pcg4dInto.toString(), makeSimNoiseRng.toString(), simNoiseGauss.toString(), simNoisePoisson.toString(),
+    simNoiseGamma.toString(), simBgScale.toString(), catmullRomWeights.toString(), buildSummedKernel.toString(),
     nextPow2.toString(), fft1d.toString(), fft2d.toString(), fftShiftKernelTile.toString(),
-    splatZernikeEmitterFFT.toString(), splatZernikeEmitter.toString(),
+    splatZernikeEmitter.toString(),
     splatSimFrame.toString(), splatBeadsFrame.toString(), applySimCameraNoise.toString(),
     `onmessage=function(e){
       const d=e.data;
@@ -12441,7 +12499,7 @@ function simWorkerSource(){
         // handler guards against.
         try{
           const {img}=splatSimFrame(16,16,5,[[8,8,0,1]],0,0,1000,1.3,4,null,null);
-          applySimCameraNoise(img,new Float32Array(16*16),1,0,Math.random);
+          applySimCameraNoise(img,new Float32Array(16*16),1,0,12345,0);
           let ok=false; for(let i=0;i<img.length;i++) if(img[i]>0){ ok=true; break; }
           if(!ok) throw new Error('self-test produced all-zero output');
           postMessage({pong:1});
@@ -12456,7 +12514,7 @@ function simWorkerSource(){
         return;
       }
       if(d.simBatch){
-        const {w,h,bg,bgMap,bgDecay,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,driftPx,ddx,ddy,n}=_simCtx;
+        const {w,h,bg,bgMap,bgDecay,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,noiseSeed,driftPx,ddx,ddy,n}=_simCtx;
         const {start,batch}=d, N=w*h;
         const buf=new Float32Array(batch.length*N);
         let zClamped=0, zTotal=0;
@@ -12465,8 +12523,7 @@ function simWorkerSource(){
           const dmag = n>1 ? fi/(n-1)*driftPx : 0, drx=dmag*ddx, dry=dmag*ddy;
           const r=splatSimFrame(w,h, bgMap?{map:bgMap,scale:simBgScale(fi,bgDecay)}:bg, ev,drx,dry,photPerFrame,sigma,rad,zKernelStack,zKernel);
           zClamped+=r.zClamped; zTotal+=r.zTotal;
-          const rng = baseSeed>0 ? mulberry32(simFrameSeed(baseSeed,fi)) : Math.random;
-          applySimCameraNoise(r.img, offsetMap, simGain, readNoiseE, rng, cam);
+          applySimCameraNoise(r.img, offsetMap, simGain, readNoiseE, noiseSeed, fi, cam);
           buf.set(r.img, i*N);
         }
         postMessage({seq:d.seq,start,count:batch.length,buf,zClamped,zTotal},[buf.buffer]);
@@ -12479,13 +12536,13 @@ function simWorkerSource(){
         return;
       }
       if(d.calibBatch){
-        const {w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx,ny,oversample,offsetMap,simGain,readNoiseE,cam}=_calibCtx;
+        const {w,h,bg,beadXY,photPerFrame,camRad,interpMode,nx,ny,oversample,offsetMap,simGain,readNoiseE,cam,noiseSeed}=_calibCtx;
         const {start,batch}=d, N=w*h;
         const buf=new Float32Array(batch.length*N);
         for(let i=0;i<batch.length;i++){
-          const kernelObj={kernel:batch[i].kernel, nx, ny, oversample};
+          const kernelObj={kernel:batch[i].kernel, sum:batch[i].sum, nx, ny, oversample};
           const img=splatBeadsFrame(w,h,bg,beadXY,photPerFrame,kernelObj,camRad,interpMode);
-          applySimCameraNoise(img, offsetMap, simGain, readNoiseE, Math.random, cam);
+          applySimCameraNoise(img, offsetMap, simGain, readNoiseE, noiseSeed, batch[i].z, cam);
           buf.set(img, i*N);
         }
         postMessage({seq:d.seq,start,count:batch.length,buf},[buf.buffer]);
@@ -12531,8 +12588,8 @@ async function getSimWorkerPool(){
 // batch order and worker assignment can't affect which pixels end up where — verified to
 // reproduce the exact same output as simulateFramesSerial() for the same simulation_seed.
 async function simulateFramesParallel(pool, ctx){
-  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,baseSeed,onProgress}=ctx;
-  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,bgMap,bgDecay,offsetMap,simGain,readNoiseE,cam,photPerFrame,sigma,rad,zKernelStack,zKernel,baseSeed,driftPx,ddx,ddy,n}));
+  const {w,h,n,bg,bgMap,bgDecay,frameEvents,driftPx,ddx,ddy,photPerFrame,sigma,rad,zKernelStack,zKernel,offsetMap,simGain,readNoiseE,cam,noiseSeed,onProgress}=ctx;
+  pool.forEach(wk=>wk.postMessage({simInit:true,w,h,bg,bgMap,bgDecay,offsetMap,simGain,readNoiseE,cam,photPerFrame,sigma,rad,zKernelStack,zKernel,noiseSeed,driftPx,ddx,ddy,n}));
   const frames=new Array(n);
   let zClampedCount=0, zTotalCount=0, done=0, err=null;
   const BATCH=Math.max(paramValue('workerBatchMin'), Math.min(paramValue('workerBatchMax'), Math.ceil(n/(pool.length*paramValue('workerBatchTarget')))));
@@ -27695,7 +27752,12 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21a — Merged upstream v0.12.7 into the vectorial-simulation
+log(`webSMLM v0.12.8-dev · build 2026-09-21b — Simulate movie is ~10x faster on the CPU: each
+camera pixel now reads one interpolation of a pre-summed PSF kernel instead of summing
+oversample² interpolations (same result to 3e-8). Camera noise now draws from a counter-based
+RNG shared with the coming GPU path, so seeded movies differ from earlier builds' (still
+reproducible from here on). Workers receive only the PSF planes a movie actually uses.
+— and from build 2026-09-21a: Merged upstream v0.12.7 into the vectorial-simulation
 branch: experimental WebGPU acceleration (Use GPU acceleration: fitting, rendering, AIM drift,
 FRC), smFRET, correlation drift, FITS and Micro-Manager metadata, the log terminal, and the new
 sidebar order all come in from upstream; everything below comes along unchanged in behaviour.

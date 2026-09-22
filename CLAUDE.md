@@ -181,6 +181,51 @@ in a module.
   generator produced it) — meaningful for any discrete-site structure (NUP) and harmless (if less
   physically interesting) for the continuously-sampled filament/ring points.
 
+  **`simulation_structureFov`** (px, no static default that matters in practice — see below;
+  boilerplate laid down 2026-09-22, deliberately no sidebar control) decouples the STRUCTURE's
+  own footprint from the camera's `simulation_fov` — two independent
+  sizes rather than the structure always being generated to exactly fill the visible frame.
+  `generateSynthetic()` calls `buildStructure(structFov, structFov, zRange, rng)` against this
+  separate size, then recentres every returned `[x,y,z]` point by `structShift=(structFov-w)/2` in
+  x and y, so the structure's own centre and the camera FOV's centre coincide regardless of which
+  is bigger. **Since build 2026-09-22c, the applied default (when nothing overrides it) is
+  `Math.round(w*1.1)` — 10% LARGER than the camera FOV, not equal to it** — computed fresh in
+  `generateSynthetic()` itself, not read from the PARAMS registry's own static `default:128` (that
+  field only matters once an explicit override is present — see the PARAMS entry's own comment).
+  The point: every simulation now has real structure sitting just outside the frame from the
+  start, so **Drift (px, total)** reveals something by default with no setup step required.
+  `structShift=0` only when `simulation_fov` and an EXPLICIT `simulation_structureFov` override
+  happen to be equal — `buildStructure(w,h,...)` then runs exactly as it did before this feature
+  existed, no shift applied at all — positive (now the default) when the structure is LARGER (its
+  edges then fall outside `[0,w)x[0,h)` on every side, so only the centre portion is ever imaged —
+  combine with **Drift (px, total)** (`driftpx`,
+  which already moves the sample under a fixed camera via `splatSimFrame()`'s `mx=ex+drx`, the
+  sample-relative-to-camera convention) to have different parts of it drift into view over a
+  movie), negative when the structure is SMALLER (the whole thing then sits inside the frame with
+  empty camera area around it, e.g. to simulate a small labelled patch on an otherwise-blank
+  coverslip). No per-type generator needed to change: `buildStructure()`'s dispatcher already
+  forwards whatever `w,h` it's given with no special-casing (see its own comment), and every
+  downstream consumer of an out-of-camera-FOV point already discards it safely with no new code —
+  `splatSimFrame()`'s Gaussian path (`if(x<0||y<0||x>=w||y>=h) continue`), `splatZernikeEmitter()`
+  (its own `Y`/`X` bounds checks), `illumAt()` (clamps to the nearest edge pixel rather than
+  reading out of bounds), and `buildSimBackgroundMap()`'s haze-density pass
+  (`if(x>=0&&y>=0&&x<w&&y<h)`) were all already bounds-safe before this existed, checked one at a
+  time rather than assumed. **`dens`'s own arrival-rate math (`areaUm2`) uses `structFov`, not the
+  camera FOV** — a deliberate correctness choice, not an oversight: density is a property of the
+  sample, so `dens` means the same emitters-per-µm² whether the structure is bigger, smaller, or
+  the same size as the visible frame; only the FRACTION of arrivals that ever gets imaged changes
+  with the camera FOV, exactly as it should. `simulation_labelEfficiency` is unaffected — it's
+  still a plain keep/drop filter over whatever candidate list `buildStructure()` returns,
+  independent of either size. **`validation`**'s `scoreTruthCore()` needed no change — a truth
+  event's position is just a number to it, so a structure point that never entered the visible FOV
+  in ANY frame is simply never counted at all (never a frame-border "don't care" case, since it's
+  never inside a frame to begin with), which is the correct behaviour, not a gap. The debug
+  single-NUP viewer and **View GT localizations** call `buildStructure()`/read
+  `groundTruthEvents` independently of this and are unaffected either way. Genuinely next: nothing
+  yet drives `driftpx`'s direction/magnitude to systematically explore a larger structure's margin
+  (it's still one random straight line), and no UI/log line reports how much of a larger structure
+  a given run's drift path actually swept into view.
+
   **Structure type** (`simulation_structureType`, `'filaments_ring'` default, `'nup'`, or one of
   `'tiltedPlane'`/`'uniform3D'`/`'shell'`) picks
   which ground-truth structure `buildStructure()` generates — a plain dispatcher now, over
@@ -322,7 +367,14 @@ in a module.
   150), `simulation_zRange` 500 and `simulation_nup_count` 100 — the byte-identity baseline is
   therefore NOT the out-of-the-box state any more; select Minimal (and zRange 1000 / 20 NPCs where
   relevant) to reproduce it. The density preset is `low`/`med`/`high`/`veryhigh` = 0.05/0.2/0.5/2, default `med` (`dens` 0.2;
-  the old default was 0.05). New random draws
+  the old default was 0.05). **Since 2026-09-22c, `simulation_structureFov`'s own default
+  additionally breaks this baseline on its own, independent of the Realism/density presets**: with
+  no explicit `paramOverrides.simulation_structureFov` override, every `generateSynthetic()` call
+  now builds its structure at `Math.round(simulation_fov*1.1)`, not `simulation_fov` itself (see
+  that PARAMS entry's own comment) — so even Minimal-preset reproduction of the pre-2026-09-22
+  baseline additionally needs `paramOverrides.simulation_structureFov=128` (or whatever
+  `simulation_fov` is set to) set explicitly first; there is still no sidebar control for it. New
+  random draws
   therefore live ONLY in branches the defaults never enter (the original single-blink loop is kept
   verbatim beside the new one for exactly this reason), and background/haze each draw from their
   OWN stream derived from the seed, after all emitter draws — so switching them on never moves an

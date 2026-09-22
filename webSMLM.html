@@ -17,11 +17,11 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-21f; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-22c; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
-    params          3774   PARAMS registry, single source of truth for params;
+    params          3775   PARAMS registry, single source of truth for params;
                            #log/#logText box/logged-text (80ch) width split;
                            isMemoryConstrainedDevice() (worker-pool size cap +
                            MOBILE_MEM_DEFAULTS, a stricter memBudgetGB/memgb/
@@ -49,7 +49,7 @@
                            own blank-line separator — otherwise a command and
                            its own first result line print with a spurious
                            blank line between them
-    in/out          5199   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
+    in/out          5217   TIFF/ND2/FITS parsing, in-memory/streamed loading, FTM;
                            loadTiffFile()'s effSliceMin ties the whole-file-
                            vs-streamed threshold to Budget raw movies (memgb);
                            tiffScaleHint()'s pixel-size branch now sanity-
@@ -62,7 +62,7 @@
                            frame-interval estimate (MM_HINT_SAMPLE=25 evenly
                            -spaced frames, not every one) — wired alongside
                            tiffScaleHint() at all 3 load call sites
-    simulation      5498   synthetic stack generator ("Simulate movie");
+    simulation      5516   synthetic stack generator ("Simulate movie");
                            buildStructure() is now a dispatcher over
                            simulation_structureType — 'filaments_ring'
                            (default, buildFilamentsRingStructure(), unchanged)
@@ -136,17 +136,17 @@
                            noise loop shares the SAME worker pool
                            (simulateCalibFramesParallel()/
                            simulateCalibFramesSerial(), splatBeadsFrame())
-    validation      8319   score localizations against the simulator's own
+    validation      8370   score localizations against the simulator's own
                            ground truth (Score vs truth): per-frame lateral
                            one-to-one matching, detection/lateral/axial
                            accuracy, bias+RMS binned on TRUE z; controls
                            live in Simulation settings (subsim validationBox),
                            popup hint-validation
-    detect          8947   per-frame band-pass + local-maxima detection
+    detect          8998   per-frame band-pass + local-maxima detection
                            (detectSpots() and its three filters) — CPU only; a
                            WebGPU port was tried and REMOVED (measured 2x slower
                            than the worker pool), see MODULE: gpu
-    fit             9259   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
+    fit             9310   phasor / LS / Poisson-MLE 2D/3D elliptical/rotated
                            localization; shared mleNewtonFit() driver;
                            separable Fisher-build fast path for spherical/
                            axis-aligned-elliptical MLE (PR #7, Hazen Babcock)
@@ -176,7 +176,7 @@
                            every fit dispatch site incl. the GPU result loop;
                            mergeNearbyMaxima() (detection_mergeRadius, MODULE:
                            detect) reaches every Localize detect site
-    render          10082  accumulate to offscreen buffer; view/colour/blur;
+    render          10133  accumulate to offscreen buffer; view/colour/blur;
                            SvgRecordingContext, renderPlotBothFormats()
                            (headless + interactive plot export), raw-frame
                            Contrast (Black/White) slider; hideOtherRawToggleBtns()
@@ -215,7 +215,7 @@
                            print their own line, several back-to-back in the
                            log for no actionable reason; the final render
                            still logs it
-    workers         11876  frame-parallel detect/fit worker pool; dedicated
+    workers         11927  frame-parallel detect/fit worker pool; dedicated
                            SR-render Worker (RENDER_WORKER_PRELUDE/
                            renderWorkerSource()/getRenderWorker()/
                            dispatchRenderWorker(), separate from the detect/
@@ -240,7 +240,7 @@
                            calibInit/calibBatch message types alongside
                            simInit/simBatch — no seeded-reproducibility
                            scheme there, calibration stacks were never seeded)
-    gpu             12539  shared WebGPU compute engine (experimental,
+    gpu             12590  shared WebGPU compute engine (experimental,
                            opt-in via "Use GPU acceleration"); covers fit (all
                            4 MLE methods plus phasor/phasor3d — the one
                            non-iterative kernel, a closed-form Fourier
@@ -289,8 +289,8 @@
                            splat + counter-based camera noise,
                            WGSL_SIM_FRAMES/WGSL_SIM_NOISE_FNS), taken
                            whenever useGpu is on (no size threshold).
-    export          15271  ThunderSTORM-compatible CSV; exportPlotEither()
-    3D calibration  15623  astigmatic sigma_x/sigma_y vs z bead curves;
+    export          15322  ThunderSTORM-compatible CSV; exportPlotEither()
+    3D calibration  15674  astigmatic sigma_x/sigma_y vs z bead curves;
                            runCalibration() logCmd()s a calibrationOnly:true
                            recorded command on success; calibrationCore()'s
                            config.exportCalibrationPoints streams each bead
@@ -301,7 +301,7 @@
                            parity-strict (step-by-2), never cached in
                            _projCache (that cache is the whole-stack average
                            locateBeadsForCalib() reuses)
-    drift           16105  AIM drift correction (2D+z); drift-vs-frame or
+    drift           16156  AIM drift correction (2D+z); drift-vs-frame or
                            x/y-path-coloured-by-time plot (driftPlotMode);
                            frame0 (first ANALYSED frame) offsets segment
                            binning in aimDrift2D()/aimDriftZ() — a Localize
@@ -325,9 +325,9 @@
                            settings hidden while correlation is selected;
                            smFRET's own new "Apply drift correction?" is a
                            thin caller over whichever method is configured
-    locprecision    17037  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
+    locprecision    17088  NeNA + FRC; both logCmd() a bare {computeNeNA:true}/
                            {computeFRC:true} on success (no other config)
-    sSMLM           18011  spectrally resolved SMLM pair-finding; renamed
+    sSMLM           18062  spectrally resolved SMLM pair-finding; renamed
                            "Pairing (sSMLM & FRET)"; merged Show
                            histograms (sSmlmHistBtn/sSmlmHistModeBtn); Pair
                            & plot sSMLM/Unpair share a row (Fit dist. &
@@ -537,7 +537,7 @@
                            "E/S histogram" title (button stays the
                            exception); getSmfretTimeTraces() now refreshes
                            an already-showing E/S histogram too
-    spt             21772  single particle tracking, trackpy-inspired;
+    spt             21823  single particle tracking, trackpy-inspired;
                            config.exportTrackData streams spt_tracks.ndjson
                            via onRecord — sptCore() calls computeEnsembleMsd()
                            for its now-exposed perTrackMsd (Map<track_id,
@@ -568,7 +568,7 @@
                            separate, minimal sortable/filterable per-track
                            table reusing parseFilter() from MODULE: table,
                            #locTable/#trackTable share one CSS rule set
-    pipeline        23311  top-level orchestration, *Core()/wrapper split;
+    pipeline        23362  top-level orchestration, *Core()/wrapper split;
                            merged Load movie/data (loadBtn); updateMethodUI()
                            resets colour map to Fire for mle3d/gaussmleEll too
                            whenever localize3D is unchecked; run() also
@@ -658,7 +658,7 @@
                            never have fit results back in time; the ring lets
                            the preview fall back to the newest frame that IS
                            ready instead
-    liveStreaming   24890  Micro-Manager/pycromanager camera bridge
+    liveStreaming   24941  Micro-Manager/pycromanager camera bridge
                            (nested inside memBox, "Memory & streaming",
                            window.webSMLM.liveStream), physically right after
                            MODULE: pipeline (whose runCore() it calls per
@@ -712,14 +712,14 @@
                            pipeline), the same mechanism a normal Localize
                            run's own live preview uses, not a manual "Render
                            every N frames" setting
-    table           28206  localizations table, filtering, histograms;
+    table           28267  localizations table, filtering, histograms;
                            renderHistogramPlotHeadless() (config.exportHistograms);
                            tempClusteringMemory (gap-frame tolerance, incl.
                            unlimited/"inf") in clusterEvents(); tableFiltersCore()
                            (config.tableFilters) replays a whole committed-filter
                            session (typed clauses/crop/clustering) headlessly —
                            every commitFilter()/crop logCmd()s the full array
-    headless API    28961  window.webSMLM.analyze()/analyzeBatch();
+    headless API    29022  window.webSMLM.analyze()/analyzeBatch();
                            config.onRecord + makeRecordEmitter() (MODULE:
                            params) stream per-record datasets in bounded
                            batches, never in analyze()'s own return value —
@@ -2802,7 +2802,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-21f</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-22c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -4256,6 +4256,25 @@ const PARAMS = {
   // default (matches the old fixed value) since buildNupStructure()'s own rejection-sampling
   // placement and renderSuperRes()'s memory-budget check both scale with FOV area.
   simulation_fov: { type:'number', id:'simulation_fov', label:'FOV (pixels)', min:32, max:1024, step:8, default:128, int:true },
+  // simulation_structureFov = the STRUCTURE's own footprint (px), decoupled from simulation_fov
+  // (the camera's). generateSynthetic() calls buildStructure(structureFov, structureFov, ...) —
+  // a different size than the camera canvas — then recentres the result onto the camera FOV
+  // (both squares share the same centre point). Smaller than simulation_fov: the structure sits
+  // entirely inside the visible frame, with empty camera area around it. Larger: the structure
+  // extends beyond the frame on every side and only part of it is ever imaged in one frame —
+  // combined with Drift (px, total) (`driftpx`), that lets structure that starts outside the
+  // frame drift into view over a movie. id:null — no sidebar control yet (boilerplate, reachable
+  // via Save/Load Settings JSON or the log terminal only, by setting
+  // `paramOverrides.simulation_structureFov` directly before calling `runSimulation()`; NOT via
+  // `analyze(config)` — generateSynthetic()/"Simulate movie" is UI-only and has no headless entry
+  // point at all); add a sidebar control only once actually asked for.
+  // **This `default:128` is NOT what generateSynthetic() actually applies** when nothing
+  // overrides it — see its own comment: every simulation now defaults to a structure 10% LARGER
+  // than whatever simulation_fov is currently set to (`Math.round(w*1.1)`), computed fresh at
+  // generation time, not this static registry value; this field only matters when something
+  // explicitly reads `paramValue('simulation_structureFov')` (an override IS present) or in a
+  // future context that doesn't go through generateSynthetic()'s own dynamic-default branch.
+  simulation_structureFov: { type:'number', id:null, label:'Structure FOV (pixels)', min:32, max:4096, step:8, default:128, int:true },
   // simulation_labelEfficiency = the fraction (%) of physical structure sites that ever carry a
   // functional label at all — real SMLM labels (antibodies, SNAP/Halo, FP fusions) never reach
   // 100% of their target. Applied as a random keep/drop over buildStructure()'s own candidate
@@ -6174,7 +6193,38 @@ async function generateSynthetic(){
   // the Zernike model has a z-dependent width to vary at all).
   const is3d=paramValue('simulation_3d'), zRange=is3d?paramValue('simulation_zRange'):0;
   const structure=paramValue('simulation_structureType'), structureSize=paramValue('simulation_structureSize');
-  const gtAll=buildStructure(w,h,zRange,rng), rad=Math.ceil(sigma*3);
+  // simulation_structureFov: the structure's own footprint, decoupled from the camera's
+  // simulation_fov (w,h). buildStructure() is called against structFov,structFov — a different
+  // canvas size — then every returned point is shifted by (structFov-w)/2 so the two squares'
+  // CENTRES coincide in camera coordinates: shift=0 when structFov===w, positive when the
+  // structure is bigger than the camera FOV (its edges then fall outside [0,w)x[0,h) on every
+  // side), negative when it's smaller (the whole structure then sits inside the frame with empty
+  // camera area around it). No per-type generator needs to change — buildStructure()'s dispatcher
+  // already forwards whatever w,h it's given with no special-casing — and every existing
+  // per-pixel bounds check downstream (splatSimFrame()'s `if(x<0||y<0||x>=w||y>=h) continue`,
+  // splatZernikeEmitter()'s own X/Y checks, illumAt()'s edge clamp, buildSimBackgroundMap()'s
+  // haze-density bounds check) already discards whatever falls outside the camera frame, so a
+  // structFov>w needs no new visibility concept of its own.
+  //
+  // Default (no explicit override in paramOverrides — the only way to set this id:null param,
+  // since it has no sidebar control): every simulation now builds its structure 10% LARGER than
+  // the camera FOV, not equal to it — so Drift (px, total) has real structure to reveal by
+  // default, rather than needing an explicit setup step first. An explicit value (Save/Load
+  // Settings JSON, or `paramOverrides.simulation_structureFov=...` in the log terminal before
+  // calling `runSimulation()`) still wins outright, including a value that restores the old
+  // structFov===w behaviour. NOT reachable via `analyze(config)` — generateSynthetic() is a
+  // UI-only generator with no headless entry point at all (see `runSimulation()`'s own comment).
+  const structFov = ('simulation_structureFov' in paramOverrides)
+    ? paramValue('simulation_structureFov') : Math.round(w*1.1);
+  const structShift=(structFov-w)/2;
+  let gtAll=buildStructure(structFov, structFov, zRange, rng);
+  if(structShift!==0){
+    for(const p of gtAll){ p[0]-=structShift; p[1]-=structShift; }
+    log(`Structure FOV: ${structFov}px, `+(structFov>w
+        ? `${(structFov-w)/2}px beyond the camera FOV on every side — some structure starts outside the frame and only enters view if Drift (px, total) carries it in.`
+        : `smaller than the camera FOV (${w}px) — the whole structure sits inside the frame, centred.`));
+  }
+  const rad=Math.ceil(sigma*3);
   // simulation_labelEfficiency = the fraction of physical structure sites that ever carry a
   // functional label at all (real SMLM labels — antibodies, SNAP/Halo, FP fusions — never reach
   // 100% of their target), applied ONCE here as a random keep/drop over buildStructure()'s own
@@ -6231,18 +6281,22 @@ async function generateSynthetic(){
         `z-dependent defocus.`);
   }
 
-  // `dens` is a physical areal density (emitters/µm²/frame), independent of how densely
-  // buildStructure() happens to sample candidate points. Convert to a Poisson emitter-arrival
-  // process over the whole FOV: mean instantaneous occupied density = dens, so with a mean ON
-  // duration of `lifetime` the arrival rate needed is (dens*area)/lifetime per frame-time. Total
-  // expected arrivals over the lead-in + movie window then follows from that rate. Each arrival
-  // is placed at a randomly chosen structure site (candidates may host more than one arrival over
-  // the movie — e.g. repeated single-molecule binding/activation at the same physical site) and
-  // gets exactly one fractional ON period — start time uniform over [-5·lifetime, n) so the
-  // exponential's early tail can already be mid-event at frame 0, duration ~
-  // Exponential(mean=lifetime) — and never re-activates. Per frame, photon output scales with the
-  // emitter's overlap fraction with that frame, so e.g. a half-frame overlap emits half the photons.
-  const areaUm2=(w*px/1000)*(h*px/1000);
+  // `dens` is a physical areal density (emitters/µm²/frame) of the STRUCTURE/sample, independent
+  // of how densely buildStructure() happens to sample candidate points and independent of the
+  // camera FOV — the arrival-rate area below is the structure's own footprint (structFov), not
+  // the camera's, so `dens` means the same thing whether the structure is bigger, smaller, or the
+  // same size as the visible frame; only the fraction of arrivals ever imaged changes with the
+  // camera FOV. Convert to a Poisson emitter-arrival process over the whole structure: mean
+  // instantaneous occupied density = dens, so with a mean ON duration of `lifetime` the arrival
+  // rate needed is (dens*area)/lifetime per frame-time. Total expected arrivals over the lead-in +
+  // movie window then follows from that rate. Each arrival is placed at a randomly chosen
+  // structure site (candidates may host more than one arrival over the movie — e.g. repeated
+  // single-molecule binding/activation at the same physical site) and gets exactly one fractional
+  // ON period — start time uniform over [-5·lifetime, n) so the exponential's early tail can
+  // already be mid-event at frame 0, duration ~ Exponential(mean=lifetime) — and never
+  // re-activates. Per frame, photon output scales with the emitter's overlap fraction with that
+  // frame, so e.g. a half-frame overlap emits half the photons.
+  const areaUm2=(structFov*px/1000)*(structFov*px/1000);
   const arrivalRate=lifetime>0 ? (dens*areaUm2)/lifetime : 0;
   const lead=5*lifetime, rangeLen=n+lead;
   const events=[];                                 // ground-truth {x,y,z,tStart,tEnd} per BLINK
@@ -27940,7 +27994,14 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-21f — Simulation defaults: Realism/compute and Density
+log(`webSMLM v0.12.8-dev · build 2026-09-22c — New: simulation_structureFov decouples the
+structure's own footprint from the camera's. Every simulation now defaults to a structure 10%
+LARGER than the camera FOV (Math.round(fov*1.1)), so Drift (px, total) has real structure sitting
+just outside the frame to reveal from the start — no setup step needed. Boilerplate only for now,
+no sidebar control yet — reachable via Save/Load Settings JSON or
+paramOverrides.simulation_structureFov in the log terminal (not via analyze() — Simulate movie has
+no headless entry point). See CLAUDE.md's own paragraph on it for what still needs building on top.
+— from build 2026-09-21f: Simulation defaults: Realism/compute and Density
 now start at Medium, Structure Z range at ±500 nm and Number of NPCs at 100. Density presets are
 Low 0.05, Medium 0.2, High 0.5, Very high 2. Score vs truth moved into Simulation settings.
 — and from build 2026-09-21e: The Direct quadrature PSF evaluator is gone, and with

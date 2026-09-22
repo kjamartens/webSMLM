@@ -5,17 +5,20 @@
 <title>Cell field simulation — seed-to-coordinate exploration</title>
 <style>
   html,body{margin:0;padding:0;background:#0c0f14;color:#dfe6ee;font-family:system-ui,Segoe UI,Arial,sans-serif;overflow:hidden}
-  #wrap{display:grid;grid-template-columns:280px 1fr;height:100vh}
+  #wrap{display:grid;grid-template-columns:300px 1fr;height:100vh}
   #side{padding:12px;overflow-y:auto;background:#11161d;border-right:1px solid #232a35;box-sizing:border-box}
   #side h1{font-size:15px;margin:0 0 4px}
   #side p.sub{font-size:11px;color:#8b97a8;margin:0 0 14px;line-height:1.4}
   label.row{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:7px 0;font-size:12px}
-  input[type=number],input[type=text]{width:80px;background:#1a212b;border:1px solid #2c3644;color:#dfe6ee;border-radius:4px;padding:3px 5px;font-size:12px;font-family:inherit}
+  input[type=number],input[type=text]{width:70px;background:#1a212b;border:1px solid #2c3644;color:#dfe6ee;border-radius:4px;padding:3px 5px;font-size:12px;font-family:inherit}
   input[type=range]{width:110px}
   button{background:#1a212b;border:1px solid #2c3644;color:#dfe6ee;border-radius:4px;padding:5px 8px;font-size:12px;cursor:pointer;font-family:inherit}
   button:hover{border-color:#4a90d9}
   fieldset{border:1px solid #232a35;border-radius:6px;margin:10px 0;padding:8px}
   legend{font-size:11px;color:#8b97a8;padding:0 4px}
+  .pair{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:7px 0;font-size:12px}
+  .pair span.k{flex:1}
+  .pair input{width:56px}
   #canvasHost{position:relative}
   canvas{display:block;background:#05070a;cursor:grab}
   canvas.dragging{cursor:grabbing}
@@ -29,37 +32,49 @@
   <div id="side">
     <h1>Cell field — seed→coordinate mock</h1>
     <p class="sub">Chunk-hashed, address-based placement (pcg4d, ported from webSMLM /
-    demoCam_SMLM_MM's CounterRng). Every cell/microtubule is a pure function of
+    demoCam_SMLM_MM's CounterRng). Every cell/nucleus is a pure function of
     (seed, chunk coords) — nothing is generated ahead of time, so you can pan
     infinitely and re-enter the same spot deterministically. Not wired into
-    webSMLM itself — standalone exploration only.</p>
+    webSMLM itself — standalone exploration only. Microtubules are still the
+    rough 2D placeholder from the first pass — not the focus this round.</p>
 
     <fieldset>
       <legend>seed / world</legend>
       <label class="row">Seed <input type="number" id="seed" value="1234" step="1"></label>
       <label class="row"><button id="reseed" style="width:100%">Randomize seed</button></label>
-      <label class="row">Chunk size (µm) <input type="number" id="chunkSize" value="30" min="4" max="200" step="1"></label>
+      <label class="row">Chunk size (µm) <input type="number" id="chunkSize" value="26" min="4" max="200" step="1"></label>
+      <label class="row">Cell jitter <input type="range" id="jitter" min="0.1" max="1" step="0.02" value="0.8"><span id="jitterVal"></span></label>
+      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.85"><span id="densityVal"></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>cell placement</legend>
-      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.55"><span id="densityVal"></span></label>
-      <label class="row">Jitter fraction <input type="range" id="jitter" min="0.1" max="1" step="0.02" value="0.72"><span id="jitterVal"></span></label>
-      <label class="row">Radius min (µm) <input type="number" id="rMin" value="6" min="1" max="60" step="0.5"></label>
-      <label class="row">Radius max (µm) <input type="number" id="rMax" value="11" min="1" max="80" step="0.5"></label>
-      <label class="row">Shrink to avoid overlap <input type="checkbox" id="avoidOverlap" checked></label>
+      <legend>cell shape (µm, footprint)</legend>
+      <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="30" step="0.5"></div>
+      <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.45" step="0.05"><input type="number" id="cellElongMax" value="0.9" step="0.05"></div>
+      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="1" step="0.02" value="0.35"><span id="cellBlobVal"></span></label>
+      <div class="pair"><span class="k">Height min/max</span><input type="number" id="cellHeightMin" value="3" step="0.5"><input type="number" id="cellHeightMax" value="6" step="0.5"></div>
     </fieldset>
 
     <fieldset>
-      <legend>microtubules (rough, 2D)</legend>
+      <legend>nucleus (3D ellipsoid, µm)</legend>
+      <div class="pair"><span class="k">Long axis min/max</span><input type="number" id="nucLongMin" value="8" step="0.5"><input type="number" id="nucLongMax" value="12" step="0.5"></div>
+      <div class="pair"><span class="k">Short/long ratio min/max</span><input type="number" id="nucRatioMin" value="0.6" step="0.05"><input type="number" id="nucRatioMax" value="1" step="0.05"></div>
+      <div class="pair"><span class="k">Height (× long axis) min/max</span><input type="number" id="nucHeightMin" value="0.3" step="0.05"><input type="number" id="nucHeightMax" value="0.6" step="0.05"></div>
+      <label class="row">Offset from cell centre <input type="range" id="nucOffsetFrac" min="0" max="1" step="0.02" value="0.3"><span id="nucOffsetFracVal"></span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>packing — cells move, never shrink</legend>
+      <label class="row">Enable packing <input type="checkbox" id="enablePacking" checked></label>
+      <label class="row">Min gap (× combined radius) <input type="range" id="packFrac" min="0.6" max="1.1" step="0.02" value="0.85"><span id="packFracVal"></span></label>
+      <label class="row">Relaxation iterations <input type="range" id="relaxIters" min="4" max="80" step="1" value="45"><span id="relaxItersVal"></span></label>
+      <label class="row">Relaxation step <input type="range" id="relaxDamping" min="0.1" max="1" step="0.05" value="0.6"><span id="relaxDampingVal"></span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>3D view</legend>
+      <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="35"><span id="tiltDegVal"></span></label>
       <label class="row">Show microtubules <input type="checkbox" id="showMt" checked></label>
-      <label class="row">Count / cell (density) <input type="range" id="mtDensity" min="0.05" max="1" step="0.05" value="0.5"><span id="mtDensityVal"></span></label>
-      <label class="row">Length (× radius) <input type="range" id="mtLen" min="0.3" max="2.5" step="0.1" value="1.4"><span id="mtLenVal"></span></label>
-      <label class="row">Waviness <input type="range" id="mtWav" min="0" max="1" step="0.05" value="0.35"><span id="mtWavVal"></span></label>
-    </fieldset>
-
-    <fieldset>
-      <legend>view</legend>
       <label class="row">Show chunk grid <input type="checkbox" id="showGrid"></label>
       <label class="row"><button id="resetView" style="width:100%">Reset view to origin</button></label>
     </fieldset>
@@ -67,7 +82,9 @@
     <p class="sub">Drag to pan, wheel to zoom. Panning is exactly the drift/
     stage-motion case for demoCam_SMLM_MM: the field doesn't move, the viewport
     (camera FOV) does, and the same world coordinate always re-derives the same
-    structure.</p>
+    structure. When packing is on, overlapping cells push each other apart
+    (never shrink); a cell that's still stuck after relaxation is dropped
+    entirely rather than resized — watch "removed" in the HUD.</p>
   </div>
 
   <div id="canvasHost">
@@ -75,6 +92,7 @@
     <div id="hud"></div>
     <div id="legend">
       <span class="sw" style="background:#5aa9e6"></span>cell body
+      <span class="sw" style="background:#e6a23c;margin-left:10px"></span>nucleus (colour = depth)
       <span class="sw" style="background:#e6c65a;margin-left:10px"></span>microtubule
       <span class="sw" style="background:#3a4454;margin-left:10px"></span>chunk grid
     </div>
@@ -108,11 +126,10 @@ function pcg4d(a, b, c, d) {
 }
 
 // One (0,1) uniform for address (seed, cx, cy, k). k is a free "purpose"
-// channel -- 0=x jitter, 1=y jitter, 2=occupancy, 3=radius, 4=rotation,
-// 100+i=microtubule i's own draws, etc. Same trick as CounterRng.Pixel()'s
-// counter channel, just spent on "what this draw is for" instead of "which
-// draw in sequence" since a chunk needs a handful of INDEPENDENT numbers
-// rather than a long stream.
+// channel -- see CH_* constants below for what each one is spent on. Same
+// trick as CounterRng.Pixel()'s counter channel, just spent on "what this
+// draw is for" instead of "which draw in sequence" since a chunk needs a
+// handful of INDEPENDENT numbers rather than a long stream.
 function hashUnit(seed, cx, cy, k) {
   const [a] = pcg4d(seed | 0, cx | 0, cy | 0, k | 0);
   return ((a >>> 9) + 0.5) * 1.1920928955078125e-7; // 2^-23, matches CounterRng
@@ -121,135 +138,267 @@ function hashUnit(seed, cx, cy, k) {
 // microtubule's own random walk) -- still address-based (seed,cx,cy,base),
 // just spends the counter channel as CounterRng does, not a mulberry32-style
 // mutable-state generator (would break the "any order, any thread" property).
+// base is multiplied well above every fixed CH_* channel below so the two
+// addressing schemes never collide.
 function hashStream(seed, cx, cy, base) {
   let ctr = 0;
   return function next() { return hashUnit(seed, cx, cy, base * 4096 + (ctr++)); };
 }
+function lerp(a, b, t) { return a + (b - a) * t; }
 
-// ---- Chunk -> cell placement -------------------------------------------
-// Each chunk of the (infinite) world grid holds at most one candidate cell,
-// centred by jittering within a `jitter` fraction of the chunk (jitter=1 is
-// a full free jitter -- can put a centre right on a chunk boundary, so two
-// neighbouring cells CAN touch; jitter<1 keeps a margin, guaranteeing every
-// pair of adjacent-chunk centres stays at least chunkSize*(1-jitter) apart).
-// This is the standard "stratified / jittered grid" sampling used for cheap,
-// tileable blue-noise-ish point fields in procedural generation (one point
-// per grid cell, jittered) -- weaker than a true Poisson-disk process but
-// O(1) per chunk and needs no global bookkeeping, which is the whole point
-// here: querying chunk (10000, -3) costs the same as chunk (0,0).
-function chunkCandidate(seed, cx, cy, p) {
+// ---- Chunk -> raw cell candidate ------------------------------------------
+// Each chunk of the (infinite) world grid holds at most one candidate cell.
+// Position is jittered within a `jitter` fraction of the chunk -- the
+// standard "stratified / jittered grid" trick for cheap, roughly blue-noise
+// point fields (one candidate per grid cell, then jitter it): O(1) per
+// chunk, no global bookkeeping, so querying chunk (10000,-3) costs the same
+// as (0,0). Everything about the cell (footprint ellipse, outline
+// wobble, height, nucleus geometry, packing-priority tiebreaker) is drawn
+// from the SAME address, each on its own channel, so a chunk's full
+// candidate is one deterministic bundle.
+const HARM_K = [2, 3, 5]; // angular harmonics composing the blobby outline
+const CH = { X: 0, Y: 1, OCC: 2, SIZE: 3, ELONG: 4, ROT: 5, HEIGHT: 6,
+  HARM_AMP: 10, HARM_PH: 20, NUC_LONG: 30, NUC_RATIO: 31, NUC_HRATIO: 32,
+  NUC_OFFR: 33, NUC_OFFANG: 34, NUC_ROT: 35, NUC_ZFRAC: 36, PRIORITY: 40 };
+
+function rawCandidate(seed, cx, cy, p) {
   const S = p.chunkSize;
-  const j = p.jitter;
-  const margin = (1 - j) / 2;
-  const ux = hashUnit(seed, cx, cy, 0);
-  const uy = hashUnit(seed, cx, cy, 1);
-  const x = (cx + margin + j * ux) * S;
-  const y = (cy + margin + j * uy) * S;
-  const occ = hashUnit(seed, cx, cy, 2);
-  const present = occ < p.density;
-  const rU = hashUnit(seed, cx, cy, 3);
-  const r = p.rMin + rU * (p.rMax - p.rMin);
-  const rot = hashUnit(seed, cx, cy, 4) * Math.PI * 2;
-  return { cx, cy, x, y, r, rot, present };
-}
+  const margin = (1 - p.jitter) / 2;
+  const x = (cx + margin + p.jitter * hashUnit(seed, cx, cy, CH.X)) * S;
+  const y = (cy + margin + p.jitter * hashUnit(seed, cx, cy, CH.Y)) * S;
+  const present = hashUnit(seed, cx, cy, CH.OCC) < p.density;
+  const c = { cx, cy, x, y, present };
+  if (!present) return c;
 
-// Finalized cell: same as chunkCandidate, but with its radius shrunk so it
-// doesn't overlap a PRESENT neighbour's own (raw) candidate. Only looks at
-// the 8 immediate neighbours' raw candidates -- one level, no recursion (a
-// neighbour's own overlap-avoidance is never consulted, so there is no
-// circular "my radius depends on your radius which depends on mine").
-// "mostly non-overlapping" rather than a hard guarantee, as requested.
-function getCell(seed, cx, cy, p) {
-  const c = chunkCandidate(seed, cx, cy, p);
-  if (!c.present || !p.avoidOverlap) return c;
-  let r = c.r;
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      if (dx === 0 && dy === 0) continue;
-      const n = chunkCandidate(seed, cx + dx, cy + dy, p);
-      if (!n.present) continue;
-      const dist = Math.hypot(c.x - n.x, c.y - n.y);
-      const maxR = dist - n.r - 0.5; // 0.5 um clear gap
-      if (maxR < r) r = maxR;
-    }
-  }
-  c.r = Math.max(p.rMin * 0.25, r);
+  // Characteristic size: geometric mean of the two footprint semi-axes
+  // stays within [diamMin/2, diamMax/2] regardless of elongation, so
+  // "diameter" reads the same whether a cell ends up round or stretched.
+  const baseR = lerp(p.cellDiamMin, p.cellDiamMax, hashUnit(seed, cx, cy, CH.SIZE)) / 2;
+  const elong = lerp(p.cellElongMin, p.cellElongMax, hashUnit(seed, cx, cy, CH.ELONG)); // short/long
+  const semiMajor = baseR / Math.sqrt(elong);
+  const semiMinor = semiMajor * elong;
+  const rot = hashUnit(seed, cx, cy, CH.ROT) * Math.PI * 2;
+  const height = lerp(p.cellHeightMin, p.cellHeightMax, hashUnit(seed, cx, cy, CH.HEIGHT));
+
+  const harmAmp = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_AMP + i) * p.cellBlob / k);
+  const harmPh = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_PH + i) * Math.PI * 2);
+  // worst-case outer reach of the wobbly outline -- used for packing/overlap
+  const rOuter = semiMajor * (1 + harmAmp.reduce((s, a) => s + Math.abs(a), 0));
+
+  const nucLong = lerp(p.nucLongMin, p.nucLongMax, hashUnit(seed, cx, cy, CH.NUC_LONG));
+  const nucRatio = lerp(p.nucRatioMin, p.nucRatioMax, hashUnit(seed, cx, cy, CH.NUC_RATIO));
+  const nucShort = nucLong * nucRatio;
+  const nucHRatio = lerp(p.nucHeightMin, p.nucHeightMax, hashUnit(seed, cx, cy, CH.NUC_HRATIO));
+  const nucHeight = nucLong * nucHRatio; // full z-extent of the ellipsoid
+  const offR = hashUnit(seed, cx, cy, CH.NUC_OFFR) * p.nucOffsetFrac * baseR;
+  const offAng = hashUnit(seed, cx, cy, CH.NUC_OFFANG) * Math.PI * 2;
+  const nucRot = hashUnit(seed, cx, cy, CH.NUC_ROT) * Math.PI * 2;
+  const nucZFrac = lerp(0.4, 0.6, hashUnit(seed, cx, cy, CH.NUC_ZFRAC));
+
+  Object.assign(c, {
+    semiMajor, semiMinor, rot, height, harmAmp, harmPh, rOuter,
+    nucLong, nucShort, nucHeight,
+    nucOffX: Math.cos(offAng) * offR, nucOffY: Math.sin(offAng) * offR,
+    nucRot, nucZ: height * nucZFrac,
+    priority: hashUnit(seed, cx, cy, CH.PRIORITY),
+  });
   return c;
 }
 
-// Rough 2D microtubule: a gently-curved random walk seeded off the cell's
-// own chunk address + a per-filament channel, so re-visiting the same chunk
-// always regrows the identical filaments. z is drawn but unused for now --
-// placeholder for the "later also in 3d" extension the user asked for, kept
-// as a real field rather than bolted on afterward.
-function buildMicrotubule(seed, cx, cy, mtIndex, cell, p) {
-  const next = hashStream(seed, cx, cy, 100 + mtIndex);
-  const startAng = next() * Math.PI * 2;
-  const startRad = Math.sqrt(next()) * cell.r * 0.6;
-  let x = cell.x + Math.cos(startAng) * startRad;
-  let y = cell.y + Math.sin(startAng) * startRad;
-  let heading = next() * Math.PI * 2;
-  const totalLen = p.mtLen * cell.r;
-  const steps = Math.max(4, Math.round(totalLen / 1.2));
-  const stepLen = totalLen / steps;
-  const turn = p.mtWav * 0.9; // max radians of heading change per step
-  const pts = [{ x, y, z: 0 }];
-  for (let i = 0; i < steps; i++) {
-    heading += (next() * 2 - 1) * turn;
-    x += Math.cos(heading) * stepLen;
-    y += Math.sin(heading) * stepLen;
-    pts.push({ x, y, z: (next() - 0.5) * 0 }); // z placeholder (2D mock)
+// Local outline radius at world angle theta: an ellipse (semiMajor/semiMinor,
+// rotated by `rot`) modulated by a few angular harmonics for a blobby, non-
+// convex silhouette closer to a real confluent-culture cell outline than a
+// plain ellipse. Modulation is clamped so a large `cellBlob` can't fold the
+// outline through itself.
+function cellRadiusAt(c, thetaWorld) {
+  const phi = thetaWorld - c.rot;
+  const a = c.semiMajor, b = c.semiMinor;
+  const base = (a * b) / Math.hypot(b * Math.cos(phi), a * Math.sin(phi));
+  let mod = 1;
+  for (let i = 0; i < HARM_K.length; i++) mod += c.harmAmp[i] * Math.cos(HARM_K[i] * thetaWorld + c.harmPh[i]);
+  mod = Math.max(0.55, Math.min(1.6, mod));
+  return base * mod;
+}
+function cellOutline(c, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const th = (i / n) * Math.PI * 2;
+    const r = cellRadiusAt(c, th);
+    pts.push([c.x + Math.cos(th) * r, c.y + Math.sin(th) * r]);
   }
   return pts;
 }
 
-function mtCountForCell(seed, cx, cy, cell, p) {
-  // density-scaled, not a hard count -- bigger cells fit more filaments
-  const base = 2 + cell.r * 0.9;
-  return Math.max(0, Math.round(base * p.mtDensity));
+// ---- Packing: move cells apart, never shrink them -------------------------
+// How many chunks away a cell's footprint can plausibly reach -- the local
+// neighbourhood radius used by both relax() and prune() below. Capped at 3
+// so cost per candidate stays bounded even at a small chunk size.
+function interactionChunks(p) {
+  return Math.min(3, Math.max(1, Math.ceil((p.cellDiamMax * 1.4) / p.chunkSize)));
 }
 
-// ---- viewer --------------------------------------------------------------
+function buildCandidateMap(seed, cx0, cy0, cx1, cy1, p) {
+  const map = new Map();
+  for (let cx = cx0; cx <= cx1; cx++)
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const c = rawCandidate(seed, cx, cy, p);
+      if (c.present) map.set(cx + ',' + cy, c);
+    }
+  return map;
+}
+
+// Jacobi relaxation: every candidate looks only at its own fixed-radius
+// neighbourhood (via chunk-address lookup, O(1) each) and, if it overlaps a
+// neighbour, moves away by half the overlap -- each candidate only ever
+// updates ITS OWN position from a same-iteration snapshot, so a pair (A,B)
+// naturally gets pushed apart symmetrically without double-counting: A moves
+// away from B's position and B independently moves away from A's, and by
+// construction those two pushes are equal and opposite. This is why no
+// per-pair bookkeeping or ordering is needed -- the result doesn't depend on
+// Map iteration order, only on the fixed neighbourhood radius and iteration
+// count, matching the "same coordinate always resolves the same" contract
+// (to the extent the query's own outer margin covers the true interaction
+// depth -- see draw()'s margin comment for the one place this is approximate).
+function relax(map, p, iters) {
+  const NR = interactionChunks(p);
+  const damping = p.relaxDamping;
+  const minGapFrac = p.packFrac;
+  for (let it = 0; it < iters; it++) {
+    const disp = new Map();
+    for (const [key, c] of map) {
+      let ax = 0, ay = 0;
+      for (let dx = -NR; dx <= NR; dx++) {
+        for (let dy = -NR; dy <= NR; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          const n = map.get((c.cx + dx) + ',' + (c.cy + dy));
+          if (!n) continue;
+          const vx = c.x - n.x, vy = c.y - n.y;
+          const d = Math.hypot(vx, vy) || 1e-6;
+          const minD = (c.rOuter + n.rOuter) * minGapFrac;
+          if (d < minD) {
+            const overlap = minD - d;
+            ax += (vx / d) * overlap * 0.5;
+            ay += (vy / d) * overlap * 0.5;
+          }
+        }
+      }
+      disp.set(key, [ax * damping, ay * damping]);
+    }
+    for (const [key, c] of map) {
+      const [ax, ay] = disp.get(key);
+      c.x += ax; c.y += ay;
+    }
+  }
+}
+
+// After relaxation, a handful of cells can still be stuck (e.g. three
+// candidates all landing in the same tight corner) -- rather than shrink
+// them, drop the lower-priority one of any pair still badly overlapping.
+// `priority` is a fixed per-candidate hash draw, so both members of a pair
+// agree on the outcome regardless of which one is evaluated first.
+function prune(map, p) {
+  const NR = interactionChunks(p);
+  const minGapFrac = p.packFrac * 0.55; // "genuinely stuck", not just cosy
+  const toRemove = new Set();
+  for (const [key, c] of map) {
+    for (let dx = -NR; dx <= NR; dx++) {
+      for (let dy = -NR; dy <= NR; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const nkey = (c.cx + dx) + ',' + (c.cy + dy);
+        const n = map.get(nkey);
+        if (!n) continue;
+        const d = Math.hypot(c.x - n.x, c.y - n.y);
+        if (d < (c.rOuter + n.rOuter) * minGapFrac) {
+          toRemove.add(c.priority >= n.priority ? nkey : key);
+        }
+      }
+    }
+  }
+  for (const k of toRemove) map.delete(k);
+  return toRemove.size;
+}
+
+// ---- microtubules (unchanged placeholder from the first pass) -------------
+function buildMicrotubule(seed, cx, cy, mtIndex, cell, p) {
+  const next = hashStream(seed, cx, cy, 100 + mtIndex);
+  const startAng = next() * Math.PI * 2;
+  const startRad = Math.sqrt(next()) * cell.semiMinor * 0.6;
+  let x = cell.x + Math.cos(startAng) * startRad;
+  let y = cell.y + Math.sin(startAng) * startRad;
+  let heading = next() * Math.PI * 2;
+  const totalLen = p.mtLen * cell.semiMajor;
+  const steps = Math.max(4, Math.round(totalLen / 1.2));
+  const stepLen = totalLen / steps;
+  const turn = p.mtWav * 0.9;
+  const pts = [{ x, y }];
+  for (let i = 0; i < steps; i++) {
+    heading += (next() * 2 - 1) * turn;
+    x += Math.cos(heading) * stepLen;
+    y += Math.sin(heading) * stepLen;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+function mtCountForCell(cell, p) {
+  return Math.max(0, Math.round((2 + cell.semiMajor * 0.9) * p.mtDensity));
+}
+
+// ---- simple depth colour ramp (blue -> cyan -> green -> yellow -> red) ----
+// Deliberately echoes the "colour by depth (z)" convention used elsewhere in
+// this project's own reference imagery -- makes the nucleus's 3D-ness legible
+// at a glance instead of just being a flat-shaded blob.
+const DEPTH_STOPS = [[0.15, 0.25, 0.9], [0.1, 0.75, 0.85], [0.25, 0.8, 0.25], [0.95, 0.85, 0.15], [0.9, 0.2, 0.15]];
+function depthColor(z, zmin, zmax, alpha) {
+  const t = zmax > zmin ? (z - zmin) / (zmax - zmin) : 0.5;
+  const f = Math.min(0.9999, Math.max(0, t)) * (DEPTH_STOPS.length - 1);
+  const i = Math.floor(f), frac = f - i;
+  const a = DEPTH_STOPS[i], b = DEPTH_STOPS[Math.min(DEPTH_STOPS.length - 1, i + 1)];
+  const r = lerp(a[0], b[0], frac) * 255, g = lerp(a[1], b[1], frac) * 255, bl = lerp(a[2], b[2], frac) * 255;
+  return `rgba(${r | 0},${g | 0},${bl | 0},${alpha})`;
+}
+
+// ---- viewer -----------------------------------------------------------------
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const hud = document.getElementById('hud');
 const host = document.getElementById('canvasHost');
 
-const view = { cx: 0, cy: 0, scale: 8 }; // world center (um), px per um
+const view = { cx: 0, cy: 0, scale: 9, tiltRad: 0 }; // world center (um), px per um
 
-const els = {
-  seed: document.getElementById('seed'),
-  reseed: document.getElementById('reseed'),
-  chunkSize: document.getElementById('chunkSize'),
-  density: document.getElementById('density'),
-  densityVal: document.getElementById('densityVal'),
-  jitter: document.getElementById('jitter'),
-  jitterVal: document.getElementById('jitterVal'),
-  rMin: document.getElementById('rMin'),
-  rMax: document.getElementById('rMax'),
-  avoidOverlap: document.getElementById('avoidOverlap'),
-  showMt: document.getElementById('showMt'),
-  mtDensity: document.getElementById('mtDensity'),
-  mtDensityVal: document.getElementById('mtDensityVal'),
-  mtLen: document.getElementById('mtLen'),
-  mtLenVal: document.getElementById('mtLenVal'),
-  mtWav: document.getElementById('mtWav'),
-  mtWavVal: document.getElementById('mtWavVal'),
-  showGrid: document.getElementById('showGrid'),
-  resetView: document.getElementById('resetView'),
-};
+const els = {};
+['seed', 'reseed', 'chunkSize', 'jitter', 'jitterVal', 'density', 'densityVal',
+ 'cellDiamMin', 'cellDiamMax', 'cellElongMin', 'cellElongMax', 'cellBlob', 'cellBlobVal',
+ 'cellHeightMin', 'cellHeightMax',
+ 'nucLongMin', 'nucLongMax', 'nucRatioMin', 'nucRatioMax', 'nucHeightMin', 'nucHeightMax',
+ 'nucOffsetFrac', 'nucOffsetFracVal',
+ 'enablePacking', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
+ 'tiltDeg', 'tiltDegVal', 'showMt', 'showGrid', 'resetView']
+  .forEach(id => { els[id] = document.getElementById(id); });
 
 function params() {
   return {
     chunkSize: +els.chunkSize.value,
-    density: +els.density.value,
     jitter: +els.jitter.value,
-    rMin: +els.rMin.value,
-    rMax: Math.max(+els.rMin.value, +els.rMax.value),
-    avoidOverlap: els.avoidOverlap.checked,
-    mtDensity: +els.mtDensity.value,
-    mtLen: +els.mtLen.value,
-    mtWav: +els.mtWav.value,
+    density: +els.density.value,
+    cellDiamMin: +els.cellDiamMin.value,
+    cellDiamMax: Math.max(+els.cellDiamMin.value, +els.cellDiamMax.value),
+    cellElongMin: +els.cellElongMin.value,
+    cellElongMax: Math.max(+els.cellElongMin.value, +els.cellElongMax.value),
+    cellBlob: +els.cellBlob.value,
+    cellHeightMin: +els.cellHeightMin.value,
+    cellHeightMax: Math.max(+els.cellHeightMin.value, +els.cellHeightMax.value),
+    nucLongMin: +els.nucLongMin.value,
+    nucLongMax: Math.max(+els.nucLongMin.value, +els.nucLongMax.value),
+    nucRatioMin: +els.nucRatioMin.value,
+    nucRatioMax: Math.max(+els.nucRatioMin.value, +els.nucRatioMax.value),
+    nucHeightMin: +els.nucHeightMin.value,
+    nucHeightMax: Math.max(+els.nucHeightMin.value, +els.nucHeightMax.value),
+    nucOffsetFrac: +els.nucOffsetFrac.value,
+    enablePacking: els.enablePacking.checked,
+    packFrac: +els.packFrac.value,
+    relaxIters: +els.relaxIters.value,
+    relaxDamping: +els.relaxDamping.value,
+    mtDensity: 0.5, mtLen: 1.4, mtWav: 0.35, // microtubule tuning: unchanged from pass 1, not exposed further this round
   };
 }
 
@@ -262,39 +411,129 @@ function resizeCanvas() {
   draw();
 }
 
-function worldToScreen(x, y) {
-  return [
-    cv.width / 2 + (x - view.cx) * view.scale * devicePixelRatio,
-    cv.height / 2 + (y - view.cy) * view.scale * devicePixelRatio,
-  ];
+// Simple oblique projection: x is unaffected by tilt, y is foreshortened by
+// cos(tilt) and z lifts the point on screen by sin(tilt) -- tilt=0 reduces
+// exactly to the original pure top-down view (cos=1, sin=0), tilt>0 reveals
+// height (cell body extrusion, nucleus ellipsoid) the way an isometric-ish
+// camera looking down at an angle would. No azimuth rotation, deliberately
+// kept to the minimum needed to make "in 3D" legible.
+function project(x, y, z) {
+  const dpr = devicePixelRatio;
+  const sx = cv.width / 2 + (x - view.cx) * view.scale * dpr;
+  const sy = cv.height / 2 + ((y - view.cy) * Math.cos(view.tiltRad) - z * Math.sin(view.tiltRad)) * view.scale * dpr;
+  return [sx, sy];
 }
+
+function polyPath(pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+}
+
+function drawCellBody(c, pxPerUm) {
+  const outline = cellOutline(c, 40);
+  const topPts = outline.map(([x, y]) => project(x, y, c.height));
+  const botPts = outline.map(([x, y]) => project(x, y, 0));
+
+  ctx.strokeStyle = 'rgba(90,169,230,0.25)';
+  ctx.lineWidth = 1;
+  polyPath(botPts); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(90,169,230,0.18)';
+  for (let i = 0; i < outline.length; i += 5) {
+    ctx.beginPath();
+    ctx.moveTo(botPts[i][0], botPts[i][1]);
+    ctx.lineTo(topPts[i][0], topPts[i][1]);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(90,169,230,0.14)';
+  ctx.strokeStyle = 'rgba(90,169,230,0.8)';
+  ctx.lineWidth = Math.max(1, 0.05 * pxPerUm);
+  polyPath(topPts); ctx.fill(); ctx.stroke();
+}
+
+const NUC_SLICES = 9, NUC_PTS = 24;
+function drawNucleus(c) {
+  const ncx = c.x + c.nucOffX, ncy = c.y + c.nucOffY;
+  const rz = c.nucHeight / 2;
+  for (let s = 0; s < NUC_SLICES; s++) {
+    const t = (s / (NUC_SLICES - 1)) * 2 - 1; // -1..1, bottom to top
+    const factor = Math.sqrt(Math.max(0, 1 - t * t));
+    if (factor < 0.05) continue;
+    const rl = (c.nucLong / 2) * factor, rs = (c.nucShort / 2) * factor;
+    const zAbs = c.nucZ + t * rz;
+    const pts = [];
+    for (let i = 0; i < NUC_PTS; i++) {
+      const th = (i / NUC_PTS) * Math.PI * 2;
+      const lx = Math.cos(th) * rl, ly = Math.sin(th) * rs;
+      const wx = ncx + lx * Math.cos(c.nucRot) - ly * Math.sin(c.nucRot);
+      const wy = ncy + lx * Math.sin(c.nucRot) + ly * Math.cos(c.nucRot);
+      pts.push(project(wx, wy, zAbs));
+    }
+    ctx.fillStyle = depthColor(zAbs, 0, c.height, 0.5);
+    ctx.strokeStyle = depthColor(zAbs, 0, c.height, 0.85);
+    ctx.lineWidth = 1;
+    polyPath(pts); ctx.fill(); ctx.stroke();
+  }
+}
+
+const CHUNK_CAP = 3500;  // safety net: above this many extended-window chunks, skip packing rather than freeze the tab
+const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip drawing entirely -- each cell body/nucleus
+                          // is dozens of path points, so tens of thousands of them per frame would hang the tab outright,
+                          // not just run slowly. Zoom in instead; this is a "mock explorer" limit, not a renderer.
 
 function draw() {
   const p = params();
   const seed = (+els.seed.value) | 0;
   const S = p.chunkSize;
+  view.tiltRad = (+els.tiltDeg.value) * Math.PI / 180;
   ctx.clearRect(0, 0, cv.width, cv.height);
 
   const halfWUm = (cv.width / devicePixelRatio / 2) / view.scale;
-  const halfHUm = (cv.height / devicePixelRatio / 2) / view.scale;
-  const x0 = view.cx - halfWUm, x1 = view.cx + halfWUm;
-  const y0 = view.cy - halfHUm, y1 = view.cy + halfHUm;
-  const cx0 = Math.floor(x0 / S) - 1, cx1 = Math.ceil(x1 / S) + 1;
-  const cy0 = Math.floor(y0 / S) - 1, cy1 = Math.ceil(y1 / S) + 1;
+  const halfHUm = (cv.height / devicePixelRatio / 2) / view.scale / Math.max(0.15, Math.cos(view.tiltRad));
+  const cx0 = Math.floor((view.cx - halfWUm) / S) - 1, cx1 = Math.ceil((view.cx + halfWUm) / S) + 1;
+  const cy0 = Math.floor((view.cy - halfHUm) / S) - 1, cy1 = Math.ceil((view.cy + halfHUm) / S) + 1;
+  const coreCount = (cx1 - cx0 + 1) * (cy1 - cy0 + 1);
 
-  if (els.showGrid.checked) {
+  if (els.showGrid.checked && coreCount <= RENDER_CAP) {
     ctx.strokeStyle = '#3a4454';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let cx = cx0; cx <= cx1; cx++) {
-      const [sx] = worldToScreen(cx * S, 0);
-      ctx.moveTo(sx, 0); ctx.lineTo(sx, cv.height);
+      const [ax, ay] = project(cx * S, cy0 * S, 0), [bx, by] = project(cx * S, cy1 * S, 0);
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
     }
     for (let cy = cy0; cy <= cy1; cy++) {
-      const [, sy] = worldToScreen(0, cy * S);
-      ctx.moveTo(0, sy); ctx.lineTo(cv.width, sy);
+      const [ax, ay] = project(cx0 * S, cy * S, 0), [bx, by] = project(cx1 * S, cy * S, 0);
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
     }
     ctx.stroke();
+  }
+
+  if (coreCount > RENDER_CAP) {
+    hud.textContent =
+      `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
+      `${coreCount} chunks in view — zoom in to render (cap ${RENDER_CAP})`;
+    return;
+  }
+
+  const NR = interactionChunks(p);
+  const margin = NR + 2;
+  const ex0 = cx0 - margin, ex1 = cx1 + margin, ey0 = cy0 - margin, ey1 = cy1 + margin;
+  const extCount = (ex1 - ex0 + 1) * (ey1 - ey0 + 1);
+  const withinCap = extCount <= CHUNK_CAP;
+
+  const map = withinCap
+    ? buildCandidateMap(seed, ex0, ey0, ex1, ey1, p)
+    : buildCandidateMap(seed, cx0, cy0, cx1, cy1, p); // fall back to core range only, unpacked
+
+  let removed = 0;
+  if (p.enablePacking && withinCap) {
+    const iters = dragging ? Math.min(6, p.relaxIters) : p.relaxIters; // cheap pass while actively panning
+    relax(map, p, iters);
+    removed = prune(map, p);
   }
 
   let nChunks = 0, nCells = 0, nMt = 0;
@@ -303,21 +542,20 @@ function draw() {
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
       nChunks++;
-      const cell = getCell(seed, cx, cy, p);
-      if (!cell.present) continue;
+      const cell = map.get(cx + ',' + cy);
+      if (!cell) continue;
       nCells++;
-      const [sx, sy] = worldToScreen(cell.x, cell.y);
 
       if (els.showMt.checked) {
-        const nMtCell = mtCountForCell(seed, cx, cy, cell, p);
+        const nMtCell = mtCountForCell(cell, p);
         ctx.strokeStyle = '#e6c65a';
-        ctx.lineWidth = Math.max(0.6, 0.12 * pxPerUm);
-        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = Math.max(0.6, 0.1 * pxPerUm);
+        ctx.globalAlpha = 0.8;
         for (let i = 0; i < nMtCell; i++) {
           const pts = buildMicrotubule(seed, cx, cy, i, cell, p);
           ctx.beginPath();
           for (let k = 0; k < pts.length; k++) {
-            const [px, py] = worldToScreen(pts[k].x, pts[k].y);
+            const [px, py] = project(pts[k].x, pts[k].y, 0);
             if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
           }
           ctx.stroke();
@@ -326,20 +564,18 @@ function draw() {
         ctx.globalAlpha = 1;
       }
 
-      ctx.strokeStyle = '#5aa9e6';
-      ctx.lineWidth = Math.max(1, 0.06 * pxPerUm);
-      ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(1, cell.r * pxPerUm), 0, Math.PI * 2);
-      ctx.stroke();
+      drawCellBody(cell, pxPerUm);
+      drawNucleus(cell);
     }
   }
 
   hud.textContent =
-    `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um\n` +
-    `chunks queried ${nChunks}   cells ${nCells}   microtubules ${nMt}`;
+    `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
+    `chunks ${nChunks}   cells ${nCells}   removed (stuck) ${removed}   microtubules ${nMt}` +
+    (withinCap ? '' : '   [packing skipped: zoom in, view too large]');
 }
 
-// ---- pan / zoom -----------------------------------------------------------
+// ---- pan / zoom -------------------------------------------------------------
 let dragging = false, lastX = 0, lastY = 0;
 cv.addEventListener('pointerdown', e => {
   dragging = true; lastX = e.clientX; lastY = e.clientY;
@@ -351,13 +587,14 @@ cv.addEventListener('pointermove', e => {
   const dx = e.clientX - lastX, dy = e.clientY - lastY;
   lastX = e.clientX; lastY = e.clientY;
   view.cx -= dx / view.scale;
-  view.cy -= dy / view.scale;
+  view.cy -= dy / (view.scale * Math.max(0.15, Math.cos(view.tiltRad)));
   draw();
 });
-window.addEventListener('pointerup', e => {
+window.addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
   cv.classList.remove('dragging');
+  draw(); // one full-quality relax pass now that dragging has stopped
 });
 cv.addEventListener('wheel', e => {
   e.preventDefault();
@@ -366,24 +603,29 @@ cv.addEventListener('wheel', e => {
   draw();
 }, { passive: false });
 
-// ---- wiring ----------------------------------------------------------------
+// ---- wiring -------------------------------------------------------------------
 function syncLabels() {
-  els.densityVal.textContent = (+els.density.value).toFixed(2);
   els.jitterVal.textContent = (+els.jitter.value).toFixed(2);
-  els.mtDensityVal.textContent = (+els.mtDensity.value).toFixed(2);
-  els.mtLenVal.textContent = (+els.mtLen.value).toFixed(1) + 'x';
-  els.mtWavVal.textContent = (+els.mtWav.value).toFixed(2);
+  els.densityVal.textContent = (+els.density.value).toFixed(2);
+  els.cellBlobVal.textContent = (+els.cellBlob.value).toFixed(2);
+  els.nucOffsetFracVal.textContent = (+els.nucOffsetFrac.value).toFixed(2);
+  els.packFracVal.textContent = (+els.packFrac.value).toFixed(2);
+  els.relaxItersVal.textContent = els.relaxIters.value;
+  els.relaxDampingVal.textContent = (+els.relaxDamping.value).toFixed(2);
+  els.tiltDegVal.textContent = els.tiltDeg.value + '°';
 }
-[els.seed, els.chunkSize, els.density, els.jitter, els.rMin, els.rMax,
- els.avoidOverlap, els.showMt, els.mtDensity, els.mtLen, els.mtWav, els.showGrid]
-  .forEach(el => el.addEventListener('input', () => { syncLabels(); draw(); }));
+Object.keys(els).forEach(id => {
+  const el = els[id];
+  if (!el || id === 'reseed' || id === 'resetView' || id.endsWith('Val')) return;
+  el.addEventListener('input', () => { syncLabels(); draw(); });
+});
 
 els.reseed.addEventListener('click', () => {
   els.seed.value = (Math.random() * 2 ** 31) | 0;
   draw();
 });
 els.resetView.addEventListener('click', () => {
-  view.cx = 0; view.cy = 0; view.scale = 8;
+  view.cx = 0; view.cy = 0; view.scale = 9;
   draw();
 });
 

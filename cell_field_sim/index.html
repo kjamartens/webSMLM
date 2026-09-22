@@ -44,14 +44,14 @@
       <label class="row"><button id="reseed" style="width:100%">Randomize seed</button></label>
       <label class="row">Chunk size (µm) <input type="number" id="chunkSize" value="26" min="4" max="200" step="1"></label>
       <label class="row">Cell jitter <input type="range" id="jitter" min="0.1" max="1" step="0.02" value="0.8"><span id="jitterVal"></span></label>
-      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.85"><span id="densityVal"></span></label>
+      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.25"><span id="densityVal"></span></label>
     </fieldset>
 
     <fieldset>
       <legend>cell shape (µm, footprint)</legend>
-      <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="30" step="0.5"></div>
-      <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.45" step="0.05"><input type="number" id="cellElongMax" value="0.9" step="0.05"></div>
-      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="0.35"><span id="cellBlobVal"></span></label>
+      <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="35" step="0.5"></div>
+      <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.2" step="0.05"><input type="number" id="cellElongMax" value="0.8" step="0.05"></div>
+      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="1.5"><span id="cellBlobVal"></span></label>
       <div class="pair"><span class="k">Height min/max</span><input type="number" id="cellHeightMin" value="3" step="0.5"><input type="number" id="cellHeightMax" value="6" step="0.5"></div>
     </fieldset>
 
@@ -59,22 +59,33 @@
       <legend>nucleus (3D ellipsoid, µm)</legend>
       <div class="pair"><span class="k">Long axis min/max</span><input type="number" id="nucLongMin" value="8" step="0.5"><input type="number" id="nucLongMax" value="12" step="0.5"></div>
       <div class="pair"><span class="k">Short/long ratio min/max</span><input type="number" id="nucRatioMin" value="0.6" step="0.05"><input type="number" id="nucRatioMax" value="1" step="0.05"></div>
-      <div class="pair"><span class="k">Height (× long axis) min/max</span><input type="number" id="nucHeightMin" value="0.3" step="0.05"><input type="number" id="nucHeightMax" value="0.6" step="0.05"></div>
+      <div class="pair"><span class="k">Height (× long axis) min/max</span><input type="number" id="nucHeightMin" value="0.3" step="0.05"><input type="number" id="nucHeightMax" value="0.5" step="0.05"></div>
       <label class="row">Offset from cell centre <input type="range" id="nucOffsetFrac" min="0" max="1" step="0.02" value="0.1"><span id="nucOffsetFracVal"></span></label>
-      <label class="row">Cell margin around nucleus (µm) <input type="range" id="nucMargin" min="1" max="5" step="0.5" value="1.5"><span id="nucMarginVal"></span></label>
+      <label class="row">Cell margin around nucleus (µm) <input type="range" id="nucMargin" min="0.1" max="1.5" step="0.1" value="1.5"><span id="nucMarginVal"></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>packing — cells move, never shrink</legend>
+      <legend>cytoplasm height (µm, per-cell min/max)</legend>
+      <div class="pair"><span class="k">Rim height min/max</span><input type="number" id="cytoRimHeightMin" value="2" step="0.1"><input type="number" id="cytoRimHeightMax" value="3" step="0.1"></div>
+      <div class="pair"><span class="k">Edge rise distance min/max</span><input type="number" id="cytoEdgeRiseMin" value="0.5" step="0.05"><input type="number" id="cytoEdgeRiseMax" value="1.0" step="0.05"></div>
+      <div class="pair"><span class="k">Mid height min/max</span><input type="number" id="cytoMidHeightMin" value="0.05" step="0.05"><input type="number" id="cytoMidHeightMax" value="0.2" step="0.05"></div>
+      <div class="pair"><span class="k">Dist. from nucleus for mid height min/max (× cell radius)</span><input type="number" id="cytoMidDistanceMin" value="0.5" step="0.05"><input type="number" id="cytoMidDistanceMax" value="0.9" step="0.05"></div>
+      <label class="row">Contour interval <input type="range" id="cytoContourStep" min="0.1" max="1" step="0.05" value="0.25"><span id="cytoContourStepVal"></span></label>
+      <label class="row">Show contour lines <input type="checkbox" id="showCytoContours"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>packing — cells move, rotate, or get removed if still stuck</legend>
       <label class="row">Enable packing <input type="checkbox" id="enablePacking" checked></label>
-      <label class="row">Min gap (× combined radius) <input type="range" id="packFrac" min="0.6" max="1.1" step="0.02" value="0.85"><span id="packFracVal"></span></label>
-      <label class="row">Relaxation iterations <input type="range" id="relaxIters" min="4" max="80" step="1" value="45"><span id="relaxItersVal"></span></label>
-      <label class="row">Relaxation step <input type="range" id="relaxDamping" min="0.1" max="1" step="0.05" value="0.6"><span id="relaxDampingVal"></span></label>
+      <label class="row">Allow rotation <input type="checkbox" id="allowPackRotation" checked></label>
+      <label class="row">Min gap (× combined radius) <input type="range" id="packFrac" min="0.6" max="1.1" step="0.02" value="1.00"><span id="packFracVal"></span></label>
+      <label class="row">Relaxation iterations <input type="range" id="relaxIters" min="4" max="80" step="1" value="12"><span id="relaxItersVal"></span></label>
+      <label class="row">Relaxation step <input type="range" id="relaxDamping" min="0.1" max="1" step="0.05" value="0.2"><span id="relaxDampingVal"></span></label>
     </fieldset>
 
     <fieldset>
       <legend>3D view</legend>
-      <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="35"><span id="tiltDegVal"></span></label>
+      <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="0"><span id="tiltDegVal"></span></label>
       <label class="row">Show microtubules <input type="checkbox" id="showMt" checked></label>
       <label class="row">Show chunk grid <input type="checkbox" id="showGrid"></label>
       <label class="row"><button id="resetView" style="width:100%">Reset view to origin</button></label>
@@ -83,9 +94,13 @@
     <p class="sub">Drag to pan, wheel to zoom. Panning is exactly the drift/
     stage-motion case for demoCam_SMLM_MM: the field doesn't move, the viewport
     (camera FOV) does, and the same world coordinate always re-derives the same
-    structure. When packing is on, overlapping cells push each other apart
-    (never shrink); a cell that's still stuck after relaxation is dropped
-    entirely rather than resized — watch "removed" in the HUD.</p>
+    structure. When packing is on, overlap is measured against each cell's own
+    true (elliptical + blobby) outline, not a circumscribed circle, so cells
+    can nestle along their waists; overlapping cells push each other apart
+    and, if rotation is allowed, also turn to reduce overlap (never shrink).
+    A cell still stuck after relaxation is dropped entirely rather than
+    resized — watch "removed" in the HUD — and the survivors get a short
+    extra settle pass afterwards to close any gap the removal left open.</p>
   </div>
 
   <div id="canvasHost">
@@ -166,7 +181,8 @@ const HARM_K = [2, 3, 5]; // angular harmonics composing the blobby outline
 // older build.
 const CH = { X: 0, Y: 1, OCC: 2, SIZE: 3, ELONG: 4, ROT: 5, HEIGHT: 6,
   HARM_AMP: 10, HARM_PH: 20, NUC_RATIO: 31, NUC_HRATIO: 32,
-  NUC_OFFR: 33, NUC_OFFANG: 34, NUC_ROT: 35, NUC_ZFRAC: 36, PRIORITY: 40 };
+  NUC_OFFR: 33, NUC_OFFANG: 34, NUC_ROT: 35, NUC_ZFRAC: 36, PRIORITY: 40,
+  CYTO_RIM: 41, CYTO_EDGE: 42, CYTO_MID: 43, CYTO_MIDDIST: 44 };
 
 function rawCandidate(seed, cx, cy, p) {
   const S = p.chunkSize;
@@ -240,6 +256,27 @@ function rawCandidate(seed, cx, cy, p) {
 
   envelopNucleus(c, p.nucMargin); // may grow c.semiMajor/semiMinor/height and re-clamp c.nucZ so the nucleus is always fully inside
 
+  // Cytoplasm height profile targets are sampled PER CELL (own hash channels,
+  // same "min/max range -> lerp(hashUnit)" pattern as every other per-cell
+  // field above) rather than read directly off `p` -- cell-to-cell
+  // variability the user asked for, so no two cells' cytoplasm domes look
+  // identical even at fixed params. cytoMidDistance is stored as a FRACTION
+  // of this cell's own rOuter (set below) -- cytoHeightAt multiplies it out
+  // at render time once rOuter is final.
+  c.cytoRimHeight = lerp(p.cytoRimHeightMin, p.cytoRimHeightMax, hashUnit(seed, cx, cy, CH.CYTO_RIM));
+  c.cytoEdgeRise = lerp(p.cytoEdgeRiseMin, p.cytoEdgeRiseMax, hashUnit(seed, cx, cy, CH.CYTO_EDGE));
+  c.cytoMidHeight = lerp(p.cytoMidHeightMin, p.cytoMidHeightMax, hashUnit(seed, cx, cy, CH.CYTO_MID));
+  c.cytoMidDistFrac = lerp(p.cytoMidDistanceMin, p.cytoMidDistanceMax, hashUnit(seed, cx, cy, CH.CYTO_MIDDIST));
+
+  // The cytoplasm height profile (see cytoHeightAt) needs c.height to reach at
+  // least THIS cell's own rim/mid height targets -- envelopNucleus only
+  // floors it against the nucleus's own vertical envelope, which can be
+  // smaller than a user-raised cytoRimHeight/cytoMidHeight (e.g. a short/flat
+  // nucleus). Safe to grow after envelopNucleus's own nucZ clamp: growing
+  // c.height only loosens that clamp's own upper bound, never invalidates the
+  // already-chosen nucZ.
+  c.height = Math.max(c.height, c.cytoRimHeight, c.cytoMidHeight);
+
   // worst-case outer reach of the wobbly outline -- used for packing/overlap; computed AFTER
   // envelopNucleus since that can grow semiMajor. Uses the CLAMPED ceiling
   // (CELL_MOD_MAX), not the unclamped sum of |harmAmp| -- the raw sum can
@@ -251,6 +288,15 @@ function rawCandidate(seed, cx, cy, p) {
   // symmetry fix above.
   c.rOuter = c.semiMajor * CELL_MOD_MAX;
   c.priority = hashUnit(seed, cx, cy, CH.PRIORITY);
+  // Packing-only rigid rotation, layered ON TOP of the local shape (c.rot,
+  // harmAmp/harmPh, nucOffX/Y, nucRot are all still the ORIGINAL, cached,
+  // position-independent local frame -- see cellOutlineLocal's own comment).
+  // Starts at 0 (identical to every build before packing could rotate cells)
+  // and is only ever nudged by relax() below; kept as a separate field rather
+  // than folded into c.rot so getCytoGeometry's per-chunk cache (keyed on
+  // chunk id, built from the local frame only) never needs invalidating when
+  // packing turns a cell.
+  c.packRot = 0;
   return c;
 }
 
@@ -291,16 +337,18 @@ function cellRadiusAt(c, thetaWorld) {
 }
 
 // The full nucleus must always sit inside the cell volume, with at least
-// `marginUm` (floored at 1 -- "minimally 1 um") of clearance on every side.
-// Rather than special-casing the geometry, this samples points on the
-// nucleus's own (possibly offset, possibly rotated) equatorial footprint and
-// grows the cell laterally/vertically only as much as needed to cover them,
-// keeping the cell's own elongation and outline character otherwise intact:
-// scaling semiMajor/semiMinor by the same factor preserves the aspect ratio,
-// and cellRadiusAt() is linear in (semiMajor, semiMinor) at fixed angle, so
-// the required scale factor can be solved for directly instead of guessed at.
+// `marginUm` (floored at 0.1 -- the slider's own minimum, just enough to
+// keep every division by `margin` elsewhere well-defined at the extreme)
+// of clearance on every side. Rather than special-casing the geometry, this
+// samples points on the nucleus's own (possibly offset, possibly rotated)
+// equatorial footprint and grows the cell laterally/vertically only as much
+// as needed to cover them, keeping the cell's own elongation and outline
+// character otherwise intact: scaling semiMajor/semiMinor by the same factor
+// preserves the aspect ratio, and cellRadiusAt() is linear in (semiMajor,
+// semiMinor) at fixed angle, so the required scale factor can be solved for
+// directly instead of guessed at.
 function envelopNucleus(c, marginUm) {
-  const margin = Math.max(1, marginUm);
+  const margin = Math.max(0.1, marginUm);
 
   // Vertical: keep the ellipsoid's [nucZ-rz, nucZ+rz] within [margin, height-margin].
   const rz = c.nucHeight / 2;
@@ -368,22 +416,330 @@ function envelopNucleus(c, marginUm) {
     c.semiMinor *= k;
   }
 }
-function cellOutline(c, n) {
+// Local (centre-relative, NOT translated by c.x/c.y) outline -- every
+// geometry field cellRadiusAt() reads (semiMajor, semiMinor, rot, harmAmp,
+// harmPh, modFloor) is a pure function of (seed, cx, cy, params), never of
+// the cell's own (possibly packing-relaxed) x,y position, so this shape is
+// identical every time a given chunk is asked for it regardless of where the
+// cell has actually settled -- exactly what makes it safe to cache (see
+// getCytoGeometry below) keyed only by chunk coordinates.
+function cellOutlineLocal(c, n) {
   const pts = [];
   for (let i = 0; i < n; i++) {
     const th = (i / n) * Math.PI * 2;
     const r = cellRadiusAt(c, th);
-    pts.push([c.x + Math.cos(th) * r, c.y + Math.sin(th) * r]);
+    pts.push([Math.cos(th) * r, Math.sin(th) * r]);
   }
   return pts;
 }
 
+// ---- Cytoplasm height field -------------------------------------------------
+// The cytoplasm is no longer a flat-topped prism: its top surface is a real
+// height field over the cell's blobby footprint, 0 at the true cell edge,
+// rising to a thin rim, then rising further and faster the closer a point
+// gets to the nucleus, always keeping at least `nucMargin` of vertical
+// clearance above it -- see cytoHeightAt() below for the exact profile.
+// Needs true (not radial) distance to both boundaries, since the nucleus can
+// sit off-centre and the outline is non-convex once cellBlob is pushed up.
+
+function smoothstep(t) {
+  t = Math.max(0, Math.min(1, t));
+  return t * t * (3 - 2 * t);
+}
+
+// True nearest-point distance from (x,y) to the closed outline polyline --
+// plain min-over-segments, since the outline (HARM_K tops out at k=5) has no
+// exotic geometry that needs anything smarter.
+function nearestDistToOutline(pts, x, y) {
+  let best = Infinity;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [ax, ay] = pts[j], [bx, by] = pts[i];
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 > 1e-12 ? ((x - ax) * dx + (y - ay) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + dx * t, py = ay + dy * t;
+    const d = Math.hypot(x - px, y - py);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+// Robust nearest point on an axis-aligned ellipse (semi-axes a>=b>0) to a
+// point (x,y) given relative to the ellipse's own centre -- Eberly's
+// characteristic-equation method, Newton's iteration safeguarded by
+// bisection (F(t) = (a*x0/(t+a^2))^2 + (b*y0/(t+b^2))^2 - 1 is strictly
+// decreasing on t > -b^2, so a bracket [-b^2, a*x0+b*y0] always contains the
+// root; unguarded Newton can otherwise step past t=-b^2 and diverge to NaN).
+function nearestPointOnEllipse(a, b, x, y) {
+  let swapped = false;
+  if (a < b) { [a, b] = [b, a]; [x, y] = [y, x]; swapped = true; }
+  const sx = x < 0 ? -1 : 1, sy = y < 0 ? -1 : 1;
+  const x0 = Math.abs(x), y0 = Math.abs(y);
+  let ex, ey;
+  if (y0 > 1e-9) {
+    if (x0 > 1e-9) {
+      let lo = -b * b, hi = a * x0 + b * y0;
+      let t = (lo + hi) / 2;
+      for (let it = 0; it < 80; it++) {
+        const ta = t + a * a, tb = t + b * b;
+        const rx = (a * x0) / ta, ry = (b * y0) / tb;
+        const f = rx * rx + ry * ry - 1;
+        if (f > 0) lo = t; else hi = t;
+        if (Math.abs(f) < 1e-12) break;
+        const df = -2 * ((a * a * x0 * x0) / (ta * ta * ta) + (b * b * y0 * y0) / (tb * tb * tb));
+        let tNext = df !== 0 ? t - f / df : (lo + hi) / 2;
+        if (!(tNext > lo && tNext < hi)) tNext = (lo + hi) / 2;
+        t = tNext;
+      }
+      ex = (a * a * x0) / (t + a * a);
+      ey = (b * b * y0) / (t + b * b);
+    } else {
+      ex = 0; ey = b;
+    }
+  } else {
+    const numer = a * x0, denom = a * a - b * b;
+    if (denom > 1e-9 && numer < denom) {
+      const xde = numer / denom;
+      ex = a * xde; ey = b * Math.sqrt(Math.max(0, 1 - xde * xde));
+    } else {
+      ex = a; ey = 0;
+    }
+  }
+  ex *= sx; ey *= sy;
+  if (swapped) { const t = ex; ex = ey; ey = t; }
+  return [ex, ey];
+}
+
+// Signed distance from a CELL-CENTRE-RELATIVE point (lx0,ly0 = worldX-c.x,
+// worldY-c.y) to the nucleus ellipse boundary (positive outside, negative
+// inside) -- transforms into the nucleus's own local (un-rotated, un-offset)
+// frame. Takes a centre-relative point rather than a world one (c.nucOffX/Y
+// are themselves already centre-relative) so this needs no c.x/c.y at all,
+// keeping it usable on the cached LOCAL mesh -- see cellOutlineLocal's own
+// comment on why the underlying shape never depends on the cell's actual
+// (packing-relaxed) position.
+function nucleusSignedDistLocal(c, lx0, ly0) {
+  const dx = lx0 - c.nucOffX, dy = ly0 - c.nucOffY;
+  const cr = Math.cos(-c.nucRot), sr = Math.sin(-c.nucRot);
+  const lx = dx * cr - dy * sr, ly = dx * sr + dy * cr;
+  const a = c.nucLong / 2, b = c.nucShort / 2;
+  const [ex, ey] = nearestPointOnEllipse(a, b, lx, ly);
+  const dist = Math.hypot(lx - ex, ly - ey);
+  const inside = (lx * lx) / (a * a) + (ly * ly) / (b * b) < 1;
+  return inside ? -dist : dist;
+}
+
+// The height profile itself: 0 at the true cell edge (dEdge=0), a quick rise
+// to a thin rim as dEdge grows, then -- independently -- a slow further rise
+// to a mid height as the point gets within `c.cytoMidDistFrac*c.rOuter` of the
+// nucleus edge (dNuc), and finally a rapid rise (within `nucMargin`, the SAME
+// margin envelopNucleus already keeps as the nucleus's own vertical
+// clearance) up to c.height, which fully envelops the nucleus. All four of
+// cytoRimHeight/cytoEdgeRise/cytoMidHeight/cytoMidDistFrac are PER-CELL
+// fields (sampled in rawCandidate from their own min/max range, like every
+// other per-cell shape field), not global params -- cell-to-cell variability,
+// not one fixed dome shape for every cell. Combining the two rises with max()
+// rather than picking one or the other keeps the whole thing monotonic along
+// a typical edge->nucleus path with no hard seam: hEdge already owns the
+// region right at the true perimeter (where hNuc's own far-field value is
+// just the flat cytoRimHeight anyway), and hNuc takes over once it exceeds
+// hEdge's own saturated rim value.
+//
+// That max() alone is NOT enough to guarantee the cytoplasm reaches 0 at the
+// true edge, though: if the nucleus sits close enough to the membrane (a
+// legal, `envelopNucleus`-guaranteed configuration, not an edge case to
+// dismiss), a point right at dEdge=0 can still have a small dNuc, and hNuc's
+// own envelope rise (up to c.height) would leak straight through the max()
+// and past the true boundary -- a real, reported bug. `edgeCeiling` is a
+// second, HARD ceiling driven only by dEdge, saturating to the full
+// `c.height` (not just cytoRimHeight, so it never constrains a legitimate
+// interior/envelope height once actually away from the edge) -- at dEdge=0
+// it is exactly 0, so the final min() always forces the boundary to 0
+// regardless of how close the nucleus is, while barely affecting anything
+// away from dEdge=0 (it saturates on the same short `cytoEdgeRise` scale, so
+// it only ever binds in the last sliver next to the true membrane).
+function cytoHeightAt(c, p, dEdge, dNuc) {
+  const margin = Math.max(0.1, p.nucMargin);
+  const riseScale = Math.max(1e-6, c.cytoEdgeRise);
+  const midDist = Math.max(0, c.cytoMidDistFrac) * c.rOuter;
+  const hEdge = c.cytoRimHeight * (1 - Math.exp(-dEdge / riseScale));
+  let hNuc;
+  if (dNuc <= 0) {
+    hNuc = c.height;
+  } else if (dNuc < margin) {
+    hNuc = lerp(c.cytoMidHeight, c.height, smoothstep(1 - dNuc / margin));
+  } else if (dNuc < margin + midDist) {
+    hNuc = lerp(c.cytoRimHeight, c.cytoMidHeight, smoothstep(1 - (dNuc - margin) / Math.max(1e-6, midDist)));
+  } else {
+    hNuc = c.cytoRimHeight;
+  }
+  const h = Math.min(c.height, Math.max(hEdge, hNuc));
+  const edgeCeiling = c.height * (1 - Math.exp(-dEdge / riseScale));
+  return Math.min(h, edgeCeiling);
+}
+
+// Builds the height-field mesh as RINGS concentric copies of the cell's own
+// outline, shrunk radially FROM THE CELL CENTRE towards it (a "polar" grid in
+// (ring, outline-index) space rather than a rectangular xy grid) -- the
+// outline itself is already defined as r(theta) from the cell centre
+// (cellRadiusAt), so scaling every outline point by a fraction in [0,1]
+// always stays strictly inside the (possibly blobby, non-convex) footprint,
+// with NO point-in-polygon test needed and the outer ring exactly matching
+// the rendered silhouette (no staircase edge, unlike an axis-aligned grid
+// clipped to the polygon -- tried first, and visibly blocky at any
+// reasonable grid spacing). Ring spacing is biased towards the outer edge
+// (`RING_BIAS`>1) so there's enough radial resolution to actually resolve
+// `cytoEdgeRise` (as small as 0.05 um) against a footprint that can be tens
+// of um across; the interior, where the profile only ever changes slowly
+// (the mid-height/nucleus-margin bands), doesn't need that same density.
+// Local (centre-relative) grid, same reasoning as cellOutlineLocal above --
+// every input (localOutlinePts, c.nucOffX/Y/Rot/Long/Short, c.height) is a
+// pure function of (seed,cx,cy,params), so this whole build is cacheable per
+// chunk regardless of the cell's actual (packing-relaxed) position. This is
+// the expensive HALF of the whole feature (a Newton solve per vertex for the
+// nucleus distance, an O(n) nearest-segment search per vertex for the edge
+// distance) -- redoing it from scratch every draw() call, including every
+// frame of a plain pan/zoom/tilt drag where NONE of this actually changes,
+// was PART of a real, reported "incredibly slow when moving around" (see
+// getCytoGeometry's own cache below for that half); a profiler run on the
+// other half (the CANVAS DRAW calls themselves: rings*n quads, each its own
+// fill+stroke) found THAT to be the larger cost, since drawing is inherently
+// per-frame regardless of caching -- `rings`/`n` (mesh resolution) is kept
+// modest for exactly that reason, not just to bound the math above.
+const CYTO_RINGS = 10, CYTO_RING_BIAS = 2.4;
+// A few Laplacian-style smoothing passes (average with ring/theta neighbours)
+// take the edge off small facet-to-facet jumps in the raw profile, purely
+// cosmetic -- theta wraps around, the outer ring (k=rings) is deliberately
+// EXCLUDED so the true edge stays pinned at exactly 0 (the guarantee
+// cytoHeightAt's own edgeCeiling establishes must survive this pass
+// untouched), and the degenerate centre ring (k=0, every theta collapses to
+// the same point by construction) is left alone too since smoothing it is a
+// no-op anyway.
+const CYTO_SMOOTH_PASSES = 2;
+function smoothCytoGrid(grid, rings, n) {
+  for (let pass = 0; pass < CYTO_SMOOTH_PASSES; pass++) {
+    const next = new Array(rings + 1);
+    for (let k = 1; k < rings; k++) {
+      next[k] = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const im = (i - 1 + n) % n, ip = (i + 1) % n;
+        next[k][i] = (grid[k][im].h + grid[k][ip].h + grid[k - 1][i].h + grid[k + 1][i].h + grid[k][i].h) / 5;
+      }
+    }
+    for (let k = 1; k < rings; k++) for (let i = 0; i < n; i++) grid[k][i].h = next[k][i];
+  }
+}
+function buildCytoMesh(c, p, localOutlinePts) {
+  const rings = CYTO_RINGS;
+  const n = localOutlinePts.length;
+  const grid = [];
+  for (let k = 0; k <= rings; k++) {
+    const frac = k === rings ? 1 : 1 - Math.pow(1 - k / rings, CYTO_RING_BIAS);
+    const row = [];
+    for (let i = 0; i < n; i++) {
+      const [ex, ey] = localOutlinePts[i];
+      const lx = ex * frac, ly = ey * frac;
+      const dEdge = frac >= 1 ? 0 : nearestDistToOutline(localOutlinePts, lx, ly);
+      const dNuc = nucleusSignedDistLocal(c, lx, ly);
+      row.push({ x: lx, y: ly, h: cytoHeightAt(c, p, dEdge, dNuc) });
+    }
+    grid.push(row);
+  }
+  smoothCytoGrid(grid, rings, n);
+  return { rings, n, grid };
+}
+
+// Small per-chunk cache: the cell shape/mesh above never depends on the
+// cell's own x,y (only its chunk identity + the params that feed
+// rawCandidate/envelopNucleus/cytoHeightAt), so it's safe to compute once and
+// reuse across every frame of a pan/zoom/tilt drag -- the caller re-adds the
+// CURRENT c.x,c.y at draw time (see drawCellBody), so a position that shifts
+// slightly between frames (packing's relax() re-runs from scratch every
+// draw() call) still renders correctly with no cache invalidation needed for
+// that. Cleared whenever any shape-affecting parameter (or the seed) changes,
+// and hard-capped so panning across a large area over a long session can't
+// grow it without bound.
+const CYTO_CACHE_MAX = 6000;
+const cytoCache = new Map();
+let cytoCacheSig = null;
+function cytoGeometrySignature(seed, p) {
+  return [seed, p.cellDiamMin, p.cellDiamMax, p.cellElongMin, p.cellElongMax, p.cellBlob,
+    p.cellHeightMin, p.cellHeightMax, p.nucLongMin, p.nucLongMax, p.nucRatioMin, p.nucRatioMax,
+    p.nucHeightMin, p.nucHeightMax, p.nucOffsetFrac, p.nucMargin,
+    p.cytoRimHeightMin, p.cytoRimHeightMax, p.cytoEdgeRiseMin, p.cytoEdgeRiseMax,
+    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax].join('|');
+}
+function ensureCytoCacheFresh(seed, p) {
+  const sig = cytoGeometrySignature(seed, p);
+  if (sig !== cytoCacheSig) { cytoCache.clear(); cytoCacheSig = sig; }
+  else if (cytoCache.size > CYTO_CACHE_MAX) { cytoCache.clear(); }
+}
+// n=64 (down from the silhouette's own 120-point sampling elsewhere) --
+// theta resolution directly multiplies quad count (rings*n, each its own
+// canvas fill+stroke), the dominant per-frame drawing cost; 64 is still
+// smooth enough for the outer silhouette at any reasonable zoom.
+const CYTO_MESH_THETA = 64;
+function getCytoGeometry(c, p) {
+  const key = c.cx + ',' + c.cy;
+  let entry = cytoCache.get(key);
+  if (entry) return entry;
+  const localOutline = cellOutlineLocal(c, CYTO_MESH_THETA);
+  const mesh = buildCytoMesh(c, p, localOutline);
+  entry = { localOutline, mesh };
+  cytoCache.set(key, entry);
+  return entry;
+}
+
+// Standard marching squares, generalised to the polar (ring, theta-index)
+// mesh above: theta wraps around (i+1 mod n), ring does not. Returns
+// segments in whatever frame the mesh itself is in (local, per
+// buildCytoMesh) with z = the iso-level (contour height) -- the caller
+// translates by c.x,c.y before projecting.
+function marchingSquaresContours(mesh, levels) {
+  const { rings, n, grid } = mesh;
+  const segs = [];
+  for (let k = 0; k < rings; k++) {
+    for (let i = 0; i < n; i++) {
+      const i2 = (i + 1) % n;
+      const p00 = grid[k][i], p10 = grid[k][i2], p11 = grid[k + 1][i2], p01 = grid[k + 1][i];
+      const edges = [[p00, p10], [p10, p11], [p11, p01], [p01, p00]];
+      for (const lvl of levels) {
+        const pts = [];
+        for (const [a, b] of edges) {
+          if ((a.h - lvl) * (b.h - lvl) < 0) {
+            const t = (lvl - a.h) / (b.h - a.h);
+            pts.push([a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t]);
+          }
+        }
+        if (pts.length === 2) segs.push({ x1: pts[0][0], y1: pts[0][1], x2: pts[1][0], y2: pts[1][1], z: lvl });
+      }
+    }
+  }
+  return segs;
+}
+
 // ---- Packing: move cells apart, never shrink them -------------------------
 // How many chunks away a cell's footprint can plausibly reach -- the local
-// neighbourhood radius used by both relax() and prune() below. Capped at 3
-// so cost per candidate stays bounded even at a small chunk size.
+// neighbourhood radius used by both relax() and prune() below.
+//
+// MUST be sized off the worst-case COMBINED reach of two cells (2x the
+// largest rOuter either one could possibly draw), not cellDiamMax alone --
+// cellDiamMax is the pre-elongation, pre-blob "diameter" input, and a cell
+// drawn towards the elongated end of cellElongMin/blobby end of cellBlob can
+// have an actual rOuter well past that. Underestimating this window isn't
+// just "packing works a bit less well" -- relax()/prune() literally never
+// SEE a pair outside it at all (chunk-address lookup only checks +-NR), so
+// no amount of relaxation iterations or pruning aggressiveness can ever fix
+// an overlap between two cells more than NR chunks apart. A real, reported
+// case: default params (cellDiamMax 35, cellElongMin 0.2) give a worst-case
+// rOuter of ~65 um -- 2.5 chunks at the default 26 um chunk size -- against
+// the OLD formula's NR=2, so plenty of real, visibly-overlapping pairs sat
+// just outside the search window and were never touched.
 function interactionChunks(p) {
-  return Math.min(3, Math.max(1, Math.ceil((p.cellDiamMax * 1.4) / p.chunkSize)));
+  const worstSemiMajor = (p.cellDiamMax / 2) / Math.sqrt(Math.max(0.05, p.cellElongMin));
+  const worstROuter = worstSemiMajor * CELL_MOD_MAX;
+  return Math.min(6, Math.max(1, Math.ceil((2 * worstROuter) / p.chunkSize)));
 }
 
 function buildCandidateMap(seed, cx0, cy0, cx1, cy1, p) {
@@ -396,58 +752,269 @@ function buildCandidateMap(seed, cx0, cy0, cx1, cy1, p) {
   return map;
 }
 
+// cellRadiusAt(c, theta) is a pure function of c's own LOCAL shape (harmAmp/
+// harmPh/rot/modFloor/semiMajor/semiMinor) -- never of c.x/c.y or c.packRot
+// -- so its value at any given angle is exactly as reusable across an entire
+// relax() call (every iteration, every neighbour, every rotation trial) as
+// getCytoGeometry's own per-chunk mesh cache is across a whole pan/zoom/tilt
+// drag. Collision used to call it fresh on every one of those (a handful of
+// Math.cos calls each, for the base ellipse AND the 3-term harmonic sum) --
+// this precomputes a fixed-resolution lookup table ONCE per candidate
+// (lazily, cached directly on the object -- candidates themselves are
+// rebuilt fresh every draw() call, so no separate invalidation is needed)
+// and answers every later query with a lerp between two table entries, no
+// trig at all. A real, reported case: this is what turned "accurate but
+// unusably slow" (over a second per draw() at realistic view sizes) into
+// something a live drag can actually run every pointermove.
+const RADIUS_LUT_N = 128;
+const TWO_PI = Math.PI * 2;
+function ensureRadiusLUT(c) {
+  let lut = c._radiusLUT;
+  if (lut) return lut;
+  lut = new Float32Array(RADIUS_LUT_N);
+  for (let i = 0; i < RADIUS_LUT_N; i++) lut[i] = cellRadiusAt(c, (i / RADIUS_LUT_N) * Math.PI * 2);
+  c._radiusLUT = lut;
+  return lut;
+}
+function radiusFromLUT(lut, thetaLocal) {
+  let t = thetaLocal % TWO_PI;
+  if (t < 0) t += TWO_PI;
+  const f = (t / TWO_PI) * RADIUS_LUT_N;
+  const i0 = f | 0, i1 = (i0 + 1) % RADIUS_LUT_N;
+  const frac = f - i0;
+  return lut[i0] * (1 - frac) + lut[i1] * frac;
+}
+// The OUTLINE_SAMPLE_N boundary sample points themselves (see
+// boundaryClearance below) sit at the SAME fixed local angles every time
+// too -- precomputed once per candidate alongside the LUT, as (x,y) pairs in
+// the packRot=0 frame, so applying the CURRENT packRot at collision time is
+// just one rotation per point, not a re-derivation of r(theta) itself.
+function ensureCollisionOutline(c) {
+  let pts = c._collisionLocal;
+  if (pts) return pts;
+  const lut = ensureRadiusLUT(c);
+  pts = new Float32Array(OUTLINE_SAMPLE_N * 2);
+  for (let i = 0; i < OUTLINE_SAMPLE_N; i++) {
+    const th = (i / OUTLINE_SAMPLE_N) * TWO_PI;
+    const r = radiusFromLUT(lut, th);
+    pts[i * 2] = r * Math.cos(th);
+    pts[i * 2 + 1] = r * Math.sin(th);
+  }
+  c._collisionLocal = pts;
+  return pts;
+}
+
+// True minimum clearance between two candidates' actual (blobby, elliptical,
+// packRot-rotated) outlines -- NEGATIVE when they already penetrate. Checked
+// first as "does one cell's own boundary land inside the other," sampled
+// densely around BOTH outlines, not just along the straight line joining the
+// two centres: a single-bearing check (a narrow fan around that one line --
+// what this used to be) is blind to a lobe that pokes out to the SIDE, at an
+// angle nothing to do with where the neighbour's centre happens to sit --
+// verified directly on a real, reported "still overlapping" case: the
+// single-bearing check reported zero overlap for a neighbourhood a dense,
+// full-boundary sweep found up to 26 um of actual penetration in. HARM_K
+// tops out at k=5, so OUTLINE_SAMPLE_N=16 per side comfortably resolves
+// every real lobe/dimple the outline can have.
+const OUTLINE_SAMPLE_N = 16;
+function boundaryClearance(c, n) {
+  let minGap = Infinity;
+  const crot = c.packRot || 0, nrot = n.packRot || 0;
+  const cCos = Math.cos(crot), cSin = Math.sin(crot);
+  const nCos = Math.cos(nrot), nSin = Math.sin(nrot);
+  const cPts = ensureCollisionOutline(c), nPts = ensureCollisionOutline(n);
+  const cLUT = ensureRadiusLUT(c), nLUT = ensureRadiusLUT(n);
+  for (let i = 0; i < OUTLINE_SAMPLE_N; i++) {
+    const lx = cPts[i * 2], ly = cPts[i * 2 + 1];
+    const wx = c.x + lx * cCos - ly * cSin, wy = c.y + lx * cSin + ly * cCos;
+    const bdx = wx - n.x, bdy = wy - n.y;
+    const bd = Math.hypot(bdx, bdy);
+    const gap = bd - radiusFromLUT(nLUT, Math.atan2(bdy, bdx) - nrot);
+    if (gap < minGap) minGap = gap;
+  }
+  for (let i = 0; i < OUTLINE_SAMPLE_N; i++) {
+    const lx = nPts[i * 2], ly = nPts[i * 2 + 1];
+    const wx = n.x + lx * nCos - ly * nSin, wy = n.y + lx * nSin + ly * nCos;
+    const adx = wx - c.x, ady = wy - c.y;
+    const ad = Math.hypot(adx, ady);
+    const gap = ad - radiusFromLUT(cLUT, Math.atan2(ady, adx) - crot);
+    if (gap < minGap) minGap = gap;
+  }
+  return minGap;
+}
+
+// Overlap amount for the relax/prune loops below, still expressed against
+// the "Min gap (x combined radius)" slider's own meaning: ra/rb (each cell's
+// TRUE reach along the straight line joining the two centres, no fan needed
+// any more now that boundaryClearance covers the full outline) set the scale
+// a shortfall is measured against, and minGapFrac<1 allows the true outlines
+// to sit up to (ra+rb)*(1-minGapFrac) INTO each other before it counts as a
+// violation -- same tolerance semantics the old circle model had, just
+// applied to the real clearance instead of an approximated one.
+function directionalOverlap(c, n, minGapFrac) {
+  const dx = n.x - c.x, dy = n.y - c.y;
+  const d = Math.hypot(dx, dy) || 1e-6;
+  const thetaAB = Math.atan2(dy, dx);
+  const ra = radiusFromLUT(ensureRadiusLUT(c), thetaAB - (c.packRot || 0));
+  const rb = radiusFromLUT(ensureRadiusLUT(n), thetaAB + Math.PI - (n.packRot || 0));
+  const allowedPenetration = (ra + rb) * (1 - minGapFrac);
+  const clearance = boundaryClearance(c, n);
+  return { overlap: -allowedPenetration - clearance, ux: dx / d, uy: dy / d };
+}
+
+// Trial rotation step for the hill-climb below, and the sum of every
+// still-positive directional overlap a candidate has with its current
+// neighbourhood AT A GIVEN packRot (temporarily substituted in, then
+// restored -- cheaper than threading a "what-if" rotation through every
+// call site).
+const PACK_ROT_TRIAL = 12 * Math.PI / 180;
+function totalDirOverlap(c, neighbors, minGapFrac, packRotTrial) {
+  const saved = c.packRot;
+  c.packRot = packRotTrial;
+  let total = 0;
+  for (const n of neighbors) {
+    const ov = directionalOverlap(c, n, minGapFrac).overlap;
+    if (ov > 0) total += ov;
+  }
+  c.packRot = saved;
+  return total;
+}
+
 // Jacobi relaxation: every candidate looks only at its own fixed-radius
 // neighbourhood (via chunk-address lookup, O(1) each) and, if it overlaps a
-// neighbour, moves away by half the overlap -- each candidate only ever
-// updates ITS OWN position from a same-iteration snapshot, so a pair (A,B)
-// naturally gets pushed apart symmetrically without double-counting: A moves
-// away from B's position and B independently moves away from A's, and by
-// construction those two pushes are equal and opposite. This is why no
-// per-pair bookkeeping or ordering is needed -- the result doesn't depend on
-// Map iteration order, only on the fixed neighbourhood radius and iteration
-// count, matching the "same coordinate always resolves the same" contract
-// (to the extent the query's own outer margin covers the true interaction
-// depth -- see draw()'s margin comment for the one place this is approximate).
+// neighbour, moves away by half the overlap AND, if rotation is allowed, also
+// tries turning a little -- each candidate only ever updates ITS OWN
+// position/rotation from a same-iteration snapshot, so a pair (A,B) naturally
+// gets pushed apart symmetrically without double-counting, and the result
+// doesn't depend on Map iteration order, only on the fixed neighbourhood
+// radius and iteration count (matching the "same coordinate always resolves
+// the same" contract, to the extent the query's own outer margin covers the
+// true interaction depth -- see draw()'s margin comment for the one place
+// this is approximate).
+//
+// Rotation is a genuinely separate degree of freedom from translation, not a
+// cosmetic addition: a long thin cell wedged between two neighbours often
+// only needs to turn its waist towards them, and pure translation (the
+// original version of this function) can't do that -- it can only shove the
+// whole body sideways, which for a crossed pair of elongated cells means
+// pushing them implausibly far apart, or leaving them stuck for prune() to
+// remove, when a small turn would have cleanly separated them instead. The
+// rotation trial is a plain 3-way hill-climb (stay / +step / -step, each
+// costing one totalDirOverlap pass over this candidate's own neighbour list)
+// rather than an analytic torque -- the outline is a clamped harmonic sum,
+// not something with a clean closed-form derivative, and at the neighbourhood
+// sizes NR actually reaches (<=3 chunks) a few extra directional-radius calls
+// per candidate per iteration is cheap; skipped entirely when the candidate
+// has no overlap this iteration; both the rotation checkbox and PACK_ROT_TRIAL are also
+// the mechanism prune()'s own accurate check inherits for free, see below.
 function relax(map, p, iters) {
   const NR = interactionChunks(p);
   const damping = p.relaxDamping;
   const minGapFrac = p.packFrac;
+  const allowRot = p.allowPackRotation;
+
+  // Chunk-adjacency depends only on chunk COORDINATES, which never change
+  // during relaxation (only c.x/c.y/c.packRot do) -- built once per relax()
+  // call rather than re-walking the (2*NR+1)^2 window with a fresh
+  // string-keyed Map.get for every candidate on EVERY iteration. That
+  // per-iteration rebuild was itself a real share of the cost once NR grew
+  // from the old ~2-3 to the correctness-driven ~5-6 (interactionChunks's
+  // own comment) -- a real, reported case: even after the LUT-based
+  // boundaryClearance fix below, a realistic view still took several hundred
+  // ms per draw(), well past what a live drag needs.
+  const chunkNbrs = new Map();
+  for (const [key, c] of map) {
+    const list = [];
+    for (let dx = -NR; dx <= NR; dx++) {
+      for (let dy = -NR; dy <= NR; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const n = map.get((c.cx + dx) + ',' + (c.cy + dy));
+        if (n) list.push(n);
+      }
+    }
+    chunkNbrs.set(key, list);
+  }
+
   for (let it = 0; it < iters; it++) {
     const disp = new Map();
     for (const [key, c] of map) {
-      let ax = 0, ay = 0;
-      for (let dx = -NR; dx <= NR; dx++) {
-        for (let dy = -NR; dy <= NR; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          const n = map.get((c.cx + dx) + ',' + (c.cy + dy));
-          if (!n) continue;
-          const vx = c.x - n.x, vy = c.y - n.y;
-          const d = Math.hypot(vx, vy) || 1e-6;
-          const minD = (c.rOuter + n.rOuter) * minGapFrac;
-          if (d < minD) {
-            const overlap = minD - d;
-            ax += (vx / d) * overlap * 0.5;
-            ay += (vy / d) * overlap * 0.5;
-          }
+      // Cheap circle-sum broad-phase reject before the several-times-more-
+      // expensive directional check below: NR itself has to be sized for the
+      // WORST-case elongation+blob any cell in this dataset could possibly
+      // draw (see interactionChunks's own comment), but almost every actual
+      // cell's rOuter is well under that ceiling, so most of an NR-chunk
+      // window holds pairs nowhere near close enough to matter. Filtering
+      // here (once per candidate per iteration) rather than inside
+      // directionalOverlap/totalDirOverlap (called up to 4x per neighbour
+      // below) is what makes the wider, correctness-driven NR affordable.
+      const neighbors = [];
+      for (const n of chunkNbrs.get(key)) {
+        const dxp = n.x - c.x, dyp = n.y - c.y;
+        const maxD = c.rOuter + n.rOuter;
+        if (dxp * dxp + dyp * dyp <= maxD * maxD) neighbors.push(n);
+      }
+
+      // curOverlapSum is free here (already summing per-neighbour overlap
+      // for the translation push below), so the rotation trial only needs
+      // TWO more totalDirOverlap passes (+-PACK_ROT_TRIAL), not three -- and
+      // over `overlapping` (the neighbours actually contributing right now),
+      // not the full broad-phase `neighbors` list: a +-12 degree nudge can't
+      // plausibly create a NEW overlap with something that wasn't already
+      // close, and if it somehow did, next iteration's translation pass
+      // (which always scans the full list) catches it.
+      let ax = 0, ay = 0, curOverlapSum = 0;
+      const overlapping = [];
+      for (const n of neighbors) {
+        const { overlap, ux, uy } = directionalOverlap(c, n, minGapFrac);
+        if (overlap > 0) {
+          curOverlapSum += overlap;
+          overlapping.push(n);
+          ax += -ux * overlap * 0.5;
+          ay += -uy * overlap * 0.5;
         }
       }
-      disp.set(key, [ax * damping, ay * damping]);
+
+      let rotDelta = 0;
+      if (allowRot && overlapping.length) {
+        const plus = totalDirOverlap(c, overlapping, minGapFrac, (c.packRot || 0) + PACK_ROT_TRIAL);
+        const minus = totalDirOverlap(c, overlapping, minGapFrac, (c.packRot || 0) - PACK_ROT_TRIAL);
+        if (plus < curOverlapSum && plus <= minus) rotDelta = PACK_ROT_TRIAL;
+        else if (minus < curOverlapSum) rotDelta = -PACK_ROT_TRIAL;
+      }
+
+      disp.set(key, [ax * damping, ay * damping, rotDelta * damping]);
     }
     for (const [key, c] of map) {
-      const [ax, ay] = disp.get(key);
+      const [ax, ay, ar] = disp.get(key);
       c.x += ax; c.y += ay;
+      if (ar) c.packRot = (c.packRot || 0) + ar;
     }
   }
 }
 
-// After relaxation, a handful of cells can still be stuck (e.g. three
-// candidates all landing in the same tight corner) -- rather than shrink
-// them, drop the lower-priority one of any pair still badly overlapping.
-// `priority` is a fixed per-candidate hash draw, so both members of a pair
-// agree on the outcome regardless of which one is evaluated first.
+// After relaxation, some cells can still be left overlapping -- packing a
+// dense, non-convex, anisotropic field by translation+rotation alone doesn't
+// always converge within a bounded iteration count (verified: it CAN reach
+// zero given enough iterations on the same data, just not always the
+// default/UI-reachable amount) -- so prune() is the backstop that actually
+// GUARANTEES no overlap survives, by dropping the lower-priority cell of
+// every pair still overlapping under the SAME "Min gap" definition packing
+// itself targets (p.packFrac, not a looser "only if REALLY stuck" fraction
+// -- a real, reported case: dialing relaxation iterations to the UI max
+// still left plainly-overlapping cell bodies on screen, because this used to
+// only remove a pair overlapping by MORE than 45% of their combined
+// directional reach, leaving every lesser-but-still-visible overlap
+// untouched. The user is explicitly fine with removal doing this work --
+// rather than shrinking a cell (which would silently break "diameter"
+// meaning what the sidebar says) or leaving a residual overlap on screen,
+// drop it). `priority` is a fixed per-candidate hash draw, so both members
+// of a pair agree on the outcome regardless of which one is evaluated
+// first; run twice (see draw()'s own call site) since removing one cell of
+// a crowded trio can newly satisfy pairs that a single pass, working from a
+// pre-removal snapshot, couldn't yet see as resolved.
 function prune(map, p) {
   const NR = interactionChunks(p);
-  const minGapFrac = p.packFrac * 0.55; // "genuinely stuck", not just cosy
+  const minGapFrac = p.packFrac;
   const toRemove = new Set();
   for (const [key, c] of map) {
     for (let dx = -NR; dx <= NR; dx++) {
@@ -456,8 +1023,12 @@ function prune(map, p) {
         const nkey = (c.cx + dx) + ',' + (c.cy + dy);
         const n = map.get(nkey);
         if (!n) continue;
-        const d = Math.hypot(c.x - n.x, c.y - n.y);
-        if (d < (c.rOuter + n.rOuter) * minGapFrac) {
+        // Same cheap broad-phase reject as relax() -- see that call site's
+        // own comment.
+        const dxp = n.x - c.x, dyp = n.y - c.y;
+        const maxD = c.rOuter + n.rOuter;
+        if (dxp * dxp + dyp * dyp > maxD * maxD) continue;
+        if (directionalOverlap(c, n, minGapFrac).overlap > 0) {
           toRemove.add(c.priority >= n.priority ? nkey : key);
         }
       }
@@ -520,7 +1091,10 @@ const els = {};
  'cellHeightMin', 'cellHeightMax',
  'nucLongMin', 'nucLongMax', 'nucRatioMin', 'nucRatioMax', 'nucHeightMin', 'nucHeightMax',
  'nucOffsetFrac', 'nucOffsetFracVal', 'nucMargin', 'nucMarginVal',
- 'enablePacking', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
+ 'cytoRimHeightMin', 'cytoRimHeightMax', 'cytoEdgeRiseMin', 'cytoEdgeRiseMax',
+ 'cytoMidHeightMin', 'cytoMidHeightMax', 'cytoMidDistanceMin', 'cytoMidDistanceMax',
+ 'cytoContourStep', 'cytoContourStepVal', 'showCytoContours',
+ 'enablePacking', 'allowPackRotation', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
  'tiltDeg', 'tiltDegVal', 'showMt', 'showGrid', 'resetView']
   .forEach(id => { els[id] = document.getElementById(id); });
 
@@ -544,7 +1118,18 @@ function params() {
     nucHeightMax: Math.max(+els.nucHeightMin.value, +els.nucHeightMax.value),
     nucOffsetFrac: +els.nucOffsetFrac.value,
     nucMargin: +els.nucMargin.value,
+    cytoRimHeightMin: +els.cytoRimHeightMin.value,
+    cytoRimHeightMax: Math.max(+els.cytoRimHeightMin.value, +els.cytoRimHeightMax.value),
+    cytoEdgeRiseMin: +els.cytoEdgeRiseMin.value,
+    cytoEdgeRiseMax: Math.max(+els.cytoEdgeRiseMin.value, +els.cytoEdgeRiseMax.value),
+    cytoMidHeightMin: +els.cytoMidHeightMin.value,
+    cytoMidHeightMax: Math.max(+els.cytoMidHeightMin.value, +els.cytoMidHeightMax.value),
+    cytoMidDistanceMin: +els.cytoMidDistanceMin.value,
+    cytoMidDistanceMax: Math.max(+els.cytoMidDistanceMin.value, +els.cytoMidDistanceMax.value),
+    cytoContourStep: +els.cytoContourStep.value,
+    showCytoContours: els.showCytoContours.checked,
     enablePacking: els.enablePacking.checked,
+    allowPackRotation: els.allowPackRotation.checked,
     packFrac: +els.packFrac.value,
     relaxIters: +els.relaxIters.value,
     relaxDamping: +els.relaxDamping.value,
@@ -613,32 +1198,107 @@ function polyPath(pts) {
   ctx.closePath();
 }
 
-function drawCellBody(c, pxPerUm) {
-  const outline = cellOutline(c, 40);
-  const topPts = outline.map(([x, y]) => project(x, y, c.height));
-  const botPts = outline.map(([x, y]) => project(x, y, 0));
+// Rotates a point out of the cell's cached LOCAL frame (the frame every
+// getCytoGeometry mesh/outline is built and cached in, independent of the
+// cell's actual position -- see cellOutlineLocal's own comment) into world
+// space by the packing-only c.packRot, then translates by c.x,c.y. Applying
+// the rotation here at draw time, rather than baking it into the cached
+// local geometry, is what lets relax() turn a cell every iteration without
+// invalidating getCytoGeometry's per-chunk cache.
+function localToWorld(c, lx, ly) {
+  const rot = c.packRot || 0;
+  if (!rot) return [c.x + lx, c.y + ly];
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  return [c.x + lx * cr - ly * sr, c.y + lx * sr + ly * cr];
+}
 
+function drawCellBody(c, pxPerUm, p) {
+  const { localOutline, mesh } = getCytoGeometry(c, p);
+  const botPts = localOutline.map(([lx, ly]) => { const [wx, wy] = localToWorld(c, lx, ly); return project(wx, wy, 0); });
+
+  // Faint footprint reference at z=0 -- still useful once tilted, and the top
+  // surface now tapers to ~0 height right at this same boundary by
+  // construction (cytoHeightAt(dEdge=0,...) = 0), so no separate wall lines
+  // are drawn any more -- a hard vertical cliff at the edge would misrepresent
+  // the smooth taper the height field now has there.
   ctx.strokeStyle = 'rgba(90,169,230,0.25)';
   ctx.lineWidth = 1;
   polyPath(botPts); ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(90,169,230,0.18)';
-  for (let i = 0; i < outline.length; i += 5) {
-    ctx.beginPath();
-    ctx.moveTo(botPts[i][0], botPts[i][1]);
-    ctx.lineTo(topPts[i][0], topPts[i][1]);
-    ctx.stroke();
+  const { rings, n, grid } = mesh;
+
+  // Shaded height-mapped surface: one quad per (ring, theta) cell, coloured
+  // by depth like the nucleus. This app has no real z-buffer anywhere (the
+  // nucleus's own slices rely on the same "draw in a sensible fixed order"
+  // convention), so quads are explicitly depth-sorted and painted back-to-
+  // front before drawing -- plain ring-then-theta draw order (tried first)
+  // is only a valid painter's-algorithm order when the tallest point sits at
+  // the mesh centre; once the nucleus (and therefore the height peak) sits
+  // off-centre, later/shorter quads can paint over earlier/taller ones and
+  // vice versa, which is exactly the tangled/self-overlapping look a real,
+  // reported screenshot showed on any cell with an off-centre or elongated
+  // nucleus. `project()`'s own screen-Y is `y*cos(tilt) - z*sin(tilt)`, so
+  // the orthogonal (into-the-screen) depth is `y*sin(tilt) + z*cos(tilt)`
+  // (a standard rotation-by-tilt decomposition): larger depth = nearer the
+  // camera, so sorting ascending and painting in that order draws farthest
+  // first, nearest last (on top).
+  const sinT = Math.sin(view.tiltRad), cosT = Math.cos(view.tiltRad);
+  const quads = [];
+  for (let k = 0; k < rings; k++) {
+    for (let i = 0; i < n; i++) {
+      const i2 = (i + 1) % n;
+      const p00 = grid[k][i], p10 = grid[k][i2], p11 = grid[k + 1][i2], p01 = grid[k + 1][i];
+      const w00 = localToWorld(c, p00.x, p00.y), w10 = localToWorld(c, p10.x, p10.y);
+      const w11 = localToWorld(c, p11.x, p11.y), w01 = localToWorld(c, p01.x, p01.y);
+      const avgWorldY = (w00[1] + w10[1] + w11[1] + w01[1]) / 4;
+      const avgH = (p00.h + p10.h + p11.h + p01.h) / 4;
+      const depth = avgWorldY * sinT + avgH * cosT;
+      const pts = [
+        project(w00[0], w00[1], p00.h),
+        project(w10[0], w10[1], p10.h),
+        project(w11[0], w11[1], p11.h),
+        project(w01[0], w01[1], p01.h),
+      ];
+      quads.push({ pts, depth, fill: depthColor(avgH, 0, c.height, 0.6) });
+    }
+  }
+  quads.sort((a, b) => a.depth - b.depth);
+  // Fill only, no per-quad stroke: at CYTO_RINGS*CYTO_MESH_THETA quads per
+  // cell this loop is the dominant per-frame drawing cost (see buildCytoMesh's
+  // own comment), and a stroke pass doubled the canvas call count for very
+  // little visual gain once adjacent quads already share exact vertices.
+  for (const q of quads) {
+    ctx.fillStyle = q.fill;
+    polyPath(q.pts); ctx.fill();
   }
 
-  ctx.fillStyle = 'rgba(90,169,230,0.14)';
-  ctx.strokeStyle = 'rgba(90,169,230,0.8)';
-  ctx.lineWidth = Math.max(1, 0.05 * pxPerUm);
-  polyPath(topPts); ctx.fill(); ctx.stroke();
+  if (p.showCytoContours) {
+    let maxH = 0;
+    for (const row of grid) for (const pt of row) if (pt.h > maxH) maxH = pt.h;
+    const levels = [];
+    for (let lvl = p.cytoContourStep; lvl < maxH; lvl += p.cytoContourStep) levels.push(lvl);
+    const segs = marchingSquaresContours(mesh, levels);
+    ctx.strokeStyle = 'rgba(20,30,45,0.55)';
+    ctx.lineWidth = Math.max(1, 0.04 * pxPerUm);
+    ctx.beginPath();
+    for (const s of segs) {
+      const wa = localToWorld(c, s.x1, s.y1), wb = localToWorld(c, s.x2, s.y2);
+      const a = project(wa[0], wa[1], s.z), b = project(wb[0], wb[1], s.z);
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.stroke();
+  }
 }
 
 const NUC_SLICES = 9, NUC_PTS = 24;
 function drawNucleus(c) {
-  const ncx = c.x + c.nucOffX, ncy = c.y + c.nucOffY;
+  // c.nucOffX/Y are defined in the cell's cached LOCAL frame (like every
+  // other shape field -- see cellOutlineLocal's own comment), so the offset
+  // itself has to be rotated by packRot too, same as localToWorld does for
+  // the cytoplasm mesh; the nucleus's own rotation (c.nucRot) simply adds to
+  // packRot since both are rotations about the same world axis (z).
+  const [ncx, ncy] = localToWorld(c, c.nucOffX, c.nucOffY);
+  const rotTotal = c.nucRot + (c.packRot || 0);
   const rz = c.nucHeight / 2;
   for (let s = 0; s < NUC_SLICES; s++) {
     const t = (s / (NUC_SLICES - 1)) * 2 - 1; // -1..1, bottom to top
@@ -650,8 +1310,8 @@ function drawNucleus(c) {
     for (let i = 0; i < NUC_PTS; i++) {
       const th = (i / NUC_PTS) * Math.PI * 2;
       const lx = Math.cos(th) * rl, ly = Math.sin(th) * rs;
-      const wx = ncx + lx * Math.cos(c.nucRot) - ly * Math.sin(c.nucRot);
-      const wy = ncy + lx * Math.sin(c.nucRot) + ly * Math.cos(c.nucRot);
+      const wx = ncx + lx * Math.cos(rotTotal) - ly * Math.sin(rotTotal);
+      const wy = ncy + lx * Math.sin(rotTotal) + ly * Math.cos(rotTotal);
       pts.push(project(wx, wy, zAbs));
     }
     ctx.fillStyle = depthColor(zAbs, 0, c.height, 0.5);
@@ -662,6 +1322,7 @@ function drawNucleus(c) {
 }
 
 const CHUNK_CAP = 3500;  // safety net: above this many extended-window chunks, skip packing rather than freeze the tab
+const PRUNE_ROUNDS = 6;  // cap on prune()+settle rounds per draw() -- see that call site's own comment
 const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip drawing entirely -- each cell body/nucleus
                           // is dozens of path points, so tens of thousands of them per frame would hang the tab outright,
                           // not just run slowly. Zoom in instead; this is a "mock explorer" limit, not a renderer.
@@ -671,6 +1332,7 @@ function draw() {
   const seed = (+els.seed.value) | 0;
   const S = p.chunkSize;
   view.tiltRad = (+els.tiltDeg.value) * Math.PI / 180;
+  ensureCytoCacheFresh(seed, p);
   ctx.clearRect(0, 0, cv.width, cv.height);
 
   const halfWUm = (cv.width / devicePixelRatio / 2) / view.scale;
@@ -720,7 +1382,20 @@ function draw() {
     // while dragging." At the chunk counts CHUNK_CAP allows through, the full
     // pass is cheap enough to run on every pointermove.
     relax(map, p, p.relaxIters);
-    removed = prune(map, p);
+    // prune()+settle to a fixed point (capped at PRUNE_ROUNDS so a
+    // pathologically dense view can't loop indefinitely): removing a cell
+    // from a crowded trio can leave its remaining two members newly
+    // resolved, or can just as easily still leave them overlapping each
+    // other -- one prune() pass, working off a single pre-removal snapshot,
+    // can't see that. Each round gets its own short settle relax so the
+    // NEXT round's overlap check reflects where survivors actually moved
+    // to, not their pre-removal positions.
+    for (let round = 0; round < PRUNE_ROUNDS; round++) {
+      const r = prune(map, p);
+      removed += r;
+      if (r === 0) break;
+      relax(map, p, Math.min(8, p.relaxIters));
+    }
   }
 
   let nChunks = 0, nCells = 0, nMt = 0;
@@ -751,7 +1426,7 @@ function draw() {
         ctx.globalAlpha = 1;
       }
 
-      drawCellBody(cell, pxPerUm);
+      drawCellBody(cell, pxPerUm, p);
       drawNucleus(cell);
     }
   }
@@ -798,6 +1473,7 @@ function syncLabels() {
   els.cellBlobVal.textContent = (+els.cellBlob.value).toFixed(2);
   els.nucOffsetFracVal.textContent = (+els.nucOffsetFrac.value).toFixed(2);
   els.nucMarginVal.textContent = (+els.nucMargin.value).toFixed(1) + ' um';
+  els.cytoContourStepVal.textContent = (+els.cytoContourStep.value).toFixed(2) + ' um';
   els.packFracVal.textContent = (+els.packFrac.value).toFixed(2);
   els.relaxItersVal.textContent = els.relaxIters.value;
   els.relaxDampingVal.textContent = (+els.relaxDamping.value).toFixed(2);

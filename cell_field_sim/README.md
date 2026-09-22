@@ -34,7 +34,7 @@ simulation stack, in case it's worth porting back later.
 
 **Cell placement**: the world is divided into a square chunk grid (`chunkSize`, µm).
 Each chunk gets **at most one** candidate cell centre, placed by jittering within a
-`jitter` fraction of the chunk (`chunkCandidate()` in `index.html`) — the standard
+`jitter` fraction of the chunk (`rawCandidate()` in `index.html`) — the standard
 "stratified / jittered grid" trick for cheap, roughly blue-noise point fields used in
 procedural generation (one candidate per grid cell, then jitter it). `jitter < 1`
 guarantees a minimum spacing of `chunkSize*(1-jitter)` between any two
@@ -52,20 +52,39 @@ without changing the spacing statistics of the cells that *are* present.
 random rotation) whose *geometric mean* diameter — not either single axis — is drawn
 from `cellDiamMin`/`cellDiamMax`, so "diameter ~25-30 µm" stays true regardless of how
 elongated the cell ends up. That ellipse is then modulated by a few angular harmonics
-(`cellRadiusAt()`, amplitude set by `cellBlob`) to get a wobbly, non-convex outline
-closer to a real confluent-culture cell than a plain ellipse — see the reference
-phase-contrast images this round was built against.
+(`cellRadiusAt()`, amplitude set by `cellBlob`, slider goes to 4) to get a wobbly,
+non-convex outline closer to a real confluent-culture cell than a plain ellipse — see
+the reference phase-contrast images this round was built against. The modulation
+clamp (`CELL_MOD_MIN`/`CELL_MOD_MAX`) is deliberately **symmetric around 1**: an
+earlier asymmetric range visibly enlarged the average cell as blobbiness went up (more
+clamp headroom above 1 than below biases the mean radius upward once the clamp
+saturates, plus adding any symmetric wobble increases enclosed area regardless, by
+Jensen's inequality on the r² area integral) — see the comment above `CELL_MOD_MIN`
+for the full reasoning. `rOuter` (the radius packing/overlap checks actually use) is
+likewise pinned to the true clamped ceiling (`semiMajor * CELL_MOD_MAX`), not the
+unclamped worst-case sum of harmonic amplitudes — the unclamped sum routinely
+overshoots what `cellRadiusAt()` ever actually draws once the clamp saturates, which
+was quietly forcing packing to space cells much further apart than their drawn
+outlines needed.
 
 **Nucleus**: a true 3D ellipsoid per cell — long axis, short/long ratio, and height
-(as a fraction of the long axis) are each drawn independently and tunable in the
-sidebar (defaults match what was asked for: long axis 8–12 µm, ratio 0.6–1, height
-0.3–0.6× long axis). Offset from the cell's own centroid by a random amount up to
-`nucOffsetFrac × cell radius`, so it sits "somewhere in the middle," not dead centre.
-Rendered as a stack of horizontal ellipse slices (`drawNucleus()`), sized by the true
-ellipsoid equation at each slice height, coloured by absolute z with a small
-blue→red depth ramp (`depthColor()`) — a deliberate echo of the "colour by depth"
-convention in this project's own reference imagery, so the 3D-ness reads at a glance
-instead of looking like a flat blob.
+(as a fraction of the long axis) are tunable in the sidebar (defaults: long axis
+8–12 µm, ratio 0.6–1, height 0.3–0.6× long axis). **Nucleus size is correlated with
+cell size, not an independent draw**: both reuse the exact same underlying hash draw
+(`sizeT` in `rawCandidate()`), so a cell at the 80th percentile of `cellDiamMin`–
+`cellDiamMax` gets a nucleus at the 80th percentile of `nucLongMin`–`nucLongMax` too —
+same percentile, not just "correlated noise." Offset from the cell's own centroid by a
+random amount up to `nucOffsetFrac × cell radius` (default 0.1 — subtle, "somewhere in
+the middle" rather than dead centre). `envelopNucleus()` then guarantees the full
+ellipsoid stays inside the cell with at least `nucMargin` µm of clearance (floored at
+1 µm) on every side, both laterally (grows `semiMajor`/`semiMinor` uniformly, solving
+for the exact scale factor needed rather than a worst-case guess — see its own
+comment) and vertically (grows `height` and re-clamps `nucZ`) — a big nucleus forces a
+bigger cell around it, never the other way round. Rendered as a stack of horizontal
+ellipse slices (`drawNucleus()`), sized by the true ellipsoid equation at each slice
+height, coloured by absolute z with a small blue→red depth ramp (`depthColor()`) — a
+deliberate echo of the "colour by depth" convention in this project's own reference
+imagery, so the 3D-ness reads at a glance instead of looking like a flat blob.
 
 **3D view**: a simple oblique projection (`project()`, one `tilt` parameter, no
 azimuth) — x is untouched, y is foreshortened by `cos(tilt)` and z lifts the point on
@@ -99,6 +118,19 @@ stress test, not a theoretical concern). Zoom in if either message appears.
 
 **Microtubules**: unchanged from the first pass — still the rough, 2D-only
 random-walk placeholder (`buildMicrotubule()`), deliberately not touched this round.
+
+**Scale bar**: bottom-right, fixed in screen space (untouched by pan/tilt), picks a
+round 1-2-5 length that renders near a target on-screen size at the current zoom
+(`drawScaleBar()`). Uses the projection's x-axis scale specifically, which stays
+`view.scale * devicePixelRatio` at any tilt (only y is foreshortened) — metrically
+correct regardless of the tilt slider.
+
+**Dragging while packing is on**: `relax()` always runs its full configured iteration
+count now, including on every `pointermove` during an active drag. It used to drop to
+6 iterations while dragging for perceived responsiveness, but that meant packing
+looked visibly broken (still-overlapping, under-relaxed cells) for the whole drag and
+only "snapped" correct on release — worse than just paying the full cost, which turned
+out cheap enough at the chunk counts `CHUNK_CAP` allows through anyway.
 
 ## Known limitations / not yet done
 

@@ -51,7 +51,7 @@
       <legend>cell shape (µm, footprint)</legend>
       <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="30" step="0.5"></div>
       <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.45" step="0.05"><input type="number" id="cellElongMax" value="0.9" step="0.05"></div>
-      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="1" step="0.02" value="0.35"><span id="cellBlobVal"></span></label>
+      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="0.35"><span id="cellBlobVal"></span></label>
       <div class="pair"><span class="k">Height min/max</span><input type="number" id="cellHeightMin" value="3" step="0.5"><input type="number" id="cellHeightMax" value="6" step="0.5"></div>
     </fieldset>
 
@@ -60,7 +60,8 @@
       <div class="pair"><span class="k">Long axis min/max</span><input type="number" id="nucLongMin" value="8" step="0.5"><input type="number" id="nucLongMax" value="12" step="0.5"></div>
       <div class="pair"><span class="k">Short/long ratio min/max</span><input type="number" id="nucRatioMin" value="0.6" step="0.05"><input type="number" id="nucRatioMax" value="1" step="0.05"></div>
       <div class="pair"><span class="k">Height (× long axis) min/max</span><input type="number" id="nucHeightMin" value="0.3" step="0.05"><input type="number" id="nucHeightMax" value="0.6" step="0.05"></div>
-      <label class="row">Offset from cell centre <input type="range" id="nucOffsetFrac" min="0" max="1" step="0.02" value="0.3"><span id="nucOffsetFracVal"></span></label>
+      <label class="row">Offset from cell centre <input type="range" id="nucOffsetFrac" min="0" max="1" step="0.02" value="0.1"><span id="nucOffsetFracVal"></span></label>
+      <label class="row">Cell margin around nucleus (µm) <input type="range" id="nucMargin" min="1" max="5" step="0.5" value="1.5"><span id="nucMarginVal"></span></label>
     </fieldset>
 
     <fieldset>
@@ -157,8 +158,14 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 // from the SAME address, each on its own channel, so a chunk's full
 // candidate is one deterministic bundle.
 const HARM_K = [2, 3, 5]; // angular harmonics composing the blobby outline
+// NUC_LONG (30) is deliberately unused/retired, not reassigned -- nucleus
+// long axis reuses SIZE's own draw (see rawCandidate) so it's correlated
+// with cell size rather than an independent channel. Leaving the number
+// retired (rather than reusing 30 for something else) keeps every other
+// existing channel's meaning stable if this is ever diffed against an
+// older build.
 const CH = { X: 0, Y: 1, OCC: 2, SIZE: 3, ELONG: 4, ROT: 5, HEIGHT: 6,
-  HARM_AMP: 10, HARM_PH: 20, NUC_LONG: 30, NUC_RATIO: 31, NUC_HRATIO: 32,
+  HARM_AMP: 10, HARM_PH: 20, NUC_RATIO: 31, NUC_HRATIO: 32,
   NUC_OFFR: 33, NUC_OFFANG: 34, NUC_ROT: 35, NUC_ZFRAC: 36, PRIORITY: 40 };
 
 function rawCandidate(seed, cx, cy, p) {
@@ -173,51 +180,118 @@ function rawCandidate(seed, cx, cy, p) {
   // Characteristic size: geometric mean of the two footprint semi-axes
   // stays within [diamMin/2, diamMax/2] regardless of elongation, so
   // "diameter" reads the same whether a cell ends up round or stretched.
-  const baseR = lerp(p.cellDiamMin, p.cellDiamMax, hashUnit(seed, cx, cy, CH.SIZE)) / 2;
+  // sizeT (this cell's size PERCENTILE within [cellDiamMin,cellDiamMax]) is
+  // reused below for the nucleus's own long axis, so a cell drawn large
+  // gets a proportionally large nucleus and vice versa -- same percentile,
+  // not an independent draw, deliberately (not just "correlated noise").
+  const sizeT = hashUnit(seed, cx, cy, CH.SIZE);
+  const baseR = lerp(p.cellDiamMin, p.cellDiamMax, sizeT) / 2;
   const elong = lerp(p.cellElongMin, p.cellElongMax, hashUnit(seed, cx, cy, CH.ELONG)); // short/long
-  const semiMajor = baseR / Math.sqrt(elong);
-  const semiMinor = semiMajor * elong;
-  const rot = hashUnit(seed, cx, cy, CH.ROT) * Math.PI * 2;
-  const height = lerp(p.cellHeightMin, p.cellHeightMax, hashUnit(seed, cx, cy, CH.HEIGHT));
+  c.semiMajor = baseR / Math.sqrt(elong);
+  c.semiMinor = c.semiMajor * elong;
+  c.rot = hashUnit(seed, cx, cy, CH.ROT) * Math.PI * 2;
+  c.height = lerp(p.cellHeightMin, p.cellHeightMax, hashUnit(seed, cx, cy, CH.HEIGHT));
+  c.harmAmp = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_AMP + i) * p.cellBlob / k);
+  c.harmPh = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_PH + i) * Math.PI * 2);
 
-  const harmAmp = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_AMP + i) * p.cellBlob / k);
-  const harmPh = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_PH + i) * Math.PI * 2);
-  // worst-case outer reach of the wobbly outline -- used for packing/overlap
-  const rOuter = semiMajor * (1 + harmAmp.reduce((s, a) => s + Math.abs(a), 0));
-
-  const nucLong = lerp(p.nucLongMin, p.nucLongMax, hashUnit(seed, cx, cy, CH.NUC_LONG));
+  const nucLong = lerp(p.nucLongMin, p.nucLongMax, sizeT);
   const nucRatio = lerp(p.nucRatioMin, p.nucRatioMax, hashUnit(seed, cx, cy, CH.NUC_RATIO));
-  const nucShort = nucLong * nucRatio;
-  const nucHRatio = lerp(p.nucHeightMin, p.nucHeightMax, hashUnit(seed, cx, cy, CH.NUC_HRATIO));
-  const nucHeight = nucLong * nucHRatio; // full z-extent of the ellipsoid
   const offR = hashUnit(seed, cx, cy, CH.NUC_OFFR) * p.nucOffsetFrac * baseR;
   const offAng = hashUnit(seed, cx, cy, CH.NUC_OFFANG) * Math.PI * 2;
-  const nucRot = hashUnit(seed, cx, cy, CH.NUC_ROT) * Math.PI * 2;
-  const nucZFrac = lerp(0.4, 0.6, hashUnit(seed, cx, cy, CH.NUC_ZFRAC));
+  c.nucLong = nucLong;
+  c.nucShort = nucLong * nucRatio;
+  c.nucHeight = nucLong * lerp(p.nucHeightMin, p.nucHeightMax, hashUnit(seed, cx, cy, CH.NUC_HRATIO));
+  c.nucOffX = Math.cos(offAng) * offR;
+  c.nucOffY = Math.sin(offAng) * offR;
+  c.nucRot = hashUnit(seed, cx, cy, CH.NUC_ROT) * Math.PI * 2;
+  c.nucZ = c.height * lerp(0.4, 0.6, hashUnit(seed, cx, cy, CH.NUC_ZFRAC)); // provisional, clamped by envelopNucleus below
 
-  Object.assign(c, {
-    semiMajor, semiMinor, rot, height, harmAmp, harmPh, rOuter,
-    nucLong, nucShort, nucHeight,
-    nucOffX: Math.cos(offAng) * offR, nucOffY: Math.sin(offAng) * offR,
-    nucRot, nucZ: height * nucZFrac,
-    priority: hashUnit(seed, cx, cy, CH.PRIORITY),
-  });
+  envelopNucleus(c, p.nucMargin); // may grow c.semiMajor/semiMinor/height and re-clamp c.nucZ so the nucleus is always fully inside
+
+  // worst-case outer reach of the wobbly outline -- used for packing/overlap; computed AFTER
+  // envelopNucleus since that can grow semiMajor. Uses the CLAMPED ceiling
+  // (CELL_MOD_MAX), not the unclamped sum of |harmAmp| -- the raw sum can
+  // hugely overshoot what cellRadiusAt() ever actually returns once the
+  // clamp saturates (routine at high cellBlob), which previously inflated
+  // rOuter far past the true rendered size and made packing push cells much
+  // further apart than their actual drawn outlines needed -- the other half
+  // of the "blobbiness enlarges cells" symptom, independent of the clamp
+  // symmetry fix above.
+  c.rOuter = c.semiMajor * CELL_MOD_MAX;
+  c.priority = hashUnit(seed, cx, cy, CH.PRIORITY);
   return c;
 }
 
 // Local outline radius at world angle theta: an ellipse (semiMajor/semiMinor,
 // rotated by `rot`) modulated by a few angular harmonics for a blobby, non-
 // convex silhouette closer to a real confluent-culture cell outline than a
-// plain ellipse. Modulation is clamped so a large `cellBlob` can't fold the
-// outline through itself.
+// plain ellipse. Modulation is clamped to keep the radius safely positive at
+// any `cellBlob` -- without a floor, a large-enough amplitude sum makes the
+// modulation go negative and the outline self-intersects/folds through the
+// centre. The clamp is deliberately SYMMETRIC around 1 (equal room to shrink
+// and grow) -- an asymmetric range (tried first: [0.45, 2.2]) visibly
+// enlarged the average cell as blobbiness went up, for two compounding
+// reasons: (1) more headroom above 1 than below means angles that would
+// have overshot get clipped less often than angles that would have
+// undershot, biasing the mean radius upward once cellBlob is large enough to
+// saturate the clamp on both sides; (2) even perfectly symmetric modulation
+// increases the ENCLOSED AREA on average (Jensen's inequality: area is a sum
+// of r^2, and E[(1+mod)^2] = 1 + E[mod^2] >= 1 whenever mod has any spread,
+// clamp or no clamp) -- an inherent property of adding wobble at a fixed
+// base radius, not a bug, but worth knowing before assuming diameter presets
+// still mean the same thing at high blobbiness. At high `cellBlob` most of
+// the angular range saturates against these bounds -- expected, that's what
+// turns a gentle wobble into blunt lobes/spikes as blobbiness is pushed up.
+const CELL_MOD_MIN = 0.35, CELL_MOD_MAX = 1.65;
 function cellRadiusAt(c, thetaWorld) {
   const phi = thetaWorld - c.rot;
   const a = c.semiMajor, b = c.semiMinor;
   const base = (a * b) / Math.hypot(b * Math.cos(phi), a * Math.sin(phi));
   let mod = 1;
   for (let i = 0; i < HARM_K.length; i++) mod += c.harmAmp[i] * Math.cos(HARM_K[i] * thetaWorld + c.harmPh[i]);
-  mod = Math.max(0.55, Math.min(1.6, mod));
+  mod = Math.max(CELL_MOD_MIN, Math.min(CELL_MOD_MAX, mod));
   return base * mod;
+}
+
+// The full nucleus must always sit inside the cell volume, with at least
+// `marginUm` (floored at 1 -- "minimally 1 um") of clearance on every side.
+// Rather than special-casing the geometry, this samples points on the
+// nucleus's own (possibly offset, possibly rotated) equatorial footprint and
+// grows the cell laterally/vertically only as much as needed to cover them,
+// keeping the cell's own elongation and outline character otherwise intact:
+// scaling semiMajor/semiMinor by the same factor preserves the aspect ratio,
+// and cellRadiusAt() is linear in (semiMajor, semiMinor) at fixed angle, so
+// the required scale factor can be solved for directly instead of guessed at.
+function envelopNucleus(c, marginUm) {
+  const margin = Math.max(1, marginUm);
+
+  // Vertical: keep the ellipsoid's [nucZ-rz, nucZ+rz] within [margin, height-margin].
+  const rz = c.nucHeight / 2;
+  const neededHeight = c.nucHeight + 2 * margin;
+  if (c.height < neededHeight) c.height = neededHeight;
+  c.nucZ = Math.min(Math.max(c.nucZ, rz + margin), c.height - rz - margin);
+
+  // Lateral: sample the nucleus's own outline (in the cell's local frame,
+  // i.e. relative to the cell centre) and make sure the cell's own outline
+  // reaches at least `margin` past every sampled point. N=32 plus a small
+  // (5%) safety factor on the target distance -- both outlines are smooth
+  // and bounded-frequency (HARM_K tops out at k=5), but sampling only checks
+  // discrete points, so without slack the true continuous worst-case gap
+  // (between two samples) can land fractionally under the floor -- measured
+  // ~0.995 um against a 1.5 um target at N=16 with no slack.
+  const N = 32;
+  let maxScale = 1;
+  for (let i = 0; i < N; i++) {
+    const th = (i / N) * Math.PI * 2;
+    const lx = Math.cos(th) * (c.nucLong / 2), ly = Math.sin(th) * (c.nucShort / 2);
+    const wx = c.nucOffX + lx * Math.cos(c.nucRot) - ly * Math.sin(c.nucRot);
+    const wy = c.nucOffY + lx * Math.sin(c.nucRot) + ly * Math.cos(c.nucRot);
+    const dist = Math.hypot(wx, wy);
+    const angle = Math.atan2(wy, wx);
+    const actual = cellRadiusAt(c, angle);
+    if (actual > 1e-6) maxScale = Math.max(maxScale, (dist * 1.05 + margin) / actual);
+  }
+  if (maxScale > 1) { c.semiMajor *= maxScale; c.semiMinor *= maxScale; }
 }
 function cellOutline(c, n) {
   const pts = [];
@@ -370,7 +444,7 @@ const els = {};
  'cellDiamMin', 'cellDiamMax', 'cellElongMin', 'cellElongMax', 'cellBlob', 'cellBlobVal',
  'cellHeightMin', 'cellHeightMax',
  'nucLongMin', 'nucLongMax', 'nucRatioMin', 'nucRatioMax', 'nucHeightMin', 'nucHeightMax',
- 'nucOffsetFrac', 'nucOffsetFracVal',
+ 'nucOffsetFrac', 'nucOffsetFracVal', 'nucMargin', 'nucMarginVal',
  'enablePacking', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
  'tiltDeg', 'tiltDegVal', 'showMt', 'showGrid', 'resetView']
   .forEach(id => { els[id] = document.getElementById(id); });
@@ -394,6 +468,7 @@ function params() {
     nucHeightMin: +els.nucHeightMin.value,
     nucHeightMax: Math.max(+els.nucHeightMin.value, +els.nucHeightMax.value),
     nucOffsetFrac: +els.nucOffsetFrac.value,
+    nucMargin: +els.nucMargin.value,
     enablePacking: els.enablePacking.checked,
     packFrac: +els.packFrac.value,
     relaxIters: +els.relaxIters.value,
@@ -422,6 +497,38 @@ function project(x, y, z) {
   const sx = cv.width / 2 + (x - view.cx) * view.scale * dpr;
   const sy = cv.height / 2 + ((y - view.cy) * Math.cos(view.tiltRad) - z * Math.sin(view.tiltRad)) * view.scale * dpr;
   return [sx, sy];
+}
+
+// Scale bar: picks a "nice" round length (1-2-5 sequence) that renders at
+// roughly TARGET_PX on screen at the current zoom, drawn bottom-right in
+// fixed screen space (untouched by pan/tilt). Uses the x-axis pixel scale
+// specifically -- project()'s x mapping is pure view.scale*dpr regardless of
+// tilt (only y is foreshortened by cos(tilt)), so a horizontal bar stays
+// metrically correct at any tilt.
+const SCALE_NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+function drawScaleBar(pxPerUm) {
+  const targetPx = 140 * devicePixelRatio;
+  let chosen = SCALE_NICE[0];
+  for (const v of SCALE_NICE) { if (v * pxPerUm <= targetPx) chosen = v; else break; }
+  const barPx = chosen * pxPerUm;
+  const m = 18 * devicePixelRatio;
+  const y = cv.height - m;
+  const x2 = cv.width - m, x1 = x2 - barPx;
+  const tick = 5 * devicePixelRatio;
+
+  ctx.strokeStyle = '#dfe6ee';
+  ctx.lineWidth = Math.max(2, 2 * devicePixelRatio);
+  ctx.beginPath();
+  ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+  ctx.moveTo(x1, y - tick); ctx.lineTo(x1, y + tick);
+  ctx.moveTo(x2, y - tick); ctx.lineTo(x2, y + tick);
+  ctx.stroke();
+
+  ctx.fillStyle = '#dfe6ee';
+  ctx.font = `${12 * devicePixelRatio}px system-ui, Segoe UI, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`${chosen} µm`, (x1 + x2) / 2, y - tick - 4 * devicePixelRatio);
 }
 
 function polyPath(pts) {
@@ -513,6 +620,7 @@ function draw() {
   }
 
   if (coreCount > RENDER_CAP) {
+    drawScaleBar(view.scale * devicePixelRatio);
     hud.textContent =
       `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
       `${coreCount} chunks in view — zoom in to render (cap ${RENDER_CAP})`;
@@ -531,8 +639,12 @@ function draw() {
 
   let removed = 0;
   if (p.enablePacking && withinCap) {
-    const iters = dragging ? Math.min(6, p.relaxIters) : p.relaxIters; // cheap pass while actively panning
-    relax(map, p, iters);
+    // Always run the full iteration count -- cutting it during an active drag
+    // (previously 6 iterations) left visibly under-relaxed, still-overlapping
+    // cells on screen until release, which read as "packing doesn't work
+    // while dragging." At the chunk counts CHUNK_CAP allows through, the full
+    // pass is cheap enough to run on every pointermove.
+    relax(map, p, p.relaxIters);
     removed = prune(map, p);
   }
 
@@ -569,6 +681,8 @@ function draw() {
     }
   }
 
+  drawScaleBar(pxPerUm);
+
   hud.textContent =
     `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
     `chunks ${nChunks}   cells ${nCells}   removed (stuck) ${removed}   microtubules ${nMt}` +
@@ -594,7 +708,6 @@ window.addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
   cv.classList.remove('dragging');
-  draw(); // one full-quality relax pass now that dragging has stopped
 });
 cv.addEventListener('wheel', e => {
   e.preventDefault();
@@ -609,6 +722,7 @@ function syncLabels() {
   els.densityVal.textContent = (+els.density.value).toFixed(2);
   els.cellBlobVal.textContent = (+els.cellBlob.value).toFixed(2);
   els.nucOffsetFracVal.textContent = (+els.nucOffsetFrac.value).toFixed(2);
+  els.nucMarginVal.textContent = (+els.nucMargin.value).toFixed(1) + ' um';
   els.packFracVal.textContent = (+els.packFrac.value).toFixed(2);
   els.relaxItersVal.textContent = els.relaxIters.value;
   els.relaxDampingVal.textContent = (+els.relaxDamping.value).toFixed(2);

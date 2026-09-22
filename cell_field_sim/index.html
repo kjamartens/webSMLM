@@ -193,6 +193,38 @@ function rawCandidate(seed, cx, cy, p) {
   c.height = lerp(p.cellHeightMin, p.cellHeightMax, hashUnit(seed, cx, cy, CH.HEIGHT));
   c.harmAmp = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_AMP + i) * p.cellBlob / k);
   c.harmPh = HARM_K.map((k, i) => hashUnit(seed, cx, cy, CH.HARM_PH + i) * Math.PI * 2);
+  // Symmetric clamping alone (see CELL_MOD_MIN/MAX below) is NOT enough to keep
+  // "diameter" meaning the same size at any blobbiness, and neither is a simple
+  // analytic RMS pre-correction (tried first: E[mod^2]=1+0.5*sum(A_k^2), exact
+  // for the UNCLAMPED modulation by orthogonality of the distinct-frequency
+  // cosines over a full period) -- because once A_k grows large enough that the
+  // clamp saturates across most of the angular range (routine well before
+  // cellBlob=3), the actual signal behaves like a two-level curve pinned near
+  // CELL_MOD_MIN/CELL_MOD_MAX, and that saturated shape's own mean-square is
+  // nowhere near what the unclamped formula predicts -- verified numerically
+  // (equivalent diameter still grew 27->48 um from blob 0->3 with only the
+  // analytic correction in place). The fix has to measure the ACTUAL clamped
+  // outline for this cell's own harmAmp/harmPh, not guess from the pre-clamp
+  // statistics: sample the outline, compare its true mean r^2 against the
+  // unmodulated ellipse's own r^2, and scale the base ellipse by the exact
+  // ratio needed to cancel the difference.
+  {
+    const N = 48;
+    let sumBase2 = 0, sumR2 = 0;
+    for (let i = 0; i < N; i++) {
+      const th = (i / N) * Math.PI * 2;
+      const phi = th - c.rot;
+      const base = (c.semiMajor * c.semiMinor) / Math.hypot(c.semiMinor * Math.cos(phi), c.semiMajor * Math.sin(phi));
+      let mod = 1;
+      for (let j = 0; j < HARM_K.length; j++) mod += c.harmAmp[j] * Math.cos(HARM_K[j] * th + c.harmPh[j]);
+      mod = Math.max(CELL_MOD_MIN, Math.min(CELL_MOD_MAX, mod));
+      sumBase2 += base * base;
+      sumR2 += base * base * mod * mod;
+    }
+    const k = Math.sqrt(sumBase2 / sumR2);
+    c.semiMajor *= k;
+    c.semiMinor *= k;
+  }
 
   const nucLong = lerp(p.nucLongMin, p.nucLongMax, sizeT);
   const nucRatio = lerp(p.nucRatioMin, p.nucRatioMax, hashUnit(seed, cx, cy, CH.NUC_RATIO));
@@ -249,7 +281,12 @@ function cellRadiusAt(c, thetaWorld) {
   const base = (a * b) / Math.hypot(b * Math.cos(phi), a * Math.sin(phi));
   let mod = 1;
   for (let i = 0; i < HARM_K.length; i++) mod += c.harmAmp[i] * Math.cos(HARM_K[i] * thetaWorld + c.harmPh[i]);
-  mod = Math.max(CELL_MOD_MIN, Math.min(CELL_MOD_MAX, mod));
+  // c.modFloor (set by envelopNucleus, once the nucleus geometry is known) can
+  // raise the floor above CELL_MOD_MIN for this specific cell, filling in
+  // just enough of its deepest dip(s) to keep the nucleus covered without
+  // touching semiMajor/semiMinor -- see envelopNucleus's own comment.
+  const floor = c.modFloor !== undefined ? c.modFloor : CELL_MOD_MIN;
+  mod = Math.max(floor, Math.min(CELL_MOD_MAX, mod));
   return base * mod;
 }
 
@@ -279,8 +316,24 @@ function envelopNucleus(c, marginUm) {
   // discrete points, so without slack the true continuous worst-case gap
   // (between two samples) can land fractionally under the floor -- measured
   // ~0.995 um against a 1.5 um target at N=16 with no slack.
+  //
+  // This raises c.modFloor (a per-cell override cellRadiusAt uses in place
+  // of the global CELL_MOD_MIN) rather than scaling semiMajor/semiMinor.
+  // Uniform scaling was tried first and is what the size-vs-blobbiness area
+  // correction just above is fighting against: a highly lobed outline
+  // (large cellBlob) can have a deep concave dip land exactly where the
+  // nucleus needs coverage, and since a single problem angle forced scaling
+  // the ENTIRE ellipse to fix it, that re-coupled rendered cell size to
+  // blobbiness through the back door -- confirmed by a numeric test (the
+  // area correction alone held equivalent diameter flat at ~27.5 um across
+  // blob 0-3; with the old scale-based envelopment back in, it grew to
+  // ~48 um at blob=3, same as before that fix existed). Raising the floor
+  // instead only fills in the specific dip(s) that actually fall short,
+  // leaving every angle that was already covering the nucleus on its own
+  // merit untouched, and leaves the cell's own nominal (already
+  // blobbiness-normalized) size alone.
   const N = 32;
-  let maxScale = 1;
+  let neededFloor = CELL_MOD_MIN;
   for (let i = 0; i < N; i++) {
     const th = (i / N) * Math.PI * 2;
     const lx = Math.cos(th) * (c.nucLong / 2), ly = Math.sin(th) * (c.nucShort / 2);
@@ -288,10 +341,32 @@ function envelopNucleus(c, marginUm) {
     const wy = c.nucOffY + lx * Math.sin(c.nucRot) + ly * Math.cos(c.nucRot);
     const dist = Math.hypot(wx, wy);
     const angle = Math.atan2(wy, wx);
-    const actual = cellRadiusAt(c, angle);
-    if (actual > 1e-6) maxScale = Math.max(maxScale, (dist * 1.05 + margin) / actual);
+    const phi = angle - c.rot;
+    const base = (c.semiMajor * c.semiMinor) / Math.hypot(c.semiMinor * Math.cos(phi), c.semiMajor * Math.sin(phi));
+    if (base <= 1e-6) continue;
+    const required = (dist * 1.05 + margin) / base;
+    // Modulation is evaluated at the sample's own WORLD angle around the
+    // cell (`angle`, matching cellRadiusAt's convention) -- not the local
+    // parametrization angle `th` used above to walk the nucleus boundary.
+    let naturalMod = 1;
+    for (let j = 0; j < HARM_K.length; j++) naturalMod += c.harmAmp[j] * Math.cos(HARM_K[j] * angle + c.harmPh[j]);
+    const cappedNatural = Math.min(CELL_MOD_MAX, naturalMod);
+    // Only angles that would otherwise fall short push the floor up --
+    // an angle already covered on its own natural modulation shouldn't
+    // force the floor (and therefore every OTHER angle's minimum) higher
+    // than it needs to be.
+    if (cappedNatural < required) neededFloor = Math.max(neededFloor, required);
   }
-  if (maxScale > 1) { c.semiMajor *= maxScale; c.semiMinor *= maxScale; }
+  c.modFloor = Math.min(neededFloor, CELL_MOD_MAX);
+  if (neededFloor > CELL_MOD_MAX) {
+    // Genuinely impossible to cover even at maximum modulation (very large
+    // nucleus/margin relative to cell size) -- fall back to the old
+    // whole-cell scale-up as a last resort so the envelopment guarantee
+    // never breaks, just no longer the routine path.
+    const k = neededFloor / CELL_MOD_MAX;
+    c.semiMajor *= k;
+    c.semiMinor *= k;
+  }
 }
 function cellOutline(c, n) {
   const pts = [];

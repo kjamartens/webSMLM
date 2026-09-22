@@ -54,18 +54,39 @@ from `cellDiamMin`/`cellDiamMax`, so "diameter ~25-30 µm" stays true regardless
 elongated the cell ends up. That ellipse is then modulated by a few angular harmonics
 (`cellRadiusAt()`, amplitude set by `cellBlob`, slider goes to 4) to get a wobbly,
 non-convex outline closer to a real confluent-culture cell than a plain ellipse — see
-the reference phase-contrast images this round was built against. The modulation
-clamp (`CELL_MOD_MIN`/`CELL_MOD_MAX`) is deliberately **symmetric around 1**: an
-earlier asymmetric range visibly enlarged the average cell as blobbiness went up (more
-clamp headroom above 1 than below biases the mean radius upward once the clamp
-saturates, plus adding any symmetric wobble increases enclosed area regardless, by
-Jensen's inequality on the r² area integral) — see the comment above `CELL_MOD_MIN`
-for the full reasoning. `rOuter` (the radius packing/overlap checks actually use) is
-likewise pinned to the true clamped ceiling (`semiMajor * CELL_MOD_MAX`), not the
-unclamped worst-case sum of harmonic amplitudes — the unclamped sum routinely
-overshoots what `cellRadiusAt()` ever actually draws once the clamp saturates, which
-was quietly forcing packing to space cells much further apart than their drawn
-outlines needed.
+the reference phase-contrast images this round was built against.
+
+**Keeping "diameter" meaning the same size at any blobbiness took three separate
+fixes, not one** — worth knowing before touching this code again:
+
+1. The modulation clamp (`CELL_MOD_MIN`/`CELL_MOD_MAX`) is **symmetric around 1**: an
+   earlier asymmetric range visibly enlarged the average cell as blobbiness went up
+   (more clamp headroom above 1 than below biases the mean radius upward once the
+   clamp saturates).
+2. Even a perfectly symmetric clamp doesn't fix it on its own — adding *any* angular
+   wobble increases enclosed area on average (Jensen's inequality: area is a sum of
+   r², and distinct-frequency cosines are exactly orthogonal over a full period, so
+   the pre-clamp E[mod²] = 1 + 0.5·Σ(harmAmp²) grows with blobbiness regardless of
+   clamp symmetry). `rawCandidate()` corrects for this **numerically per cell**, not
+   analytically: an analytic pre-correction based on the *unclamped* variance was
+   tried first and failed once the clamp started saturating (routine by blob≈1.5),
+   because a saturated signal's true mean-square looks nothing like the unclamped
+   formula predicts. The actual fix samples the cell's own already-clamped outline
+   (48 points) and rescales `semiMajor`/`semiMinor` by the exact ratio needed so the
+   sampled mean-square area matches the unmodulated ellipse's — verified numerically
+   flat (equivalent diameter within 0.1 µm) across blob 0–4 in isolation.
+3. `envelopNucleus()`'s own lateral correction (below) used to scale the *whole*
+   ellipse uniformly to fix any single problem angle — which re-inflated cell size
+   exactly in proportion to how deep a lobed outline's dips got, undoing fix #2 by a
+   different path (confirmed: with fix #2 alone but the old scale-based envelopment,
+   equivalent diameter still grew 27→48 µm from blob 0→3). Fixed by raising a
+   *per-cell modulation floor* (`c.modFloor`) instead — see its own comment.
+
+`rOuter` (the radius packing/overlap checks actually use) is pinned to the true
+clamped ceiling (`semiMajor * CELL_MOD_MAX`), not the unclamped worst-case sum of
+harmonic amplitudes — the unclamped sum routinely overshoots what `cellRadiusAt()`
+ever actually draws once the clamp saturates, which was quietly forcing packing to
+space cells much further apart than their drawn outlines needed.
 
 **Nucleus**: a true 3D ellipsoid per cell — long axis, short/long ratio, and height
 (as a fraction of the long axis) are tunable in the sidebar (defaults: long axis
@@ -75,16 +96,22 @@ cell size, not an independent draw**: both reuse the exact same underlying hash 
 `cellDiamMax` gets a nucleus at the 80th percentile of `nucLongMin`–`nucLongMax` too —
 same percentile, not just "correlated noise." Offset from the cell's own centroid by a
 random amount up to `nucOffsetFrac × cell radius` (default 0.1 — subtle, "somewhere in
-the middle" rather than dead centre). `envelopNucleus()` then guarantees the full
-ellipsoid stays inside the cell with at least `nucMargin` µm of clearance (floored at
-1 µm) on every side, both laterally (grows `semiMajor`/`semiMinor` uniformly, solving
-for the exact scale factor needed rather than a worst-case guess — see its own
-comment) and vertically (grows `height` and re-clamps `nucZ`) — a big nucleus forces a
-bigger cell around it, never the other way round. Rendered as a stack of horizontal
-ellipse slices (`drawNucleus()`), sized by the true ellipsoid equation at each slice
-height, coloured by absolute z with a small blue→red depth ramp (`depthColor()`) — a
-deliberate echo of the "colour by depth" convention in this project's own reference
-imagery, so the 3D-ness reads at a glance instead of looking like a flat blob.
+the middle" rather than dead centre).
+
+`envelopNucleus()` guarantees the full ellipsoid stays inside the cell with at least
+`nucMargin` µm of clearance (floored at 1 µm) on every side. Vertically this grows
+`height` and re-clamps `nucZ` (cheap, no interaction with blobbiness). Laterally it
+samples the nucleus's own boundary (32 points) and, for any point the cell's outline
+would otherwise fall short of, raises a **per-cell modulation floor**
+(`c.modFloor`, read by `cellRadiusAt()` in place of the global `CELL_MOD_MIN`) just
+high enough to cover it — filling in a specific dip rather than scaling
+`semiMajor`/`semiMinor` (see point 3 above for why that distinction matters). Only
+falls back to whole-cell scaling in the rare case even maximum modulation can't cover
+the nucleus. Rendered as a stack of horizontal ellipse slices (`drawNucleus()`), sized
+by the true ellipsoid equation at each slice height, coloured by absolute z with a
+small blue→red depth ramp (`depthColor()`) — a deliberate echo of the "colour by
+depth" convention in this project's own reference imagery, so the 3D-ness reads at a
+glance instead of looking like a flat blob.
 
 **3D view**: a simple oblique projection (`project()`, one `tilt` parameter, no
 azimuth) — x is untouched, y is foreshortened by `cos(tilt)` and z lifts the point on

@@ -242,6 +242,26 @@ in a module.
   `buildStructure()` — the Poisson emitter-arrival process, per-frame splat/noise — needed to
   change for a new structure type; a future structure type is just a third case in that switch.
 
+  **Microtubule structure** (`'microtubules'`, `buildMicrotubuleStructure()` → `CellField.buildWindow()`,
+  MODULE: simulation, right above the NUP block) is `cell_field_sim/` copied into one IIFE (`CellField`,
+  so its ~100 helper names — `lerp`, `relax`, `prune`, `CH`, … — can't collide with the file's globals)
+  plus a small adapter at its end. The cell/nucleus/cytoplasm/packing/microtubule code is verbatim from
+  `cell_field_sim/index.html` + `microtubules.js` (DOM/drawing removed): **when the prototype changes,
+  re-copy the affected function** — nothing keeps them in sync automatically. Main thread only, never in a
+  worker. `simulation_mt_seed` (default 1249) picks the world; `simulation_mt_x`/`_y` (µm, default 0,0) are
+  the window centre, moved by the **Move 1/5/10 µm** buttons (`moveMtView()`, +y is down); the window is the
+  structure FOV (px × `simulation_pxnm`), so 128 px at 100 nm is the central 12.8 µm (+10% margin).
+  `simulation_mt_density`/`simulation_mt_focusZ` (µm above coverslip = z 0, default 0.5) are `id:null` PARAMS.
+  Each microtubule centreline is decorated with the 13_3 lattice (25 nm cylinder, 12 nm binder, dye at a 2–5 nm
+  uniform-in-volume linker offset) and **every dye is one candidate emitter site**, so blinking happens on the
+  dyes; `simulation_labelEfficiency` still thins them afterwards. Two deliberate differences from the
+  prototype's `buildMicrotubuleLabelPoints()`: only segments that can reach the window are decorated (a full
+  network is millions of sites), and each site's linker draw is *addressed* by (seed, cell, microtubule,
+  protofilament, lattice index) via `mtSiteUniforms()` rather than taken from a running stream, so a dye's
+  position doesn't change when the window moves. Sites are clipped to ±`simulation_zRange` around the focus
+  height (an optical section that keeps them inside the PSF kernel's z range) — this applies in 2D too,
+  where `buildStructure()` then flattens z to 0. Consumes nothing from the simulation's `mulberry32` stream.
+
   **NUP structure** (`buildNupAttachmentPoints()`/`displaceByLinker()`/`buildNupLocalPoints()`/
   `buildNupStructure()`) models the endogenously SNAP-tagged Nup96 nuclear pore complex (NPC)
   reference standard from Thevathasan et al., *Nat. Methods* 16, 1045–1053 (2019),

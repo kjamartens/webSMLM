@@ -1883,7 +1883,12 @@ elapsed time instead.
 | `simulation_seed` | Random seed (0 = random) | number | 0 | 2147483647 | 1 | 0 |
 | `simulation_3d` | 3D simulation? | bool | — | — | — | off |
 | `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 500 |
-| `simulation_structureType` | Structure type | enum (`filaments_ring`, `nup`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `filaments_ring` |
+| `simulation_structureType` | Structure type | enum (`filaments_ring`, `nup`, `tiltedPlane`, `uniform3D`, `shell`, `microtubules`) | — | — | — | `filaments_ring` |
+| `simulation_mt_seed` | Microtubule seed | number | -2147483647 | 2147483647 | 1 | 1249 |
+| `simulation_mt_x` | View centre X (µm) | number | -1000000 | 1000000 | 1 | 0 |
+| `simulation_mt_y` | View centre Y (µm) | number | -1000000 | 1000000 | 1 | 0 |
+| `simulation_mt_density` | Microtubule density (per µm² of cell footprint) — no sidebar control | number | 0 | 2 | 0.005 | 0.45 |
+| `simulation_mt_focusZ` | Focus height above the coverslip (µm) — no sidebar control | number | 0 | 10 | 0.1 | 0.5 |
 | `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
 | `simulation_nup_radius` | NPC ring radius (nm) | number | 20 | 150 | 0.5 | 53.5 |
 | `simulation_nup_cornerSpread` | Corner sub-point spread (nm) | number | 0 | 30 | 0.5 | 12 |
@@ -1943,6 +1948,19 @@ pick, ON/OFF timing, drift direction, and all simulated camera noise) reproducib
 instead, so two runs with the same seed and only <b>PSF placement interpolation</b> changed differ
 ONLY in the PSF placement itself — useful for A/B-comparing interpolation modes on identical
 underlying data.</p>
+<p><b>Microtubules (cell field)</b> — a window onto an effectively infinite, seed-addressed sample of
+cells with nuclei, each carrying a microtubule network (ported from <code>cell_field_sim/</code>). Every
+microtubule is a 25 nm cylinder with the 13-protofilament (13_3) lattice, and each lattice site carries
+a binder + dye at a random 2–5 nm linker offset; <b>each dye position is one emitter site</b>, so
+blinking happens exactly where the labels are (<b>Labeling efficiency</b> still thins them). The window
+is the structure FOV (pixels × pixel size — 128 px at 100 nm is the central ~12.8 µm, plus the usual
+10% margin) centred on <b>View centre X/Y (µm)</b>. The same <b>Microtubule seed</b> always gives the
+same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
+arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
+clipped to a slab of ±<b>Structure Z range</b> around 0.5 µm above the coverslip (<code>simulation_mt_focusZ</code>,
+no sidebar control) — an optical section that also keeps every site inside the PSF's z range; cells are
+~3–6 µm tall. Generation takes about a second for a default window and does not consume the
+simulation's own random stream.</p>
 <!-- /HINT:simulation-type -->
 
 **Nuclear pore complex (NPC) structure** (`hint-simulation-nup`, shown only when **Structure

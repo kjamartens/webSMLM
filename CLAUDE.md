@@ -251,7 +251,10 @@ in a module.
   worker. `simulation_mt_seed` (default 1249) picks the world; `simulation_mt_x`/`_y` (µm, default 0,0) are
   the window centre, moved by the **Move 1/5/10 µm** buttons (`moveMtView()`, +y is down); the window is the
   structure FOV (px × `simulation_pxnm`), so 128 px at 100 nm is the central 12.8 µm (+10% margin).
-  `simulation_mt_density`/`simulation_mt_focusZ` (µm above coverslip = z 0, default 0.5) are `id:null` PARAMS.
+  Sidebar also exposes `simulation_mt_cellDensity` (cell occupancy, default 0.25) and `simulation_mt_density`
+  (microtubules/µm², 0.45); every other cell/cytoplasm knob stays at `CF_PARAMS` (cytoplasm: rim 0.05–0.2, mid
+  height 0.1–0.2, mid distance 0.3–0.6 × radius — same defaults as `cell_field_sim/`). `simulation_mt_focusZ`
+  (µm above coverslip = z 0, default 0.5) is an `id:null` PARAM.
   Each microtubule centreline is decorated with the 13_3 lattice (25 nm cylinder, 12 nm binder, dye at a 2–5 nm
   uniform-in-volume linker offset) and **every dye is one candidate emitter site**, so blinking happens on the
   dyes; `simulation_labelEfficiency` still thins them afterwards. Two deliberate differences from the

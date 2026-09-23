@@ -1887,7 +1887,8 @@ elapsed time instead.
 | `simulation_mt_seed` | Microtubule seed | number | -2147483647 | 2147483647 | 1 | 1249 |
 | `simulation_mt_x` | View centre X (µm) | number | -1000000 | 1000000 | 1 | 0 |
 | `simulation_mt_y` | View centre Y (µm) | number | -1000000 | 1000000 | 1 | 0 |
-| `simulation_mt_density` | Microtubule density (per µm² of cell footprint) — no sidebar control | number | 0 | 2 | 0.005 | 0.45 |
+| `simulation_mt_density` | Microtubule density (per µm² of cell footprint) | number | 0 | 2 | 0.005 | 0.45 |
+| `simulation_mt_cellDensity` | Cell density (occupancy — fraction of chunks holding a cell) | number | 0.05 | 1 | 0.01 | 0.25 |
 | `simulation_mt_focusZ` | Focus height above the coverslip (µm) — no sidebar control | number | 0 | 10 | 0.1 | 0.5 |
 | `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
 | `simulation_nup_radius` | NPC ring radius (nm) | number | 20 | 150 | 0.5 | 53.5 |
@@ -1954,7 +1955,7 @@ microtubule is a 25 nm cylinder with the 13-protofilament (13_3) lattice, and ea
 a binder + dye at a random 2–5 nm linker offset; <b>each dye position is one emitter site</b>, so
 blinking happens exactly where the labels are (<b>Labeling efficiency</b> still thins them). The window
 is the structure FOV (pixels × pixel size — 128 px at 100 nm is the central ~12.8 µm, plus the usual
-10% margin) centred on <b>View centre X/Y (µm)</b>. The same <b>Microtubule seed</b> always gives the
+10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the prototype's defaults. The same <b>Microtubule seed</b> always gives the
 same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
 arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
 clipped to a slab of ±<b>Structure Z range</b> around 0.5 µm above the coverslip (<code>simulation_mt_focusZ</code>,

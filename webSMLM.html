@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-23a; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-23b; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -2804,7 +2804,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-23a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-23b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3111,7 +3111,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           a binder + dye at a random 2–5 nm linker offset; <b>each dye position is one emitter site</b>, so
           blinking happens exactly where the labels are (<b>Labeling efficiency</b> still thins them). The window
           is the structure FOV (pixels × pixel size — 128 px at 100 nm is the central ~12.8 µm, plus the usual
-          10% margin) centred on <b>View centre X/Y (µm)</b>. The same <b>Microtubule seed</b> always gives the
+          10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the prototype's defaults. The same <b>Microtubule seed</b> always gives the
           same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
           arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
           clipped to a slab of ±<b>Structure Z range</b> around 0.5 µm above the coverslip (<code>simulation_mt_focusZ</code>,
@@ -3131,6 +3131,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="mtSeedRow" style="display:none" title="Seed of the infinite cell field (cells, nuclei, microtubules). The same seed always gives the same sample; X/Y below choose which part of it is imaged.">Microtubule seed <input type="number" id="simulation_mt_seed" min="-2147483647" max="2147483647" step="1" value="1249" class="num"></label>
           <label class="row" id="mtXRow" style="display:none" title="World X (µm) of the centre of the simulated window. The window is Structure FOV (px) x pixel size wide.">View centre X (µm) <input type="number" id="simulation_mt_x" min="-1000000" max="1000000" step="1" value="0" class="num"></label>
           <label class="row" id="mtYRow" style="display:none" title="World Y (µm) of the centre of the simulated window.">View centre Y (µm) <input type="number" id="simulation_mt_y" min="-1000000" max="1000000" step="1" value="0" class="num"></label>
+          <label class="row" id="mtCellDensRow" style="display:none" title="Fraction of world chunks holding a cell (occupancy). Higher = more, more crowded cells; packing drops the ones that would overlap.">Cell density <input type="number" id="simulation_mt_cellDensity" min="0.05" max="1" step="0.01" value="0.25" class="num"></label>
+          <label class="row" id="mtDensRow" style="display:none" title="Microtubules per µm² of cell footprint.">Microtubule density (per µm²) <input type="number" id="simulation_mt_density" min="0" max="2" step="0.005" value="0.45" class="num"></label>
           <label class="row" id="mtMove1Row" style="display:none" title="Move the window across the sample by 1 µm (left/right/up/down).">Move 1 µm <span class="mtmove"><button type="button" onclick="moveMtView(-1,0)">&larr;</button><button type="button" onclick="moveMtView(1,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-1)">&uarr;</button><button type="button" onclick="moveMtView(0,1)">&darr;</button></span></label>
           <label class="row" id="mtMove5Row" style="display:none" title="Move the window across the sample by 5 µm (left/right/up/down).">Move 5 µm <span class="mtmove"><button type="button" onclick="moveMtView(-5,0)">&larr;</button><button type="button" onclick="moveMtView(5,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-5)">&uarr;</button><button type="button" onclick="moveMtView(0,5)">&darr;</button></span></label>
           <label class="row" id="mtMove10Row" style="display:none" title="Move the window across the sample by 10 µm (left/right/up/down).">Move 10 µm <span class="mtmove"><button type="button" onclick="moveMtView(-10,0)">&larr;</button><button type="button" onclick="moveMtView(10,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-10)">&uarr;</button><button type="button" onclick="moveMtView(0,10)">&darr;</button></span></label>
@@ -4478,11 +4480,13 @@ const PARAMS = {
   simulation_mt_seed: { type:'number', id:'simulation_mt_seed', label:'Microtubule seed', min:-2147483647, max:2147483647, step:1, default:1249, int:true },
   simulation_mt_x: { type:'number', id:'simulation_mt_x', label:'View centre X (µm)', min:-1000000, max:1000000, step:1, default:0, int:false },
   simulation_mt_y: { type:'number', id:'simulation_mt_y', label:'View centre Y (µm)', min:-1000000, max:1000000, step:1, default:0, int:false },
-  // id:null (no sidebar control, reachable via Save/Load Settings JSON or paramOverrides): microtubules
-  // per µm² of cell footprint, and the height above the coverslip (µm) that sits at z=0 / in focus.
+  // Microtubules per µm² of cell footprint (sidebar), and the id:null height above the coverslip (µm)
+  // that sits at z=0 / in focus (no sidebar control; Save/Load Settings JSON or paramOverrides).
   // The network is clipped to ±simulation_zRange around that height (an optical section); cells are
   // ~3-6 µm tall, so the default 0.5 µm focuses near the flat lamellar part.
-  simulation_mt_density: { type:'number', id:null, label:'Microtubule density (per µm²)', min:0, max:2, step:0.005, default:0.45, int:false },
+  simulation_mt_density: { type:'number', id:'simulation_mt_density', label:'Microtubule density (per µm²)', min:0, max:2, step:0.005, default:0.45, int:false },
+  // Cell occupancy: the fraction of world chunks that hold a cell (the prototype's "Density (occupancy)").
+  simulation_mt_cellDensity: { type:'number', id:'simulation_mt_cellDensity', label:'Cell density (occupancy)', min:0.05, max:1, step:0.01, default:0.25, int:false },
   simulation_mt_focusZ: { type:'number', id:null, label:'Focus height above coverslip (µm)', min:0, max:10, step:0.1, default:0.5, int:false },
 
   // ---- NUP structure (nuclear pore complex, simulation_structureType==='nup') ----
@@ -7883,13 +7887,13 @@ function buildMicrotubulesForCell(seed, cx, cy, cell, p) {
   // was chosen against exactly these). Deliberately not PARAMS entries: only the MT seed, view
   // centre and MT density are exposed (see PARAMS.simulation_mt_*).
   const CF_PARAMS = {
-    chunkSize: 26, jitter: 0.8, density: 0.25,
+    chunkSize: 26, jitter: 0.8, density: 0.25,   // density = cell occupancy; overridden by simulation_mt_cellDensity
     cellDiamMin: 25, cellDiamMax: 35, cellElongMin: 0.2, cellElongMax: 0.8, cellBlob: 1.5,
     cellHeightMin: 3, cellHeightMax: 6,
     nucLongMin: 8, nucLongMax: 12, nucRatioMin: 0.6, nucRatioMax: 1, nucHeightMin: 0.3, nucHeightMax: 0.5,
     nucOffsetFrac: 0.1, nucMargin: 1.5,
-    cytoRimHeightMin: 2, cytoRimHeightMax: 3, cytoEdgeRiseMin: 0.5, cytoEdgeRiseMax: 1.0,
-    cytoMidHeightMin: 0.05, cytoMidHeightMax: 0.2, cytoMidDistanceMin: 0.5, cytoMidDistanceMax: 0.9,
+    cytoRimHeightMin: 0.05, cytoRimHeightMax: 0.2, cytoEdgeRiseMin: 0.5, cytoEdgeRiseMax: 1.0,
+    cytoMidHeightMin: 0.1, cytoMidHeightMax: 0.2, cytoMidDistanceMin: 0.3, cytoMidDistanceMax: 0.6,
     enablePacking: true, allowPackRotation: true, packFrac: 1.0, relaxIters: 12, relaxDamping: 0.2,
     mtDensity: 0.45, mtStartFracMin: 0, mtStartFracMax: 0.3, mtStartOffsetXY: 0,
     mtEndFracMin: 0.01, mtEndFracMax: 0.4, mtEndJitterDeg: 145, mtWobbleTurn: 0.8, mtWobbleFactor: 1.05,
@@ -7992,7 +7996,7 @@ function buildMicrotubulesForCell(seed, cx, cy, cell, p) {
   // kernel's z range).
   function buildWindow(w, h, o) {
     const seed = o.seed | 0, pxUm = o.pxnm / 1000;
-    const p = Object.assign({}, CF_PARAMS, { mtDensity: o.mtDensity });
+    const p = Object.assign({}, CF_PARAMS, { mtDensity: o.mtDensity, density: o.cellDensity });
     ensureCytoCacheFresh(seed, p);
     const halfW = w * pxUm / 2, halfH = h * pxUm / 2, S = p.chunkSize;
     const cx0 = Math.floor((o.xUm - halfW) / S) - 1, cx1 = Math.ceil((o.xUm + halfW) / S) + 1;
@@ -8050,7 +8054,7 @@ function buildMicrotubuleStructure(w,h){
   const px=paramValue('simulation_pxnm');
   const res=CellField.buildWindow(w,h,{
     seed:paramValue('simulation_mt_seed'), xUm:paramValue('simulation_mt_x'), yUm:paramValue('simulation_mt_y'),
-    pxnm:px, mtDensity:paramValue('simulation_mt_density'), focusUm:paramValue('simulation_mt_focusZ'),
+    pxnm:px, mtDensity:paramValue('simulation_mt_density'), cellDensity:paramValue('simulation_mt_cellDensity'), focusUm:paramValue('simulation_mt_focusZ'),
     slabNm:paramValue('simulation_zRange')
   });
   log(`Microtubules (seed ${paramValue('simulation_mt_seed')}, centre ${paramValue('simulation_mt_x')}, ${paramValue('simulation_mt_y')} µm, `+
@@ -28751,7 +28755,7 @@ updateSimulation3dUI();
 
 // Structure-type rows (simTypeBox) — same "one selector, a list of rows toggled together"
 // pattern as updatePsfModelUI() above, just for the NUP-only fields.
-const MT_ROW_IDS=['mtSeedRow','mtXRow','mtYRow','mtMove1Row','mtMove5Row','mtMove10Row'];
+const MT_ROW_IDS=['mtSeedRow','mtXRow','mtYRow','mtCellDensRow','mtDensRow','mtMove1Row','mtMove5Row','mtMove10Row'];
 const NUP_ROW_IDS=['nupRadiusRow','nupCornerSpreadRow','nupRingSeparationRow','nupLinkerMinRow','nupLinkerMaxRow','nupMembraneTypeRow','nupCountRow','nupMinSpacingRow','nupCurvatureRow','nupDebugBtnRow'];
 function updateStructureTypeUI(){
   const on = paramValue('simulation_structureType')==='nup';
@@ -30410,9 +30414,10 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-23a — New: Structure type "Microtubules (cell field)" — a seeded
+log(`webSMLM v0.12.8-dev · build 2026-09-23b — New: Structure type "Microtubules (cell field)" — a seeded
 (default 1249) window onto the cell_field_sim world; every dye on the 13-protofilament microtubule
-lattice is an emitter site. View centre X/Y (µm) settings plus Move 1/5/10 µm arrow buttons pan across it.
+lattice is an emitter site. View centre X/Y (µm) settings plus Move 1/5/10 µm arrow buttons pan across it;
+Cell density and Microtubule density are exposed, cytoplasm defaults changed (thin, flat cells).
 — from build 2026-09-22c: simulation_structureFov decouples the
 structure's own footprint from the camera's. Every simulation now defaults to a structure 10%
 LARGER than the camera FOV (Math.round(fov*1.1)), so Drift (px, total) has real structure sitting

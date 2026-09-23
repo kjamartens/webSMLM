@@ -35,8 +35,7 @@
     demoCam_SMLM_MM's CounterRng). Every cell/nucleus is a pure function of
     (seed, chunk coords) — nothing is generated ahead of time, so you can pan
     infinitely and re-enter the same spot deterministically. Not wired into
-    webSMLM itself — standalone exploration only. Microtubules are still the
-    rough 2D placeholder from the first pass — not the focus this round.</p>
+    webSMLM itself — standalone exploration only.</p>
 
     <fieldset>
       <legend>seed / world</legend>
@@ -84,8 +83,27 @@
     </fieldset>
 
     <fieldset>
+      <legend>microtubules (µm, per cell)</legend>
+      <label class="row">Density (per µm²) <input type="range" id="mtDensity" min="0" max="2" step="0.005" value="0.45"><span id="mtDensityVal"></span></label>
+      <div class="pair"><span class="k">Start offset from nucleus edge (× cell radius) min/max</span><input type="number" id="mtStartFracMin" value="0" min="0" max="1" step="0.01"><input type="number" id="mtStartFracMax" value="0.3" min="0" max="1" step="0.01"></div>
+      <label class="row">Start position XY jitter (µm) <input type="range" id="mtStartOffsetXY" min="0" max="2" step="0.05" value="0"><span id="mtStartOffsetXYVal"></span></label>
+      <div class="pair"><span class="k">End offset from cell edge (× cell radius) min/max</span><input type="number" id="mtEndFracMin" value="0.01" min="0" max="1" step="0.01"><input type="number" id="mtEndFracMax" value="0.4" min="0" max="1" step="0.01"></div>
+      <label class="row">End direction jitter (deg) <input type="range" id="mtEndJitterDeg" min="0" max="180" step="1" value="145"><span id="mtEndJitterDegVal"></span></label>
+      <label class="row">Wobble turn strength <input type="range" id="mtWobbleTurn" min="0" max="3" step="0.05" value="0.8"><span id="mtWobbleTurnVal"></span></label>
+      <label class="row">Wobble path length × <input type="range" id="mtWobbleFactor" min="0.9" max="1.3" step="0.01" value="1.05"><span id="mtWobbleFactorVal"></span></label>
+      <label class="row">Line thickness (µm) <input type="range" id="mtLineWidth" min="0.02" max="0.5" step="0.01" value="0.02"><span id="mtLineWidthVal"></span></label>
+      <label class="row">Step length (µm) <input type="range" id="mtStepLen" min="0.05" max="1" step="0.01" value="0.05"><span id="mtStepLenVal"></span></label>
+      <label class="row">Path smoothing (µm) <input type="range" id="mtSmoothLen" min="1" max="10" step="0.5" value="1.5"><span id="mtSmoothLenVal"></span></label>
+      <label class="row">Min turn radius (µm) <input type="range" id="mtMinTurnRadius" min="0" max="2" step="0.01" value="0.15"><span id="mtMinTurnRadiusVal"></span></label>
+      <label class="row">Min separation (µm) <input type="range" id="mtMinSeparation" min="0" max="0.5" step="0.01" value="0.05"><span id="mtMinSeparationVal"></span></label>
+      <label class="row">Max height slope (×xy) <input type="range" id="mtMaxZSlope" min="1" max="20" step="0.5" value="5"><span id="mtMaxZSlopeVal"></span></label>
+    </fieldset>
+
+    <fieldset>
       <legend>3D view</legend>
       <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="0"><span id="tiltDegVal"></span></label>
+      <label class="row">Show cytoplasm <input type="checkbox" id="showCyto" checked></label>
+      <label class="row">Show nucleus <input type="checkbox" id="showNucleus" checked></label>
       <label class="row">Show microtubules <input type="checkbox" id="showMt" checked></label>
       <label class="row">Show chunk grid <input type="checkbox" id="showGrid"></label>
       <label class="row"><button id="resetView" style="width:100%">Reset view to origin</button></label>
@@ -115,6 +133,11 @@
   </div>
 </div>
 
+<!-- Microtubule geometry lives in its own file, kept independent of the cell/
+     nucleus/cytoplasm generator below -- loaded first since the main script's
+     own trailing resizeCanvas()/draw() call runs synchronously as soon as it
+     finishes parsing, before a script tag placed after it would have loaded. -->
+<script src="microtubules.js"></script>
 <script>
 'use strict';
 
@@ -608,23 +631,36 @@ function cytoHeightAt(c, p, dEdge, dNuc) {
 // per-frame regardless of caching -- `rings`/`n` (mesh resolution) is kept
 // modest for exactly that reason, not just to bound the math above.
 const CYTO_RINGS = 10, CYTO_RING_BIAS = 2.4;
-// A few Laplacian-style smoothing passes (average with ring/theta neighbours)
-// take the edge off small facet-to-facet jumps in the raw profile, purely
-// cosmetic -- theta wraps around, the outer ring (k=rings) is deliberately
-// EXCLUDED so the true edge stays pinned at exactly 0 (the guarantee
-// cytoHeightAt's own edgeCeiling establishes must survive this pass
+// A few smoothing passes take the edge off facet-to-facet jumps in the raw
+// profile, purely cosmetic -- theta wraps around, the outer ring (k=rings) is
+// deliberately EXCLUDED so the true edge stays pinned at exactly 0 (the
+// guarantee cytoHeightAt's own edgeCeiling establishes must survive this pass
 // untouched), and the degenerate centre ring (k=0, every theta collapses to
 // the same point by construction) is left alone too since smoothing it is a
-// no-op anyway.
-const CYTO_SMOOTH_PASSES = 2;
+// no-op anyway. Each pass is a 3x3 binomial (Gaussian-approximating) kernel
+// -- [[1,2,1],[2,4,2],[1,2,1]]/16 -- not a 4-neighbour cross average: CYTO
+// rings are biased toward the OUTER edge (CYTO_RING_BIAS, see buildCytoMesh),
+// so the region right around the nucleus -- where the envelope rise is
+// steepest -- sits at the SPARSEST radial spacing, and a cross-only kernel
+// (no diagonals) barely rounds a peak built from such coarse wedges; a real,
+// reported "jagged pyramid" look at the nucleus. Diagonal neighbours make the
+// blur isotropic instead of separately axis-biased, and more passes (6, up
+// from 2) round it further. This only costs time once per chunk at mesh-build
+// time (getCytoGeometry's own cache) -- the per-frame cost this file's other
+// comments warn about is the CANVAS DRAW loop over rings*n quads, not this.
+const CYTO_SMOOTH_PASSES = 6;
 function smoothCytoGrid(grid, rings, n) {
   for (let pass = 0; pass < CYTO_SMOOTH_PASSES; pass++) {
     const next = new Array(rings + 1);
     for (let k = 1; k < rings; k++) {
       next[k] = new Array(n);
+      const km = k - 1, kp = k + 1;
       for (let i = 0; i < n; i++) {
         const im = (i - 1 + n) % n, ip = (i + 1) % n;
-        next[k][i] = (grid[k][im].h + grid[k][ip].h + grid[k - 1][i].h + grid[k + 1][i].h + grid[k][i].h) / 5;
+        const sum = grid[k][i].h * 4
+          + (grid[k][im].h + grid[k][ip].h + grid[km][i].h + grid[kp][i].h) * 2
+          + grid[km][im].h + grid[km][ip].h + grid[kp][im].h + grid[kp][ip].h;
+        next[k][i] = sum / 16;
       }
     }
     for (let k = 1; k < rings; k++) for (let i = 0; i < n; i++) grid[k][i].h = next[k][i];
@@ -689,6 +725,33 @@ function getCytoGeometry(c, p) {
   entry = { localOutline, mesh };
   cytoCache.set(key, entry);
   return entry;
+}
+
+// Samples the ACTUAL rendered (smoothed) cytoplasm height-field at an
+// arbitrary local (x,y), not just at the CYTO_RINGS x CYTO_MESH_THETA grid
+// vertices buildCytoMesh() itself uses -- bilinear over (ring-fraction,
+// theta-index). Needed because mtClampIntoCytoplasm() (microtubules.js) used
+// to clamp against the raw analytic cytoHeightAt() while the surface actually
+// DRAWN comes from this smoothed mesh (smoothCytoGrid's Laplacian averaging
+// systematically lowers the sharp nucleus-adjacent dome peak below its raw
+// analytic value) -- clamping against the raw function let a microtubule
+// point sit above what render actually shows, a real, reported "pokes out of
+// the dome" bug. The ring-bias schedule (frac_k = 1-(1-k/rings)^CYTO_RING_BIAS,
+// see buildCytoMesh) is monotonic and invertible in closed form:
+// k(f) = rings*(1-(1-f)^(1/CYTO_RING_BIAS)).
+function sampleCytoMeshHeight(c, p, x, y) {
+  const { mesh } = getCytoGeometry(c, p);
+  const { rings, n, grid } = mesh;
+  const theta = Math.atan2(y, x);
+  const thetaNorm = ((theta / (Math.PI * 2)) % 1 + 1) % 1;
+  const iF = thetaNorm * n;
+  const i0 = Math.floor(iF) % n, i1 = (i0 + 1) % n, ti = iF - Math.floor(iF);
+  const rc = cellRadiusAt(c, theta);
+  const f = Math.min(1, Math.max(0, rc > 1e-9 ? Math.hypot(x, y) / rc : 0));
+  const kF = Math.min(rings, rings * (1 - Math.pow(1 - f, 1 / CYTO_RING_BIAS)));
+  const k0 = Math.min(rings - 1, Math.floor(kF)), k1 = k0 + 1, tk = kF - k0;
+  const h00 = grid[k0][i0].h, h01 = grid[k0][i1].h, h10 = grid[k1][i0].h, h11 = grid[k1][i1].h;
+  return (h00 * (1 - ti) + h01 * ti) * (1 - tk) + (h10 * (1 - ti) + h11 * ti) * tk;
 }
 
 // Standard marching squares, generalised to the polar (ring, theta-index)
@@ -1038,30 +1101,10 @@ function prune(map, p) {
   return toRemove.size;
 }
 
-// ---- microtubules (unchanged placeholder from the first pass) -------------
-function buildMicrotubule(seed, cx, cy, mtIndex, cell, p) {
-  const next = hashStream(seed, cx, cy, 100 + mtIndex);
-  const startAng = next() * Math.PI * 2;
-  const startRad = Math.sqrt(next()) * cell.semiMinor * 0.6;
-  let x = cell.x + Math.cos(startAng) * startRad;
-  let y = cell.y + Math.sin(startAng) * startRad;
-  let heading = next() * Math.PI * 2;
-  const totalLen = p.mtLen * cell.semiMajor;
-  const steps = Math.max(4, Math.round(totalLen / 1.2));
-  const stepLen = totalLen / steps;
-  const turn = p.mtWav * 0.9;
-  const pts = [{ x, y }];
-  for (let i = 0; i < steps; i++) {
-    heading += (next() * 2 - 1) * turn;
-    x += Math.cos(heading) * stepLen;
-    y += Math.sin(heading) * stepLen;
-    pts.push({ x, y });
-  }
-  return pts;
-}
-function mtCountForCell(cell, p) {
-  return Math.max(0, Math.round((2 + cell.semiMajor * 0.9) * p.mtDensity));
-}
+// ---- microtubules: see microtubules.js -------------------------------------
+// buildMicrotubulesForCell(seed, cx, cy, cell, p) is defined there, kept
+// independent of the cell/nucleus/cytoplasm generator above (see that file's
+// own header comment) so it can be swapped or ported on its own.
 
 // ---- simple depth colour ramp (blue -> cyan -> green -> yellow -> red) ----
 // Deliberately echoes the "colour by depth (z)" convention used elsewhere in
@@ -1095,7 +1138,14 @@ const els = {};
  'cytoMidHeightMin', 'cytoMidHeightMax', 'cytoMidDistanceMin', 'cytoMidDistanceMax',
  'cytoContourStep', 'cytoContourStepVal', 'showCytoContours',
  'enablePacking', 'allowPackRotation', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
- 'tiltDeg', 'tiltDegVal', 'showMt', 'showGrid', 'resetView']
+ 'mtDensity', 'mtDensityVal', 'mtStartFracMin', 'mtStartFracMax', 'mtStartOffsetXY', 'mtStartOffsetXYVal',
+ 'mtEndFracMin', 'mtEndFracMax',
+ 'mtEndJitterDeg', 'mtEndJitterDegVal', 'mtWobbleTurn', 'mtWobbleTurnVal',
+ 'mtWobbleFactor', 'mtWobbleFactorVal', 'mtLineWidth', 'mtLineWidthVal', 'mtStepLen', 'mtStepLenVal', 'mtSmoothLen', 'mtSmoothLenVal',
+ 'mtMinTurnRadius', 'mtMinTurnRadiusVal',
+ 'mtMinSeparation', 'mtMinSeparationVal',
+ 'mtMaxZSlope', 'mtMaxZSlopeVal',
+ 'tiltDeg', 'tiltDegVal', 'showCyto', 'showNucleus', 'showMt', 'showGrid', 'resetView']
   .forEach(id => { els[id] = document.getElementById(id); });
 
 function params() {
@@ -1133,7 +1183,21 @@ function params() {
     packFrac: +els.packFrac.value,
     relaxIters: +els.relaxIters.value,
     relaxDamping: +els.relaxDamping.value,
-    mtDensity: 0.5, mtLen: 1.4, mtWav: 0.35, // microtubule tuning: unchanged from pass 1, not exposed further this round
+    mtDensity: +els.mtDensity.value,
+    mtStartFracMin: +els.mtStartFracMin.value,
+    mtStartFracMax: Math.max(+els.mtStartFracMin.value, +els.mtStartFracMax.value),
+    mtStartOffsetXY: +els.mtStartOffsetXY.value,
+    mtEndFracMin: +els.mtEndFracMin.value,
+    mtEndFracMax: Math.max(+els.mtEndFracMin.value, +els.mtEndFracMax.value),
+    mtEndJitterDeg: +els.mtEndJitterDeg.value,
+    mtWobbleTurn: +els.mtWobbleTurn.value,
+    mtWobbleFactor: Math.max(1, +els.mtWobbleFactor.value),
+    mtLineWidth: Math.max(0.001, +els.mtLineWidth.value),
+    mtStepLen: Math.max(0.02, +els.mtStepLen.value),
+    mtSmoothLen: Math.max(0, +els.mtSmoothLen.value),
+    mtMinTurnRadius: Math.max(0, +els.mtMinTurnRadius.value),
+    mtMinSeparation: +els.mtMinSeparation.value,
+    mtMaxZSlope: Math.max(1, +els.mtMaxZSlope.value),
   };
 }
 
@@ -1409,15 +1473,15 @@ function draw() {
       nCells++;
 
       if (els.showMt.checked) {
-        const nMtCell = mtCountForCell(cell, p);
+        const mts = buildMicrotubulesForCell(seed, cx, cy, cell, p);
         ctx.strokeStyle = '#e6c65a';
-        ctx.lineWidth = Math.max(0.6, 0.1 * pxPerUm);
+        ctx.lineWidth = Math.max(0.6, p.mtLineWidth * pxPerUm);
         ctx.globalAlpha = 0.8;
-        for (let i = 0; i < nMtCell; i++) {
-          const pts = buildMicrotubule(seed, cx, cy, i, cell, p);
+        for (const pts of mts) {
           ctx.beginPath();
           for (let k = 0; k < pts.length; k++) {
-            const [px, py] = project(pts[k].x, pts[k].y, 0);
+            const [wx, wy] = localToWorld(cell, pts[k].x, pts[k].y);
+            const [px, py] = project(wx, wy, pts[k].z);
             if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
           }
           ctx.stroke();
@@ -1426,8 +1490,8 @@ function draw() {
         ctx.globalAlpha = 1;
       }
 
-      drawCellBody(cell, pxPerUm, p);
-      drawNucleus(cell);
+      if (els.showCyto.checked) drawCellBody(cell, pxPerUm, p);
+      if (els.showNucleus.checked) drawNucleus(cell);
     }
   }
 
@@ -1477,6 +1541,17 @@ function syncLabels() {
   els.packFracVal.textContent = (+els.packFrac.value).toFixed(2);
   els.relaxItersVal.textContent = els.relaxIters.value;
   els.relaxDampingVal.textContent = (+els.relaxDamping.value).toFixed(2);
+  els.mtDensityVal.textContent = (+els.mtDensity.value).toFixed(3) + ' /um²';
+  els.mtStartOffsetXYVal.textContent = (+els.mtStartOffsetXY.value).toFixed(2) + ' um';
+  els.mtEndJitterDegVal.textContent = els.mtEndJitterDeg.value + '°';
+  els.mtWobbleTurnVal.textContent = (+els.mtWobbleTurn.value).toFixed(2);
+  els.mtWobbleFactorVal.textContent = (+els.mtWobbleFactor.value).toFixed(2) + '×';
+  els.mtLineWidthVal.textContent = (+els.mtLineWidth.value).toFixed(2) + ' um';
+  els.mtStepLenVal.textContent = (+els.mtStepLen.value).toFixed(2) + ' um';
+  els.mtSmoothLenVal.textContent = (+els.mtSmoothLen.value).toFixed(1) + ' um';
+  els.mtMinTurnRadiusVal.textContent = (+els.mtMinTurnRadius.value).toFixed(2) + ' um';
+  els.mtMinSeparationVal.textContent = (+els.mtMinSeparation.value).toFixed(2) + ' um';
+  els.mtMaxZSlopeVal.textContent = (+els.mtMaxZSlope.value).toFixed(1) + '×';
   els.tiltDegVal.textContent = els.tiltDeg.value + '°';
 }
 Object.keys(els).forEach(id => {

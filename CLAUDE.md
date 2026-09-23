@@ -29,6 +29,13 @@ license honoured in the head banner. (`tools/` is the one exception: a separate,
 Node+Playwright CLI for headless/scripting use — see **pipeline** below — with its own scoped
 `package.json`, deliberately kept out of `webSMLM.html` so the app's own property is untouched.)
 
+## cell_field_sim / demoCam port spec
+
+`cell_field_sim/` is a standalone prototype (not part of `webSMLM.html`). `cell_field_sim/DEMOCAM_PORT.md`
+is the hand-off spec for porting it to `C:\GitHub\demoCam_SMLM_MM`. **While that file exists, keep it up
+to date**: any change to `cell_field_sim/` that affects what it describes (hash channels, defaults,
+geometry, dye/label model, function names) updates `DEMOCAM_PORT.md` in the same commit.
+
 ## Editing model
 
 All work happens inside `webSMLM.html`. It is organized into commented `MODULE:` banners; find the

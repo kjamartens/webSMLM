@@ -469,3 +469,20 @@ on purpose — it's an open-ended exploration of a different generation paradigm
 useful pieces (the address-based placement scheme, in particular) can be ported into
 either webSMLM's simulator or demoCam_SMLM_MM's `SMLMStructures`, whichever ends up
 wanting it.
+
+## Microtubule surface labels (debug preview)
+
+`buildMicrotubuleLabelPoints()` (microtubules.js) treats a centerline as a 25 nm-diameter cylinder
+carrying the 13_3 protofilament lattice (13 sites per 8 nm dimer ring, neighbouring protofilaments
+staggered by 3/13 dimer). Each site becomes surface attachment point -> binder tip (12 nm radial stalk,
+nanobody/antibody) -> dye, displaced from the tip by a uniform-in-volume 2-5 nm linker (ported from
+`displaceByLinker()` in webSMLM.html). Constants (`MT_RADIUS_NM`, `MT_BINDER_NM`, `MT_LINKER_*`) sit at
+the top of that section. Full-network labeling can reach millions of points, so it is not done in
+`draw()`; **Debug: view MT labels** labels only 1 µm of the longest microtubule in view.
+
+## demoCam_SMLM_MM port spec (keep in sync)
+
+[`DEMOCAM_PORT.md`](DEMOCAM_PORT.md) is the hand-off spec for reimplementing this in
+`C:\GitHub\demoCam_SMLM_MM` (cells, microtubules, dyes/blinks, dummy XY stage). **While that file
+exists, update it in the same commit as any change here that it describes** (hash channels, defaults,
+geometry, dye model, function names).

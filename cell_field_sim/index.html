@@ -23,6 +23,8 @@
   canvas{display:block;background:#05070a;cursor:grab}
   canvas.dragging{cursor:grabbing}
   #hud{position:absolute;top:8px;left:8px;font-size:11px;background:rgba(10,13,18,.7);border:1px solid #232a35;border-radius:6px;padding:8px 10px;line-height:1.5;pointer-events:none;white-space:pre}
+  #mtDebug{position:absolute;bottom:8px;right:8px;display:none;background:rgba(10,13,18,.92);border:1px solid #232a35;border-radius:6px;padding:6px}
+  #mtDebug .t{font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;gap:12px}
   #legend{position:absolute;bottom:8px;left:8px;font-size:11px;background:rgba(10,13,18,.7);border:1px solid #232a35;border-radius:6px;padding:6px 9px;line-height:1.5}
   .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>
@@ -97,6 +99,8 @@
       <label class="row">Min turn radius (µm) <input type="range" id="mtMinTurnRadius" min="0" max="2" step="0.01" value="0.15"><span id="mtMinTurnRadiusVal"></span></label>
       <label class="row">Min separation (µm) <input type="range" id="mtMinSeparation" min="0" max="0.5" step="0.01" value="0.05"><span id="mtMinSeparationVal"></span></label>
       <label class="row">Max height slope (×xy) <input type="range" id="mtMaxZSlope" min="1" max="20" step="0.5" value="5"><span id="mtMaxZSlopeVal"></span></label>
+      <label class="row">Show MT label sites (zoom in) <input type="checkbox" id="showMtLabels"></label>
+      <label class="row"><button id="mtLabelDebugBtn" style="width:100%" title="Shows nanobody/antibody + dye label positions on a 1 um stretch of the longest microtubule in view (13-protofilament lattice, 25 nm cylinder). Never labels the whole network.">Debug: view MT labels</button></label>
     </fieldset>
 
     <fieldset>
@@ -124,6 +128,7 @@
   <div id="canvasHost">
     <canvas id="cv"></canvas>
     <div id="hud"></div>
+    <div id="mtDebug"><div class="t"><span id="mtDebugInfo"></span><a href="#" id="mtDebugClose">close</a></div><canvas id="mtDebugCv" width="800" height="280"></canvas></div>
     <div id="legend">
       <span class="sw" style="background:#5aa9e6"></span>cell body
       <span class="sw" style="background:#e6a23c;margin-left:10px"></span>nucleus (colour = depth)
@@ -1145,7 +1150,7 @@ const els = {};
  'mtMinTurnRadius', 'mtMinTurnRadiusVal',
  'mtMinSeparation', 'mtMinSeparationVal',
  'mtMaxZSlope', 'mtMaxZSlopeVal',
- 'tiltDeg', 'tiltDegVal', 'showCyto', 'showNucleus', 'showMt', 'showGrid', 'resetView']
+ 'mtLabelDebugBtn', 'showMtLabels', 'tiltDeg', 'tiltDegVal', 'showCyto', 'showNucleus', 'showMt', 'showGrid', 'resetView']
   .forEach(id => { els[id] = document.getElementById(id); });
 
 function params() {
@@ -1463,6 +1468,8 @@ function draw() {
   }
 
   let nChunks = 0, nCells = 0, nMt = 0;
+  mtDebugSource = null;
+  mtLabelBudget = MT_LABEL_MAX_DRAWN; let labelNote = '';
   const pxPerUm = view.scale * devicePixelRatio;
 
   for (let cx = cx0; cx <= cx1; cx++) {
@@ -1478,6 +1485,7 @@ function draw() {
         ctx.lineWidth = Math.max(0.6, p.mtLineWidth * pxPerUm);
         ctx.globalAlpha = 0.8;
         for (const pts of mts) {
+          if (!mtDebugSource || pts.length > mtDebugSource.pts.length) mtDebugSource = { pts, seed, cx, cy };
           ctx.beginPath();
           for (let k = 0; k < pts.length; k++) {
             const [wx, wy] = localToWorld(cell, pts[k].x, pts[k].y);
@@ -1488,6 +1496,10 @@ function draw() {
           nMt++;
         }
         ctx.globalAlpha = 1;
+        if (els.showMtLabels.checked) {
+          if (pxPerUm < MT_LABEL_MIN_PX_PER_UM) labelNote = 'zoom in to show MT labels';
+          else if (drawMtLabels(cell, mts, seed, cx, cy, pxPerUm)) labelNote = 'label cap reached, some not drawn';
+        }
       }
 
       if (els.showCyto.checked) drawCellBody(cell, pxPerUm, p);
@@ -1500,7 +1512,8 @@ function draw() {
   hud.textContent =
     `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
     `chunks ${nChunks}   cells ${nCells}   removed (stuck) ${removed}   microtubules ${nMt}` +
-    (withinCap ? '' : '   [packing skipped: zoom in, view too large]');
+    (withinCap ? '' : '   [packing skipped: zoom in, view too large]') +
+    (labelNote ? '   [' + labelNote + ']' : '');
 }
 
 // ---- pan / zoom -------------------------------------------------------------
@@ -1526,7 +1539,7 @@ window.addEventListener('pointerup', () => {
 cv.addEventListener('wheel', e => {
   e.preventDefault();
   const factor = Math.exp(-e.deltaY * 0.0015);
-  view.scale = Math.min(200, Math.max(0.3, view.scale * factor));
+  view.scale = Math.max(0.3, view.scale * factor);
   draw();
 }, { passive: false });
 
@@ -1556,7 +1569,7 @@ function syncLabels() {
 }
 Object.keys(els).forEach(id => {
   const el = els[id];
-  if (!el || id === 'reseed' || id === 'resetView' || id.endsWith('Val')) return;
+  if (!el || id === 'reseed' || id === 'resetView' || id === 'mtLabelDebugBtn' || id.endsWith('Val')) return;
   el.addEventListener('input', () => { syncLabels(); draw(); });
 });
 
@@ -1568,6 +1581,109 @@ els.resetView.addEventListener('click', () => {
   view.cx = 0; view.cy = 0; view.scale = 9;
   draw();
 });
+
+// ---- microtubule label debug preview ----------------------------------------
+let mtDebugSource = null;
+// ---- MT label sites in the main view --------------------------------------
+// Only 1 um windows that intersect the canvas are generated (cached per path),
+// gated by zoom and a per-frame draw cap, since a whole network is millions of sites.
+const MT_LABEL_MIN_PX_PER_UM = 120;
+const MT_LABEL_MAX_DRAWN = 150000;
+const MT_LABEL_CACHE_MAX = 600000;
+let mtLabelBudget = 0;
+let mtLabelCache = new WeakMap(), mtLabelCached = 0;
+function drawMtLabels(cell, mts, seed, cx, cy, pxPerUm) {
+  if (mtLabelCached > MT_LABEL_CACHE_MAX) { mtLabelCache = new WeakMap(); mtLabelCached = 0; }
+  const W = cv.width, H = cv.height, m = pxPerUm;
+  let capped = false;
+  ctx.fillStyle = '#5ad1e6';
+  for (let i = 0; i < mts.length; i++) {
+    const pts = mts[i];
+    let e = mtLabelCache.get(pts);
+    if (!e) {
+      let len = 0;
+      for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y, pts[k].z - pts[k - 1].z);
+      e = { len, wins: new Map() };
+      mtLabelCache.set(pts, e);
+    }
+    const nWin = Math.min(512, Math.ceil(e.len));
+    const phase = 2 * Math.PI * hashUnit(seed, cx, cy, 8000000 + i);
+    for (let w = 0; w < nWin; w++) {
+      let L = e.wins.get(w);
+      if (!L) {
+        const len = Math.min(1, e.len - w);
+        if (len < 0.01) { e.wins.set(w, []); continue; }
+        // cull by window centre before generating
+        const c = mtPointAtArc(pts, w + 0.5);
+        const [wx, wy] = localToWorld(cell, c.x, c.y);
+        const [px, py] = project(wx, wy, c.z);
+        if (px < -m || py < -m || px > W + m || py > H + m) continue;
+        L = buildMicrotubuleLabelPoints(pts, { startUm: w, lenUm: Math.min(1, e.len - w), phase },
+          hashStream(seed, cx, cy, 9000000 + i * 512 + w));
+        e.wins.set(w, L); mtLabelCached += L.length;
+      }
+      for (const l of L) {
+        if (mtLabelBudget <= 0) { capped = true; break; }
+        const [wx, wy] = localToWorld(cell, l.ax, l.ay);
+        const [px, py] = project(wx, wy, l.az);
+        if (px < 0 || py < 0 || px > W || py > H) continue;
+        ctx.fillStyle = '#5ad1e6';
+        ctx.fillRect(px - 0.5, py - 0.5, 1.2, 1.2);
+        const [dwx, dwy] = localToWorld(cell, l.x, l.y);
+        const [dpx, dpy] = project(dwx, dwy, l.z);
+        ctx.fillStyle = '#ff4d4d';
+        ctx.fillRect(dpx - 0.5, dpy - 0.5, 1.2, 1.2);
+        mtLabelBudget--;
+      }
+      if (capped) return true;
+    }
+  }
+  return capped;
+}
+function mtPointAtArc(pts, s) {
+  let acc = 0;
+  for (let k = 1; k < pts.length; k++) {
+    const d = Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y, pts[k].z - pts[k - 1].z);
+    if (acc + d >= s) { const t = d > 0 ? (s - acc) / d : 0; return { x: lerp(pts[k - 1].x, pts[k].x, t), y: lerp(pts[k - 1].y, pts[k].y, t), z: lerp(pts[k - 1].z, pts[k].z, t) }; }
+    acc += d;
+  }
+  return pts[pts.length - 1];
+}
+function showMtLabelDebug() {
+  if (!mtDebugSource) { els.mtLabelDebugBtn.textContent = 'No microtubule in view'; setTimeout(() => { els.mtLabelDebugBtn.textContent = 'Debug: view MT labels'; }, 1500); return; }
+  const { pts, seed, cx, cy } = mtDebugSource;
+  const rng = hashStream(seed, cx, cy, MT_LABEL_STREAM_BASE);
+  const labels = buildMicrotubuleLabelPoints(pts, { lenUm: 1 }, rng);
+  drawMtLabelDebug(labels);
+  document.getElementById('mtDebug').style.display = 'block';
+}
+function drawMtLabelDebug(labels) {
+  const c = document.getElementById('mtDebugCv'), g = c.getContext('2d');
+  g.fillStyle = '#0a0d12'; g.fillRect(0, 0, c.width, c.height);
+  const axW = 560, mid = c.height / 2;
+  const sx = (axW - 20) / 1000, ex = 100 / (MT_RADIUS_NM + MT_BINDER_NM + MT_LINKER_MAX_NM + 5);
+  const ecx = axW + 120;
+  g.strokeStyle = '#3a4454'; g.lineWidth = 1;
+  g.strokeRect(10 + 0.5, mid - MT_RADIUS_NM * sx * 4, 1000 * sx, MT_RADIUS_NM * 2 * sx * 4);
+  g.beginPath(); g.arc(ecx, mid, MT_RADIUS_NM * ex, 0, 2 * Math.PI); g.stroke();
+  const dot = (X, Y, col, r) => { g.fillStyle = col; g.beginPath(); g.arc(X, Y, r, 0, 2 * Math.PI); g.fill(); };
+  const A = 4; // axial view: vertical exaggeration
+  for (const L of labels) {
+    dot(10 + L.att.s * sx, mid + L.att.u * sx * A, '#6b7686', 1);
+    dot(10 + L.tip.s * sx, mid + L.tip.u * sx * A, 'rgba(90,169,230,.5)', 1);
+    dot(10 + L.dye.s * sx, mid + L.dye.u * sx * A, '#ff4d4d', 1.4);
+    dot(ecx + L.att.u * ex, mid + L.att.v * ex, '#6b7686', 1.5);
+    dot(ecx + L.tip.u * ex, mid + L.tip.v * ex, 'rgba(90,169,230,.6)', 1.5);
+    dot(ecx + L.dye.u * ex, mid + L.dye.v * ex, '#ff4d4d', 2);
+  }
+  g.fillStyle = '#8b96a5'; g.font = '11px sans-serif';
+  g.fillText('axial (1 um, vertical x4)', 12, 14);
+  g.fillText('end-on (25 nm cylinder)', ecx - 70, 14);
+  document.getElementById('mtDebugInfo').textContent =
+    `${labels.length} labels; grey = surface site, blue = binder tip (${MT_BINDER_NM} nm), red = dye`;
+}
+document.getElementById('mtLabelDebugBtn').addEventListener('click', showMtLabelDebug);
+document.getElementById('mtDebugClose').addEventListener('click', e => { e.preventDefault(); document.getElementById('mtDebug').style.display = 'none'; });
 
 window.addEventListener('resize', resizeCanvas);
 syncLabels();

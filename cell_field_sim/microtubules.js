@@ -1273,3 +1273,99 @@ function buildMicrotubulesForCell(seed, cx, cy, cell, p) {
   mtResultCache.set(key, { sig, paths });
   return paths;
 }
+
+// ---- Surface labels (nanobody/antibody + dye) --------------------------------
+// Each centerline is treated as a MT_RADIUS_NM cylinder carrying the 13_3
+// protofilament lattice. Per lattice site: attachment point on the surface ->
+// binder tip (stalk of MT_BINDER_NM, radially outward) -> dye, displaced from
+// the tip by displaceByLinker (uniform in volume, ported from webSMLM.html's
+// NUP model). Full-network output can reach millions of points, so this is
+// only ever called on a short window (see the debug preview in index.html).
+const MT_RADIUS_NM = 12.5;
+const MT_N_PROTOFILAMENTS = 13;
+const MT_DIMER_NM = 8;
+const MT_LATTICE_START = 3;       // 13_3 lattice: neighbouring protofilaments stagger by 3/13 dimer
+const MT_BINDER_NM = 12;
+const MT_LINKER_MIN_NM = 2;
+const MT_LINKER_MAX_NM = 5;
+const MT_LABEL_STREAM_BASE = 7777777;
+
+function mtDisplaceByLinker(p, minNm, maxNm, rng) {
+  const u = rng() * 2 - 1, phi = rng() * 2 * Math.PI, sn = Math.sqrt(1 - u * u);
+  const r = Math.cbrt(Math.pow(minNm, 3) + (Math.pow(maxNm, 3) - Math.pow(minNm, 3)) * rng());
+  return { a: p.a + r * sn * Math.cos(phi), b: p.b + r * sn * Math.sin(phi), c: p.c + r * u };
+}
+
+// pts: centerline [{x,y,z}] (um). opts: {startUm, lenUm, efficiency, binderNm,
+// linkerMinNm, linkerMaxNm}. rng: () => [0,1). Returns [{x,y,z (dye, um),
+// ax..az (attachment), bx..bz (binder tip), k (protofilament), s (nm along the
+// window), att/tip/dye: {u,v,s} offsets in nm in the axis frame}].
+function buildMicrotubuleLabelPoints(pts, opts, rng) {
+  const o = opts || {};
+  const binderNm = o.binderNm != null ? o.binderNm : MT_BINDER_NM;
+  const lMin = o.linkerMinNm != null ? o.linkerMinNm : MT_LINKER_MIN_NM;
+  const lMax = o.linkerMaxNm != null ? o.linkerMaxNm : MT_LINKER_MAX_NM;
+  const eff = o.efficiency != null ? o.efficiency : 1;
+  const n = pts.length;
+  if (n < 2) return [];
+
+  // Per-segment tangent + parallel-transported normal frame, cumulative length (um).
+  const cum = [0], T = [], U = [], V = [];
+  let prevU = null;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1].x - pts[i].x, dy = pts[i + 1].y - pts[i].y, dz = pts[i + 1].z - pts[i].z;
+    const len = Math.hypot(dx, dy, dz);
+    cum.push(cum[i] + len);
+    let t = len > 1e-12 ? [dx / len, dy / len, dz / len] : (T.length ? T[i - 1] : [1, 0, 0]);
+    let u;
+    if (!prevU) {
+      u = Math.abs(t[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    } else u = prevU;
+    const d = u[0] * t[0] + u[1] * t[1] + u[2] * t[2];
+    u = [u[0] - d * t[0], u[1] - d * t[1], u[2] - d * t[2]];
+    const ul = Math.hypot(u[0], u[1], u[2]) || 1;
+    u = [u[0] / ul, u[1] / ul, u[2] / ul];
+    T.push(t); U.push(u);
+    V.push([t[1] * u[2] - t[2] * u[1], t[2] * u[0] - t[0] * u[2], t[0] * u[1] - t[1] * u[0]]);
+    prevU = u;
+  }
+  const total = cum[n - 1];
+  const lenUm = Math.min(o.lenUm != null ? o.lenUm : 1, total);
+  const startUm = o.startUm != null ? Math.min(Math.max(0, o.startUm), total - lenUm) : (total - lenUm) / 2;
+  const phase = o.phase != null ? o.phase : rng() * 2 * Math.PI;
+  const nm = 1e-3;
+  const out = [];
+  for (let k = 0; k < MT_N_PROTOFILAMENTS; k++) {
+    const th = phase + k * 2 * Math.PI / MT_N_PROTOFILAMENTS;
+    const ct = Math.cos(th), st = Math.sin(th);
+    const off = (k * MT_LATTICE_START * MT_DIMER_NM / MT_N_PROTOFILAMENTS) % MT_DIMER_NM;
+    let seg = 0;
+    for (let sNm = off; sNm < lenUm * 1000 - 1e-9; sNm += MT_DIMER_NM) {
+      if (rng() >= eff) continue;
+      const S = startUm + sNm * nm;
+      while (seg < n - 2 && cum[seg + 1] < S) seg++;
+      const t = T[seg], u = U[seg], v = V[seg], f = S - cum[seg];
+      const cx = pts[seg].x + t[0] * f, cy = pts[seg].y + t[1] * f, cz = pts[seg].z + t[2] * f;
+      const r = [ct * u[0] + st * v[0], ct * u[1] + st * v[1], ct * u[2] + st * v[2]];
+      const R = MT_RADIUS_NM * nm, B = (MT_RADIUS_NM + binderNm) * nm;
+      const a = [cx + r[0] * R, cy + r[1] * R, cz + r[2] * R];
+      const b = [cx + r[0] * B, cy + r[1] * B, cz + r[2] * B];
+      const dye = mtDisplaceByLinker({ a: b[0], b: b[1], c: b[2] }, lMin * nm, lMax * nm, rng);
+      const dv = [dye.a - cx, dye.b - cy, dye.c - cz];
+      out.push({
+        x: dye.a, y: dye.b, z: dye.c,
+        ax: a[0], ay: a[1], az: a[2],
+        bx: b[0], by: b[1], bz: b[2],
+        k, s: sNm,
+        att: { u: R / nm * ct, v: R / nm * st, s: sNm },
+        tip: { u: B / nm * ct, v: B / nm * st, s: sNm },
+        dye: {
+          u: (dv[0] * u[0] + dv[1] * u[1] + dv[2] * u[2]) / nm,
+          v: (dv[0] * v[0] + dv[1] * v[1] + dv[2] * v[2]) / nm,
+          s: sNm + (dv[0] * t[0] + dv[1] * t[1] + dv[2] * t[2]) / nm,
+        },
+      });
+    }
+  }
+  return out;
+}

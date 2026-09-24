@@ -42,14 +42,22 @@ code, defaults, `CF_PARAMS`) must be re-copied into the matching `CellField` fun
 in the same commit, and vice versa — nothing keeps them in sync automatically.
 
 **Viewer performance rule (`cell_field_sim/index.html`).** `draw()` runs on every pan/zoom event, so it
-must never do per-event work a pan/zoom cannot change: no `buildCandidateMap`/`relax`/`prune` outside
-`getPackedMap()`'s window check (`packCache`, view padded by 2 views each side, a 5x5 window), no per-frame quad sorting or
-per-point array allocation (mesh render cache `getMeshRender()`/`ensureQuadOrder()`, cached contour
-segments, per-cell MT `Path2D` in `getMtPath2D()`), all draws go through `requestDraw()` (rAF), and
-off-screen cells are culled (`cellVisible()`). Cell bodies draw on a WebGL2 layer (`#cvGl`; `?2d` in the
-URL forces the 2D fallback, also used automatically if WebGL2 is missing). Any new per-frame cost must be
-justified against a pan benchmark (headless Playwright, 60 synthetic pointermoves: was ~2.2 s/frame,
-now ~0.1 s in software GL) — re-measure whenever `draw()`/`drawCellBody2D()` change.
+must never do per-event work a pan/zoom cannot change, and must never run the generator on the main
+thread when workers are available: window packing (`getPackedMapAsync()`, `packCache`, a 5x5-view
+window re-packed in the background before the view reaches its edge) and per-cell mesh + microtubules
+(`assets`, `pumpAssets()`) are built by Web Workers that run the same generator source as the main
+thread (index.html's generator half + `microtubules.js`, whose body is wrapped in `window.__MT_SRC`
+purely so its text is readable under file://). `draw()` only reads caches and skips cells not delivered
+yet (they pop in); without workers (`?nw`, or if they fail) `getPackedMapSync()`/`getAsset()` compute
+synchronously. Anything a worker needs must live above the `// ---- viewer ---` marker (the worker
+source is cut there) and be DOM-free; new worker-side calls into viewer-only functions need a stub in
+`genWorkerMain()` (see `freeMeshGl`). Also: no per-frame quad sorting/allocation (mesh render cache
+`getMeshRender()`/`ensureQuadOrder()`, cached contour segments, per-cell MT `Path2D` in
+`getMtPath2D()`), draws go through `requestDraw()` (rAF), off-screen cells are culled
+(`cellVisible()`). Cell bodies draw on a WebGL2 layer (`#cvGl`; `?2d` forces the 2D fallback, also
+automatic without WebGL2). Justify any new per-frame cost against a pan benchmark (headless
+Playwright, 300 synthetic pan frames: was ~2.2 s/frame; now p50 17 ms, p95 26 ms with workers in
+software GL) — re-measure whenever `draw()` or the worker plumbing change.
 
 ## Editing model
 

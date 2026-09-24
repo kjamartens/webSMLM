@@ -1,3 +1,9 @@
+// Wrapped in a function ONLY so index.html can read this file's own source text
+// (Function.prototype.toString) and hand it to the generator Web Workers: a page
+// opened straight from disk (file://) cannot fetch() or importScripts() a sibling
+// file, but it can always read a function's source. index.html re-runs the body
+// as a plain global script, so everything below behaves as if it were top-level.
+window.__MT_SRC = function () {
 'use strict';
 
 // ---- Microtubules ------------------------------------------------------------
@@ -1369,3 +1375,4 @@ function buildMicrotubuleLabelPoints(pts, opts, rng) {
   }
   return out;
 }
+};

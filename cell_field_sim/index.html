@@ -157,6 +157,18 @@
      finishes parsing, before a script tag placed after it would have loaded. -->
 <script src="microtubules.js"></script>
 <script>
+// Re-run microtubules.js's wrapped body as a plain global script (see its header),
+// keeping the text for the generator workers.
+var MT_BODY = (() => {
+  const f = window.__MT_SRC.toString();
+  const body = f.slice(f.indexOf('{') + 1, f.lastIndexOf('}'));
+  const el = document.createElement('script');
+  el.textContent = body + '\n//# sourceURL=microtubules.js';
+  document.head.appendChild(el);
+  return body;
+})();
+</script>
+<script id="mainScript">
 'use strict';
 
 // ---- pcg4d: address-based hash, ported line-for-line from webSMLM's
@@ -1203,6 +1215,31 @@ function depthColor(z, zmin, zmax, alpha) {
   return `rgba(${r | 0},${g | 0},${bl | 0},${alpha})`;
 }
 
+// Pack a candidate map in place (relax + prune to a fixed point); returns how many
+// cells prune() removed. Lives with the generator (above the viewer) so the main
+// thread and the generator workers run literally the same code.
+const PRUNE_ROUNDS = 6;  // cap on prune()+settle rounds per pack -- see below
+function packMap(map, p) {
+  let removed = 0;
+  // Always the full iteration count: cutting it left visibly under-relaxed,
+  // still-overlapping cells on screen ("packing doesn't work while dragging").
+  relax(map, p, p.relaxIters);
+  // prune()+settle to a fixed point (capped at PRUNE_ROUNDS so a pathologically
+  // dense view can't loop indefinitely): removing a cell from a crowded trio can
+  // leave its remaining two members newly resolved, or can just as easily still
+  // leave them overlapping each other -- one prune() pass, working off a single
+  // pre-removal snapshot, can't see that. Each round gets its own short settle
+  // relax so the NEXT round's overlap check reflects where survivors actually
+  // moved to, not their pre-removal positions.
+  for (let round = 0; round < PRUNE_ROUNDS; round++) {
+    const r = prune(map, p);
+    removed += r;
+    if (r === 0) break;
+    relax(map, p, Math.min(8, p.relaxIters));
+  }
+  return removed;
+}
+
 // ---- viewer -----------------------------------------------------------------
 const cv = document.getElementById('cv');
 const cvBase = document.getElementById('cvBase'), cvGl = document.getElementById('cvGl');
@@ -1615,8 +1652,8 @@ function drawBodiesGl(cells, p) {
   gl.uniform2f(glU.u_canvas, W, H);
   gl.uniform1f(glU.u_scale, S);
   gl.uniform2f(glU.u_tilt, Math.sin(view.tiltRad), Math.cos(view.tiltRad));
-  for (const { cell: c } of cells) {
-    const g = ensureMeshGl(getCytoGeometry(c, p), c);
+  for (const { cell: c, asset } of cells) {
+    const g = ensureMeshGl(asset.entry, c);
     const rot = c.packRot || 0;
     gl.uniform2f(glU.u_off, c.x - view.cx, c.y - view.cy);
     gl.uniform2f(glU.u_rot, Math.cos(rot), Math.sin(rot));
@@ -1657,65 +1694,275 @@ function drawNucleus(c) {
   }
 }
 
-const CHUNK_CAP = 3500;  // safety net: above this many extended-window chunks, skip packing rather than freeze the tab
-const PRUNE_ROUNDS = 6;  // cap on prune()+settle rounds per pack -- see that call site's own comment
-const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip drawing entirely -- each cell body/nucleus
-                          // is dozens of path points, so tens of thousands of them per frame would hang the tab outright,
-                          // not just run slowly. Zoom in instead; this is a "mock explorer" limit, not a renderer.
+// ---- generator workers ---------------------------------------------------------
+// Packing a window (~4 s at 60x50 chunks) and building one cell's mesh +
+// microtubules (~0.6 s) are what used to hitch a pan. They run in Web Workers that
+// execute the SAME generator source as the main thread (index.html's generator
+// half + microtubules.js, stringified -- see the file:// note in microtubules.js):
+//   worker 0      : window packing  ({type:'pack'})
+//   workers 1..K  : per-cell assets ({type:'cell'}: cytoplasm mesh + microtubules)
+// Results are cached on the main thread (`packCache`, `assets`); draw() only ever
+// READS them, so a pan never waits on the generator. If workers cannot start, every
+// getX() below falls back to computing synchronously (the pre-worker behaviour).
+function genWorkerMain() {
+  self.freeMeshGl = () => {}; // clearCytoCache() (generator half) releases GPU buffers on the main thread only
+  onmessage = e => {
+    const d = e.data;
+    if (d.type === 'pack') {
+      const map = buildCandidateMap(d.seed, d.win[0], d.win[1], d.win[2], d.win[3], d.p);
+      const removed = d.p.enablePacking ? packMap(map, d.p) : 0;
+      const cells = [];
+      for (const c of map.values()) { delete c._radiusLUT; delete c._collisionLocal; cells.push(c); }
+      postMessage({ type: 'pack', id: d.id, key: d.key, win: d.win, cells, removed });
+    } else if (d.type === 'cell') {
+      ensureCytoCacheFresh(d.seed, d.p);
+      const entry = getCytoGeometry(d.cell, d.p), mesh = entry.mesh;
+      const nv = (mesh.rings + 1) * mesh.n;
+      const out = { type: 'cell', key: d.key, sig: d.sig, seed: d.seed, rings: mesh.rings, n: mesh.n,
+        outline: new Float64Array(entry.localOutline.length * 2),
+        mx: new Float64Array(nv), my: new Float64Array(nv), mh: new Float64Array(nv), mts: null };
+      entry.localOutline.forEach((pt, i) => { out.outline[2 * i] = pt[0]; out.outline[2 * i + 1] = pt[1]; });
+      for (let k = 0; k <= mesh.rings; k++) for (let i = 0; i < mesh.n; i++) {
+        const v = k * mesh.n + i, g = mesh.grid[k][i];
+        out.mx[v] = g.x; out.my[v] = g.y; out.mh[v] = g.h;
+      }
+      const transfer = [out.outline.buffer, out.mx.buffer, out.my.buffer, out.mh.buffer];
+      if (d.mt) {
+        const paths = buildMicrotubulesForCell(d.seed, d.cell.cx, d.cell.cy, d.cell, d.p);
+        let total = 0;
+        for (const pts of paths) total += pts.length;
+        const xyz = new Float64Array(total * 3), lens = new Uint32Array(paths.length);
+        let o = 0;
+        paths.forEach((pts, i) => {
+          lens[i] = pts.length;
+          for (const pt of pts) { xyz[o++] = pt.x; xyz[o++] = pt.y; xyz[o++] = pt.z; }
+        });
+        out.mts = { xyz, lens };
+        transfer.push(xyz.buffer, lens.buffer);
+      }
+      postMessage(out, transfer);
+    }
+  };
+}
+
+const genWorkers = { ok: false, pack: null, cells: [], busy: [] };
+let genBlobUrl = null;
+function spawnGenWorker() {
+  const w = new Worker(genBlobUrl);
+  w.onerror = e => { console.warn('generator worker failed, computing on the main thread:', e.message); disableGenWorkers(); };
+  return w;
+}
+function initGenWorkers() {
+  try {
+    const src = document.getElementById('mainScript').textContent;
+    const gen = src.slice(0, src.indexOf('// ---- viewer ---'));
+    const code = gen + '\n' + MT_BODY + '\n(' + genWorkerMain.toString() + ')();';
+    genBlobUrl = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    const K = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 2));
+    genWorkers.pack = spawnGenWorker();
+    genWorkers.pack.onmessage = onPackResult;
+    for (let i = 0; i < K; i++) {
+      const w = spawnGenWorker();
+      w.onmessage = e => onCellResult(i, e.data);
+      genWorkers.cells.push(w); genWorkers.busy.push(null);
+    }
+    genWorkers.ok = true;
+  } catch (e) { console.warn('generator workers unavailable:', e); disableGenWorkers(); }
+}
+function disableGenWorkers() {
+  genWorkers.ok = false;
+  for (const w of [genWorkers.pack, ...genWorkers.cells]) if (w) w.terminate();
+  genWorkers.pack = null; genWorkers.cells = []; genWorkers.busy = [];
+  packPending = null;
+  assetInflight.clear();
+  requestDraw();
+}
 
 // ---- packed-map cache -----------------------------------------------------
 // STANDING RULE: draw() runs on every pan/zoom event, so it must not redo work a
 // pan/zoom cannot change. The candidate map + relax() + prune() over the extended
 // window is the expensive part, and it depends only on the seed and the
 // generation/packing params, never on the view -- so it is built once over the
-// view PADDED by PACK_PAD_VIEWS views each side and reused until the needed extended
-// range (view + NR+2 chunks, which is what guarantees every visible cell sees all
-// its neighbours) leaves the cached window. Same algorithm as before, just not
-// re-run per event (which also stops cells shimmering as the window edge moved).
-// mt*/contour params are left out of the key: they cannot move a cell.
+// view PADDED by PACK_PAD_VIEWS views each side (2 => 5x5 views, only the central
+// 1x1 visible) and reused until the needed extended range (view + NR+2 chunks,
+// which is what guarantees every visible cell sees all its neighbours) leaves the
+// cached window. With workers, the NEXT window is packed in the background once
+// the view gets within one view of the edge, so the swap is usually invisible
+// (cells deep inside both windows resolve to the same positions). mt*/contour
+// params are left out of the key: they cannot move a cell.
+const CHUNK_CAP = 3500;  // safety net: above this many extended-window chunks, skip packing rather than freeze the tab
+const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip drawing entirely -- each cell body/nucleus
+                          // is dozens of path points, so tens of thousands of them per frame would hang the tab outright,
+                          // not just run slowly. Zoom in instead; this is a "mock explorer" limit, not a renderer.
 const PACK_PAD_VIEWS = 2;
-let packCache = null;
+let packCache = null;   // {key, ex0..ey1, map, removed}
+let packPending = null; // {id, key, win} in flight on the pack worker
+let packId = 0;
 const PACK_KEY_SKIP = /^(mt|showCytoContours$|cytoContourStep$)/;
 function packKey(seed, p) {
   const o = [seed];
   for (const k in p) if (!PACK_KEY_SKIP.test(k)) o.push(k + '=' + p[k]);
   return o.join('|');
 }
-function getPackedMap(seed, p, ex0, ey0, ex1, ey1) {
-  const key = packKey(seed, p), pc = packCache;
-  if (pc && pc.key === key && ex0 >= pc.ex0 && ex1 <= pc.ex1 && ey0 >= pc.ey0 && ey1 <= pc.ey1) return pc;
-  // Pad by PACK_PAD_VIEWS whole views each side (2 => a 5x5-view window, only the
-  // central 1x1 visible), shrinking until it fits CHUNK_CAP.
-  const coreW = ex1 - ex0 + 1 - 2 * (interactionChunks(p) + 2), coreH = ey1 - ey0 + 1 - 2 * (interactionChunks(p) + 2);
-  let a0 = ex0, a1 = ex1, b0 = ey0, b1 = ey1;
+// Window to pack for a needed extended range: padded, shrunk until it fits CHUNK_CAP.
+function packWindow(p, ex0, ey0, ex1, ey1) {
+  const m = 2 * (interactionChunks(p) + 2);
+  const coreW = ex1 - ex0 + 1 - m, coreH = ey1 - ey0 + 1 - m;
   for (let f = PACK_PAD_VIEWS; f > 0; f -= 0.5) {
     const px = Math.ceil(coreW * f), py = Math.ceil(coreH * f);
-    if ((ex1 - ex0 + 1 + 2 * px) * (ey1 - ey0 + 1 + 2 * py) <= CHUNK_CAP) { a0 = ex0 - px; a1 = ex1 + px; b0 = ey0 - py; b1 = ey1 + py; break; }
+    if ((ex1 - ex0 + 1 + 2 * px) * (ey1 - ey0 + 1 + 2 * py) <= CHUNK_CAP) return [ex0 - px, ey0 - py, ex1 + px, ey1 + py];
   }
+  return [ex0, ey0, ex1, ey1];
+}
+function packCovers(pc, key, ex0, ey0, ex1, ey1) {
+  return pc && pc.key === key && ex0 >= pc.ex0 && ex1 <= pc.ex1 && ey0 >= pc.ey0 && ey1 <= pc.ey1;
+}
+function getPackedMapSync(seed, p, ex0, ey0, ex1, ey1) {
+  const key = packKey(seed, p);
+  if (packCovers(packCache, key, ex0, ey0, ex1, ey1)) return packCache;
+  const [a0, b0, a1, b1] = packWindow(p, ex0, ey0, ex1, ey1);
   const map = buildCandidateMap(seed, a0, b0, a1, b1, p);
-  let removed = 0;
-  if (p.enablePacking) {
-    // Always the full iteration count: cutting it left visibly under-relaxed,
-    // still-overlapping cells on screen ("packing doesn't work while dragging").
-    relax(map, p, p.relaxIters);
-    // prune()+settle to a fixed point (capped at PRUNE_ROUNDS so a pathologically
-    // dense view can't loop indefinitely): removing a cell from a crowded trio can
-    // leave its remaining two members newly resolved, or can just as easily still
-    // leave them overlapping each other -- one prune() pass, working off a single
-    // pre-removal snapshot, can't see that. Each round gets its own short settle
-    // relax so the NEXT round's overlap check reflects where survivors actually
-    // moved to, not their pre-removal positions.
-    for (let round = 0; round < PRUNE_ROUNDS; round++) {
-      const r = prune(map, p);
-      removed += r;
-      if (r === 0) break;
-      relax(map, p, Math.min(8, p.relaxIters));
-    }
-  }
+  const removed = p.enablePacking ? packMap(map, p) : 0;
   packCache = { key, ex0: a0, ex1: a1, ey0: b0, ey1: b1, map, removed };
   return packCache;
 }
+// Worker path: returns the best map available right now (possibly stale or
+// not-yet-covering, possibly null) and makes sure a repack is in flight if needed.
+function getPackedMapAsync(seed, p, ex0, ey0, ex1, ey1) {
+  const key = packKey(seed, p), pc = packCache;
+  const covers = packCovers(pc, key, ex0, ey0, ex1, ey1);
+  let want = !covers;
+  if (covers) { // prefetch the next window once within one view of the cached window's edge
+    const m = 2 * (interactionChunks(p) + 2);
+    const coreW = ex1 - ex0 + 1 - m, coreH = ey1 - ey0 + 1 - m;
+    want = ex0 - pc.ex0 < coreW || pc.ex1 - ex1 < coreW || ey0 - pc.ey0 < coreH || pc.ey1 - ey1 < coreH;
+  }
+  const pend = packPending;
+  const pendingCovers = pend && pend.key === key && ex0 >= pend.win[0] && ey0 >= pend.win[1] && ex1 <= pend.win[2] && ey1 <= pend.win[3];
+  if (want && !pendingCovers) {
+    if (pend && pend.key !== key) { // stale params: abort the running job
+      genWorkers.pack.terminate();
+      genWorkers.pack = spawnGenWorker(); genWorkers.pack.onmessage = onPackResult;
+      packPending = null;
+    }
+    if (!packPending) {
+      const win = packWindow(p, ex0, ey0, ex1, ey1);
+      packPending = { id: ++packId, key, win };
+      genWorkers.pack.postMessage({ type: 'pack', id: packPending.id, key, win, seed, p });
+    }
+  }
+  return pc;
+}
+function onPackResult(e) {
+  const d = e.data;
+  if (!packPending || d.id !== packPending.id) return;
+  packPending = null;
+  const map = new Map();
+  for (const c of d.cells) map.set(c.cx + ',' + c.cy, c);
+  packCache = { key: d.key, ex0: d.win[0], ey0: d.win[1], ex1: d.win[2], ey1: d.win[3], map, removed: d.removed };
+  requestDraw();
+}
 
+// ---- per-cell assets (cytoplasm mesh + microtubules) -------------------------
+// assets: chunk key -> {sig, seed, hasMt, entry, mts}. `entry` is the getCytoGeometry
+// shape ({localOutline, mesh}) plus the render caches hung off it; `mts` the
+// microtubule point arrays. An asset whose sig is out of date (a slider moved) keeps
+// being drawn until its replacement arrives, unless the SEED changed (then it would
+// be a different world). Bounded to ASSET_MAX, evicting the cells farthest from view.
+const ASSET_MAX = 220, PREFETCH_VIEWS = 0.5;
+const assets = new Map();
+const assetInflight = new Map(); // key -> sig
+const ASSET_SIG_SKIP = /^(showCytoContours$|cytoContourStep$|mtLineWidth$|enablePacking$|allowPackRotation$|packFrac$|relaxIters$|relaxDamping$)/;
+function assetSig(seed, p) {
+  const o = [seed];
+  for (const k in p) if (!ASSET_SIG_SKIP.test(k)) o.push(k + '=' + p[k]);
+  return o.join('|');
+}
+let lastView = null; // {seed, p, sig, map, cx0..cy1, mt} -- what pumpAssets() prioritises against
+function disposeAsset(a) { if (a && a.entry) freeMeshGl(a.entry); }
+function evictAssets() {
+  if (assets.size <= ASSET_MAX || !lastView) return;
+  const mx = (lastView.cx0 + lastView.cx1) / 2, my = (lastView.cy0 + lastView.cy1) / 2;
+  const dist = k => { const [cx, cy] = k.split(',').map(Number); return Math.hypot(cx - mx, cy - my); };
+  const keys = [...assets.keys()].sort((a, b) => dist(b) - dist(a));
+  for (const k of keys) { if (assets.size <= ASSET_MAX) break; disposeAsset(assets.get(k)); assets.delete(k); }
+}
+function unpackAsset(d) {
+  const n = d.outline.length / 2, lo = new Array(n);
+  for (let i = 0; i < n; i++) lo[i] = [d.outline[2 * i], d.outline[2 * i + 1]];
+  const grid = new Array(d.rings + 1);
+  for (let k = 0; k <= d.rings; k++) {
+    const row = new Array(d.n);
+    for (let i = 0; i < d.n; i++) { const v = k * d.n + i; row[i] = { x: d.mx[v], y: d.my[v], h: d.mh[v] }; }
+    grid[k] = row;
+  }
+  let mts = null;
+  if (d.mts) {
+    mts = new Array(d.mts.lens.length);
+    let o = 0;
+    for (let i = 0; i < mts.length; i++) {
+      const pts = new Array(d.mts.lens[i]);
+      for (let k = 0; k < pts.length; k++, o += 3) pts[k] = { x: d.mts.xyz[o], y: d.mts.xyz[o + 1], z: d.mts.xyz[o + 2] };
+      mts[i] = pts;
+    }
+  }
+  return { sig: d.sig, seed: d.seed, hasMt: !!d.mts, entry: { localOutline: lo, mesh: { rings: d.rings, n: d.n, grid } }, mts };
+}
+function onCellResult(wi, d) {
+  genWorkers.busy[wi] = null;
+  if (assetInflight.get(d.key) === d.sig) assetInflight.delete(d.key);
+  if (lastView && d.sig === lastView.sig) {
+    disposeAsset(assets.get(d.key));
+    assets.set(d.key, unpackAsset(d));
+    evictAssets();
+    requestDraw();
+  }
+  pumpAssets();
+}
+// Sends the most wanted missing assets (visible first, then a prefetch ring; each
+// nearest the view centre first) to whichever cell workers are idle.
+function pumpAssets() {
+  if (!genWorkers.ok || !lastView) return;
+  const v = lastView;
+  if (!genWorkers.busy.includes(null)) return;
+  const w = v.cx1 - v.cx0 + 1, h = v.cy1 - v.cy0 + 1;
+  const px = Math.ceil(w * PREFETCH_VIEWS), py = Math.ceil(h * PREFETCH_VIEWS);
+  const mx = (v.cx0 + v.cx1) / 2, my = (v.cy0 + v.cy1) / 2, cand = [];
+  for (let cx = v.cx0 - px; cx <= v.cx1 + px; cx++) for (let cy = v.cy0 - py; cy <= v.cy1 + py; cy++) {
+    const key = cx + ',' + cy, cell = v.map.get(key);
+    if (!cell) continue;
+    const a = assets.get(key);
+    if ((a && a.sig === v.sig && (a.hasMt || !v.mt)) || assetInflight.get(key) === v.sig) continue;
+    const inView = cx >= v.cx0 && cx <= v.cx1 && cy >= v.cy0 && cy <= v.cy1;
+    cand.push({ key, cell, rank: (inView ? 0 : 1e6) + Math.hypot(cx - mx, cy - my) });
+  }
+  cand.sort((a, b) => a.rank - b.rank);
+  let ci = 0;
+  for (let wi = 0; wi < genWorkers.busy.length && ci < cand.length; wi++) {
+    if (genWorkers.busy[wi]) continue;
+    const { key, cell } = cand[ci++];
+    const slim = Object.assign({}, cell);
+    delete slim._radiusLUT; delete slim._collisionLocal;
+    genWorkers.busy[wi] = key;
+    assetInflight.set(key, v.sig);
+    genWorkers.cells[wi].postMessage({ type: 'cell', key, sig: v.sig, seed: v.seed, p: v.p, cell: slim, mt: v.mt });
+  }
+}
+// The asset to draw for `cell` right now, or null if none exists yet (the worker will
+// deliver it and request a redraw). Without workers it is computed here, synchronously.
+function getAsset(cell, key, seed, p, sig, mt) {
+  const a = assets.get(key);
+  if (a && a.sig === sig && (a.hasMt || !mt)) return a;
+  if (!genWorkers.ok) {
+    const entry = getCytoGeometry(cell, p);
+    const mts = mt ? buildMicrotubulesForCell(seed, cell.cx, cell.cy, cell, p) : (a ? a.mts : null);
+    const fresh = { sig, seed, hasMt: !!mt || !!(a && a.hasMt), entry, mts };
+    if (a && a.entry !== entry) disposeAsset(a);
+    assets.set(key, fresh);
+    return fresh;
+  }
+  return a && a.seed === seed ? a : null;
+}
 
 // Microtubule polylines as one Path2D per cell, built in the cell's own screen-
 // pixel frame (packRot, scale and tilt baked in, translation excluded) and
@@ -1813,27 +2060,34 @@ function draw() {
 
   let map, removed = 0;
   if (withinCap) {
-    const pc = getPackedMap(seed, p, ex0, ey0, ex1, ey1);
-    map = pc.map; removed = pc.removed;
+    const pc = genWorkers.ok ? getPackedMapAsync(seed, p, ex0, ey0, ex1, ey1) : getPackedMapSync(seed, p, ex0, ey0, ex1, ey1);
+    map = pc ? pc.map : new Map(); removed = pc ? pc.removed : 0; // no map yet => empty until the pack worker delivers
   } else {
     map = buildCandidateMap(seed, cx0, cy0, cx1, cy1, p); // fall back to core range only, unpacked
   }
 
-  let nChunks = 0, nCells = 0, nMt = 0;
+  let nChunks = 0, nCells = 0, nMt = 0, nLoading = 0;
   mtDebugSource = null;
   mtLabelBudget = MT_LABEL_MAX_DRAWN; let labelNote = '';
 
   // Visible cells only: a cell whose bounding circle is off-screen costs nothing.
-  const vis = [];
+  // A visible cell whose mesh/microtubules the workers have not delivered yet is
+  // skipped (pops in when ready) rather than computed here -- see getAsset().
+  const vis = [], sig = assetSig(seed, p), wantMt = els.showMt.checked;
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
       nChunks++;
-      const cell = map.get(cx + ',' + cy);
+      const key = cx + ',' + cy, cell = map.get(key);
       if (!cell) continue;
       nCells++;
-      if (cellVisible(cell)) vis.push({ cx, cy, cell });
+      if (!cellVisible(cell)) continue;
+      const asset = getAsset(cell, key, seed, p, sig, wantMt);
+      if (asset) vis.push({ cx, cy, cell, asset }); else nLoading++;
     }
   }
+  lastView = { seed, p, sig, map, cx0, cx1, cy0, cy1, mt: wantMt };
+  evictAssets();
+  pumpAssets();
 
   // Pass 1 (base layer): footprint outlines + microtubules, each batched into ONE path.
   ctx = bg;
@@ -1841,15 +2095,15 @@ function draw() {
     ctx.strokeStyle = 'rgba(90,169,230,0.25)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (const { cell } of vis) addOutlinePath(cell, getCytoGeometry(cell, p));
+    for (const { cell, asset } of vis) addOutlinePath(cell, asset.entry);
     ctx.stroke();
   }
   if (els.showMt.checked) {
     ctx.strokeStyle = '#e6c65a';
     ctx.lineWidth = Math.max(0.6, p.mtLineWidth * pxPerUm);
     ctx.globalAlpha = 0.8;
-    for (const { cx, cy, cell } of vis) {
-      const mts = buildMicrotubulesForCell(seed, cx, cy, cell, p);
+    for (const { cx, cy, cell, asset } of vis) {
+      const mts = asset.mts || [];
       const t = cellXform(cell);
       for (const pts of mts) if (!mtDebugSource || pts.length > mtDebugSource.pts.length) mtDebugSource = { pts, seed, cx, cy };
       nMt += mts.length;
@@ -1861,8 +2115,8 @@ function draw() {
     ctx.globalAlpha = 1;
     if (els.showMtLabels.checked) {
       if (pxPerUm < MT_LABEL_MIN_PX_PER_UM) labelNote = 'zoom in to show MT labels';
-      else for (const { cx, cy, cell } of vis) {
-        if (drawMtLabels(cell, buildMicrotubulesForCell(seed, cx, cy, cell, p), seed, cx, cy, pxPerUm)) { labelNote = 'label cap reached, some not drawn'; break; }
+      else for (const { cx, cy, cell, asset } of vis) {
+        if (drawMtLabels(cell, asset.mts || [], seed, cx, cy, pxPerUm)) { labelNote = 'label cap reached, some not drawn'; break; }
       }
     }
   }
@@ -1873,7 +2127,7 @@ function draw() {
     else { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
   } else if (els.showCyto.checked) {
     ctx = ctxTop;
-    for (const { cell } of vis) drawCellBody2D(cell, getCytoGeometry(cell, p));
+    for (const { cell, asset } of vis) drawCellBody2D(cell, asset.entry);
   }
 
   // Pass 3 (top layer): contours, nuclei, scale bar.
@@ -1882,7 +2136,7 @@ function draw() {
     ctx.strokeStyle = 'rgba(20,30,45,0.55)';
     ctx.lineWidth = Math.max(1, 0.04 * pxPerUm);
     ctx.beginPath();
-    for (const { cell } of vis) addContourPath(cell, getCytoGeometry(cell, p), p.cytoContourStep);
+    for (const { cell, asset } of vis) addContourPath(cell, asset.entry, p.cytoContourStep);
     ctx.stroke();
   }
   if (els.showNucleus.checked) for (const { cell } of vis) drawNucleus(cell);
@@ -1892,6 +2146,7 @@ function draw() {
   hud.textContent =
     `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°   ${useGl ? 'GPU' : '2D'}\n` +
     `chunks ${nChunks}   cells ${nCells} (${vis.length} on screen)   removed (stuck) ${removed}   microtubules ${nMt}` +
+    (packPending ? '   [packing…]' : '') + (nLoading ? `   [loading ${nLoading} cells…]` : '') +
     (withinCap ? '' : '   [packing skipped: zoom in, view too large]') +
     (labelNote ? '   [' + labelNote + ']' : '');
 }
@@ -2072,6 +2327,7 @@ document.getElementById('mtDebugClose').addEventListener('click', e => { e.preve
 
 window.addEventListener('resize', resizeCanvas);
 syncLabels();
+if (!/[?&]nw/.test(location.search)) initGenWorkers(); // ?nw keeps generation on the main thread (for testing)
 setLayerMode(!/[?&]2d/.test(location.search) && initGl()); // ?2d forces the 2D fallback (for testing)
 resizeCanvas();
 </script>

@@ -46,6 +46,16 @@
     webSMLM itself — standalone exploration only.</p>
 
     <fieldset>
+      <legend>3D view</legend>
+      <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="0"><span id="tiltDegVal"></span></label>
+      <label class="row">Show cytoplasm <input type="checkbox" id="showCyto" checked></label>
+      <label class="row">Show nucleus <input type="checkbox" id="showNucleus" checked></label>
+      <label class="row">Show microtubules <input type="checkbox" id="showMt" checked></label>
+      <label class="row">Show chunk grid <input type="checkbox" id="showGrid"></label>
+      <label class="row"><button id="resetView" style="width:100%">Reset view to origin</button></label>
+    </fieldset>
+
+    <fieldset>
       <legend>seed / world</legend>
       <label class="row">Seed <input type="number" id="seed" value="1249" step="1"></label>
       <label class="row"><button id="reseed" style="width:100%">Randomize seed</button></label>
@@ -57,7 +67,7 @@
     <fieldset>
       <legend>cell shape (µm, footprint)</legend>
       <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="35" step="0.5"></div>
-      <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.2" step="0.05"><input type="number" id="cellElongMax" value="0.8" step="0.05"></div>
+      <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.5" step="0.05"><input type="number" id="cellElongMax" value="1" step="0.05"></div>
       <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="1.75"><span id="cellBlobVal"></span></label>
       <div class="pair"><span class="k">Height min/max</span><input type="number" id="cellHeightMin" value="3" step="0.5"><input type="number" id="cellHeightMax" value="6" step="0.5"></div>
     </fieldset>
@@ -97,7 +107,7 @@
 
     <fieldset>
       <legend>microtubules (µm, per cell)</legend>
-      <label class="row">Density (per µm²) <input type="range" id="mtDensity" min="0" max="2" step="0.005" value="0.45"><span id="mtDensityVal"></span></label>
+      <label class="row">Density (per µm²) <input type="range" id="mtDensity" min="0" max="2" step="0.005" value="0.9"><span id="mtDensityVal"></span></label>
       <div class="pair"><span class="k">Start offset from nucleus edge (× cell radius) min/max</span><input type="number" id="mtStartFracMin" value="0" min="0" max="1" step="0.01"><input type="number" id="mtStartFracMax" value="0.3" min="0" max="1" step="0.01"></div>
       <label class="row">Start position XY jitter (µm) <input type="range" id="mtStartOffsetXY" min="0" max="2" step="0.05" value="0"><span id="mtStartOffsetXYVal"></span></label>
       <div class="pair"><span class="k">End offset from cell edge (× cell radius) min/max</span><input type="number" id="mtEndFracMin" value="0.01" min="0" max="1" step="0.01"><input type="number" id="mtEndFracMax" value="0.4" min="0" max="1" step="0.01"></div>
@@ -114,15 +124,6 @@
       <label class="row"><button id="mtLabelDebugBtn" style="width:100%" title="Shows nanobody/antibody + dye label positions on a 1 um stretch of the longest microtubule in view (13-protofilament lattice, 25 nm cylinder). Never labels the whole network.">Debug: view MT labels</button></label>
     </fieldset>
 
-    <fieldset>
-      <legend>3D view</legend>
-      <label class="row">Tilt (deg) <input type="range" id="tiltDeg" min="0" max="75" step="1" value="0"><span id="tiltDegVal"></span></label>
-      <label class="row">Show cytoplasm <input type="checkbox" id="showCyto" checked></label>
-      <label class="row">Show nucleus <input type="checkbox" id="showNucleus" checked></label>
-      <label class="row">Show microtubules <input type="checkbox" id="showMt" checked></label>
-      <label class="row">Show chunk grid <input type="checkbox" id="showGrid"></label>
-      <label class="row"><button id="resetView" style="width:100%">Reset view to origin</button></label>
-    </fieldset>
 
     <p class="sub">Drag to pan, wheel to zoom. Panning is exactly the drift/
     stage-motion case for demoCam_SMLM_MM: the field doesn't move, the viewport

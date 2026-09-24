@@ -256,7 +256,7 @@ in a module.
   worker. `simulation_mt_seed` (default 1249) picks the world; `simulation_mt_x`/`_y` (µm, default 0,0) are
   the window centre, moved by the **Move 1/5/10 µm** buttons (`moveMtView()`, +y is down); the window is the
   structure FOV (px × `simulation_pxnm`), so 128 px at 100 nm is the central 12.8 µm (+10% margin).
-  Sidebar also exposes `simulation_mt_cellDensity` (cell occupancy, default 0.25) and `simulation_mt_density`
+  Sidebar also exposes `simulation_mt_cellDensity` (cell occupancy, default 0.33) and `simulation_mt_density`
   (microtubules/µm², 0.45); every other cell/cytoplasm knob stays at `CF_PARAMS` (cytoplasm: rim 0.1–0.3, edge rise 0.1–0.5, mid
   height 1–2, mid distance 0.1–0.3 × radius, `nucMargin` 0.6, mesh 60 rings × 128 angular samples, 12 smoothing passes — same defaults as `cell_field_sim/`). `simulation_mt_focusZ`
   (µm above coverslip = z 0, default 0.5) is an `id:null` PARAM.

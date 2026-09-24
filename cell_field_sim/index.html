@@ -45,14 +45,14 @@
       <label class="row"><button id="reseed" style="width:100%">Randomize seed</button></label>
       <label class="row">Chunk size (µm) <input type="number" id="chunkSize" value="26" min="4" max="200" step="1"></label>
       <label class="row">Cell jitter <input type="range" id="jitter" min="0.1" max="1" step="0.02" value="0.8"><span id="jitterVal"></span></label>
-      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.25"><span id="densityVal"></span></label>
+      <label class="row">Density (occupancy) <input type="range" id="density" min="0.05" max="1" step="0.01" value="0.33"><span id="densityVal"></span></label>
     </fieldset>
 
     <fieldset>
       <legend>cell shape (µm, footprint)</legend>
       <div class="pair"><span class="k">Diameter min/max</span><input type="number" id="cellDiamMin" value="25" step="0.5"><input type="number" id="cellDiamMax" value="35" step="0.5"></div>
       <div class="pair"><span class="k">Elongation (short/long) min/max</span><input type="number" id="cellElongMin" value="0.2" step="0.05"><input type="number" id="cellElongMax" value="0.8" step="0.05"></div>
-      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="1.5"><span id="cellBlobVal"></span></label>
+      <label class="row">Outline blobbiness <input type="range" id="cellBlob" min="0" max="4" step="0.05" value="1.75"><span id="cellBlobVal"></span></label>
       <div class="pair"><span class="k">Height min/max</span><input type="number" id="cellHeightMin" value="3" step="0.5"><input type="number" id="cellHeightMax" value="6" step="0.5"></div>
     </fieldset>
 
@@ -85,8 +85,8 @@
       <label class="row">Enable packing <input type="checkbox" id="enablePacking" checked></label>
       <label class="row">Allow rotation <input type="checkbox" id="allowPackRotation" checked></label>
       <label class="row">Min gap (× combined radius) <input type="range" id="packFrac" min="0.6" max="1.1" step="0.02" value="1.00"><span id="packFracVal"></span></label>
-      <label class="row">Relaxation iterations <input type="range" id="relaxIters" min="4" max="80" step="1" value="12"><span id="relaxItersVal"></span></label>
-      <label class="row">Relaxation step <input type="range" id="relaxDamping" min="0.1" max="1" step="0.05" value="0.2"><span id="relaxDampingVal"></span></label>
+      <label class="row">Relaxation iterations <input type="range" id="relaxIters" min="4" max="150" step="1" value="80"><span id="relaxItersVal"></span></label>
+      <label class="row">Relaxation step <input type="range" id="relaxDamping" min="0.1" max="1" step="0.05" value="0.55"><span id="relaxDampingVal"></span></label>
     </fieldset>
 
     <fieldset>

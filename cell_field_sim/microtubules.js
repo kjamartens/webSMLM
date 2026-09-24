@@ -1231,7 +1231,7 @@ function mtResultSig(seed, cell, p) {
   // cached microtubule set built against the old clearance/height field.
   return [seed, mtCellShapeSig(cell), p.mtDensity, p.mtStartFracMin, p.mtStartFracMax,
     p.mtStartOffsetXY, p.mtEndFracMin, p.mtEndFracMax, p.mtEndJitterDeg, p.mtWobbleTurn,
-    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
+    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin, p.cytoMaxSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 
 // The one entry point index.html's draw() calls: builds every microtubule for

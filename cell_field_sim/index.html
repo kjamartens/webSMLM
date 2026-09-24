@@ -72,6 +72,8 @@
       <div class="pair"><span class="k">Mid height min/max</span><input type="number" id="cytoMidHeightMin" value="1" step="0.05"><input type="number" id="cytoMidHeightMax" value="2" step="0.05"></div>
       <div class="pair"><span class="k">Dist. from nucleus for mid height min/max (× cell radius)</span><input type="number" id="cytoMidDistanceMin" value="0.1" step="0.05"><input type="number" id="cytoMidDistanceMax" value="0.3" step="0.05"></div>
       <label class="row">Contour interval <input type="range" id="cytoContourStep" min="0.1" max="1" step="0.05" value="0.25"><span id="cytoContourStepVal"></span></label>
+      <label class="row" title="Max rise of the cytoplasm surface per µm outside the dome (saturating from the edge). 0 = off. Cells grow to make room.">Cytoplasm slope cap <input type="range" id="cytoMaxSlope" min="0" max="2" step="0.05" value="0.5"><span id="cytoMaxSlopeVal"></span></label>
+      <label class="row" title="Max slope of the dome flank over the nucleus. 0 = off (flank spans only the nucleus margin). Lower = rounder dome but bigger cells.">Nucleus dome slope cap <input type="range" id="cytoDomeSlope" min="0" max="4" step="0.1" value="1.5"><span id="cytoDomeSlopeVal"></span></label>
       <label class="row">Smoothing passes <input type="range" id="cytoSmoothPasses" min="0" max="12" step="1" value="12"><span id="cytoSmoothPassesVal"></span></label>
       <label class="row">Mesh rings <input type="range" id="cytoRings" min="4" max="60" step="1" value="60"><span id="cytoRingsVal"></span></label>
       <label class="row">Mesh angular samples <input type="range" id="cytoTheta" min="32" max="128" step="4" value="128"><span id="cytoThetaVal"></span></label>
@@ -301,7 +303,7 @@ function rawCandidate(seed, cx, cy, p) {
   // may grow c.semiMajor/semiMinor/height and re-clamp c.nucZ so the nucleus is always fully inside;
   // cytoSlopeRunout() additionally pushes the OUTLINE out wherever the slope cap could not otherwise
   // reach cytoMidHeight by the time it gets to the nucleus margin (see cytoSlopeCeiling).
-  envelopNucleus(c, p.nucMargin, cytoSlopeRunout(c, p));
+  envelopNucleus(c, p.nucMargin, cc => cytoSlopeRunout(cc, p));
 
   // The cytoplasm height profile (see cytoHeightAt) needs c.height to reach at
   // least THIS cell's own rim/mid height targets -- envelopNucleus only
@@ -418,6 +420,7 @@ function envelopNucleus(c, marginUm, extraUm = 0) {
   // leaving every angle that was already covering the nucleus on its own
   // merit untouched, and leaves the cell's own nominal (already
   // blobbiness-normalized) size alone.
+  if (typeof extraUm === 'function') extraUm = extraUm(c); // needs the final c.height from the vertical step above
   const N = 32;
   let neededFloor = CELL_MOD_MIN;
   for (let i = 0; i < N; i++) {
@@ -598,8 +601,8 @@ function nucleusSignedDistLocal(c, lx0, ly0) {
 // away from dEdge=0 (it saturates on the same short `cytoEdgeRise` scale, so
 // it only ever binds in the last sliver next to the true membrane).
 //
-// SLOPE CAP (`p.cytoMaxSlope`, um of height per um of distance; 0 = off, the
-// legacy behaviour). Everywhere OUTSIDE the nucleus-margin band the cytoplasm
+// SLOPE CAPS (`p.cytoMaxSlope` for the cytoplasm, `p.cytoDomeSlope` for the dome over
+// the nucleus; um of height per um of distance; 0 = off, the legacy behaviour). Everywhere OUTSIDE the nucleus-margin band the cytoplasm
 // (the "cytoTerm" below) may not rise faster than that, in three ways, each
 // analytic and 1-Lipschitz-safe (dEdge and dNuc are true distances, so any
 // function of them has slope <= its own derivative; min/max preserve that):
@@ -612,8 +615,11 @@ function nucleusSignedDistLocal(c, lx0, ly0) {
 //     reach cytoMidHeight by the margin contour, the OUTLINE moves out instead
 //     (envelopNucleus's `extraUm`, cytoSlopeRunout) -- so the ceiling never
 //     clips the value the margin band starts from.
-// The margin band itself (dNuc < margin, the dome over the nucleus) is
-// exempt from the cap by design and is joined with max(), not clipped.
+//  4. the dome over the nucleus obeys its OWN cap (cytoDomeSlope): its flank falls from
+//     c.height to cytoMidHeight over cytoDomeReach() (>= nucMargin), wider than
+//     the margin, and is joined with max(). It is exempt from the EDGE ceiling
+//     only (that plateaus at 2x mid, far below c.height) -- the outline
+//     push-out (cytoSlopeRunout) reserves room for flank + ceiling together.
 function cytoSlopeCeiling(c, p, dEdge) {
   const s = p.cytoMaxSlope, Hc = 2 * c.cytoMidHeight; // plateau: 2x mid, so mid is reached at half of it
   return Hc * (1 - Math.exp(-s * dEdge / Hc));
@@ -622,24 +628,37 @@ function cytoSlopeCeiling(c, p, dEdge) {
 // (Hc(1-e^{-s d/Hc}) = Hc/2  =>  d = Hc ln2 / s). The outline must stay at
 // least this far (plus nucMargin) from the nucleus.
 function cytoSlopeRunout(c, p) {
-  if (!(p.cytoMaxSlope > 0)) return 0;
-  return 2 * c.cytoMidHeight * Math.LN2 / p.cytoMaxSlope;
+  const margin = Math.max(0.1, p.nucMargin);
+  const ceilRun = p.cytoMaxSlope > 0 ? 2 * c.cytoMidHeight * Math.LN2 / p.cytoMaxSlope : 0;
+  return Math.max(0, cytoDomeReach(c, p) + ceilRun - margin);
+}
+// Lateral reach of the dome flank over the nucleus: it falls from c.height (over the nucleus) to
+// cytoMidHeight along a smoothstep whose PEAK slope (1.5x the average) equals p.cytoDomeSlope --
+// a SEPARATE cap from p.cytoMaxSlope (the dome must climb several um, so at the cytoplasm's
+// gentle slope its flank would need ~10 um of room and double the cell size). Off (<=0): just
+// the nucleus margin.
+function cytoDomeReach(c, p) {
+  const margin = Math.max(0.1, p.nucMargin);
+  if (!(p.cytoDomeSlope > 0)) return margin;
+  const H = Math.max(c.height, c.cytoRimHeight, c.cytoMidHeight);
+  return Math.max(margin, 1.5 * (H - c.cytoMidHeight) / p.cytoDomeSlope);
 }
 function cytoHeightAt(c, p, dEdge, dNuc) {
   const margin = Math.max(0.1, p.nucMargin);
   const riseScale = Math.max(1e-6, c.cytoEdgeRise);
   const slopeOn = p.cytoMaxSlope > 0;
+  const inner = cytoDomeReach(c, p); // == margin when the cap is off
   let midDist = Math.max(0, c.cytoMidDistFrac) * c.rOuter;
   if (slopeOn) midDist = Math.max(midDist, 1.5 * Math.max(0, c.cytoMidHeight - c.cytoRimHeight) / p.cytoMaxSlope);
   const hEdge = c.cytoRimHeight * (1 - Math.exp(-dEdge / riseScale));
   // envelope term: the dome over the nucleus, only inside the margin band
   let hEnv = 0;
   if (dNuc <= 0) hEnv = c.height;
-  else if (dNuc < margin) hEnv = lerp(c.cytoMidHeight, c.height, smoothstep(1 - dNuc / margin));
+  else if (dNuc < inner) hEnv = lerp(c.cytoMidHeight, c.height, smoothstep(1 - dNuc / inner));
   // cytoplasm term: mid height in the band, ramping down to the rim outside it
   let hCyto;
-  if (dNuc < margin) hCyto = c.cytoMidHeight;
-  else if (dNuc < margin + midDist) hCyto = lerp(c.cytoRimHeight, c.cytoMidHeight, smoothstep(1 - (dNuc - margin) / Math.max(1e-6, midDist)));
+  if (dNuc < inner) hCyto = c.cytoMidHeight;
+  else if (dNuc < inner + midDist) hCyto = lerp(c.cytoRimHeight, c.cytoMidHeight, smoothstep(1 - (dNuc - inner) / Math.max(1e-6, midDist)));
   else hCyto = c.cytoRimHeight;
   hCyto = Math.max(hEdge, hCyto);
   if (slopeOn) hCyto = Math.min(hCyto, cytoSlopeCeiling(c, p, dEdge));
@@ -751,7 +770,7 @@ function cytoGeometrySignature(seed, p) {
     p.cellHeightMin, p.cellHeightMax, p.nucLongMin, p.nucLongMax, p.nucRatioMin, p.nucRatioMax,
     p.nucHeightMin, p.nucHeightMax, p.nucOffsetFrac, p.nucMargin,
     p.cytoRimHeightMin, p.cytoRimHeightMax, p.cytoEdgeRiseMin, p.cytoEdgeRiseMax,
-    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax, p.cytoMaxSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
+    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax, p.cytoMaxSlope, p.cytoDomeSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 function ensureCytoCacheFresh(seed, p) {
   const sig = cytoGeometrySignature(seed, p);
@@ -1183,7 +1202,7 @@ const els = {};
  'nucOffsetFrac', 'nucOffsetFracVal', 'nucMargin', 'nucMarginVal',
  'cytoRimHeightMin', 'cytoRimHeightMax', 'cytoEdgeRiseMin', 'cytoEdgeRiseMax',
  'cytoMidHeightMin', 'cytoMidHeightMax', 'cytoMidDistanceMin', 'cytoMidDistanceMax',
- 'cytoContourStep', 'cytoContourStepVal', 'cytoSmoothPasses', 'cytoSmoothPassesVal', 'cytoRings', 'cytoRingsVal', 'cytoTheta', 'cytoThetaVal', 'showCytoContours',
+ 'cytoContourStep', 'cytoContourStepVal', 'cytoMaxSlope', 'cytoMaxSlopeVal', 'cytoDomeSlope', 'cytoDomeSlopeVal', 'cytoSmoothPasses', 'cytoSmoothPassesVal', 'cytoRings', 'cytoRingsVal', 'cytoTheta', 'cytoThetaVal', 'showCytoContours',
  'enablePacking', 'allowPackRotation', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
  'mtDensity', 'mtDensityVal', 'mtStartFracMin', 'mtStartFracMax', 'mtStartOffsetXY', 'mtStartOffsetXYVal',
  'mtEndFracMin', 'mtEndFracMax',
@@ -1224,7 +1243,8 @@ function params() {
     cytoMidDistanceMin: +els.cytoMidDistanceMin.value,
     cytoMidDistanceMax: Math.max(+els.cytoMidDistanceMin.value, +els.cytoMidDistanceMax.value),
     cytoContourStep: +els.cytoContourStep.value,
-    cytoMaxSlope: 0.5, // um/um, no sidebar control yet; 0 = off
+    cytoMaxSlope: +els.cytoMaxSlope.value, // um/um: cytoplasm slope cap; 0 = off
+    cytoDomeSlope: +els.cytoDomeSlope.value, // um/um: slope cap of the dome flank over the nucleus; 0 = off (flank spans nucMargin only)
     cytoSmoothPasses: +els.cytoSmoothPasses.value,
     cytoRings: +els.cytoRings.value,
     cytoTheta: +els.cytoTheta.value,
@@ -1596,6 +1616,8 @@ function syncLabels() {
   els.cellBlobVal.textContent = (+els.cellBlob.value).toFixed(2);
   els.nucOffsetFracVal.textContent = (+els.nucOffsetFrac.value).toFixed(2);
   els.nucMarginVal.textContent = (+els.nucMargin.value).toFixed(1) + ' um';
+  els.cytoMaxSlopeVal.textContent = +els.cytoMaxSlope.value ? (+els.cytoMaxSlope.value).toFixed(2) : 'off';
+  els.cytoDomeSlopeVal.textContent = +els.cytoDomeSlope.value ? (+els.cytoDomeSlope.value).toFixed(1) : 'off';
   els.cytoSmoothPassesVal.textContent = els.cytoSmoothPasses.value;
   els.cytoRingsVal.textContent = els.cytoRings.value;
   els.cytoThetaVal.textContent = els.cytoTheta.value;

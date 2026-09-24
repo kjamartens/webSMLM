@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24a; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24b; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -2804,7 +2804,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24a</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -5858,7 +5858,7 @@ function rawCandidate(seed, cx, cy, p) {
   // may grow c.semiMajor/semiMinor/height and re-clamp c.nucZ so the nucleus is always fully inside;
   // cytoSlopeRunout() additionally pushes the OUTLINE out wherever the slope cap could not otherwise
   // reach cytoMidHeight by the time it gets to the nucleus margin (see cytoSlopeCeiling).
-  envelopNucleus(c, p.nucMargin, cytoSlopeRunout(c, p));
+  envelopNucleus(c, p.nucMargin, cc => cytoSlopeRunout(cc, p));
 
   // The cytoplasm height profile (see cytoHeightAt) needs c.height to reach at
   // least THIS cell's own rim/mid height targets -- envelopNucleus only
@@ -5975,6 +5975,7 @@ function envelopNucleus(c, marginUm, extraUm = 0) {
   // leaving every angle that was already covering the nucleus on its own
   // merit untouched, and leaves the cell's own nominal (already
   // blobbiness-normalized) size alone.
+  if (typeof extraUm === 'function') extraUm = extraUm(c); // needs the final c.height from the vertical step above
   const N = 32;
   let neededFloor = CELL_MOD_MIN;
   for (let i = 0; i < N; i++) {
@@ -6155,8 +6156,8 @@ function nucleusSignedDistLocal(c, lx0, ly0) {
 // away from dEdge=0 (it saturates on the same short `cytoEdgeRise` scale, so
 // it only ever binds in the last sliver next to the true membrane).
 //
-// SLOPE CAP (`p.cytoMaxSlope`, um of height per um of distance; 0 = off, the
-// legacy behaviour). Everywhere OUTSIDE the nucleus-margin band the cytoplasm
+// SLOPE CAPS (`p.cytoMaxSlope` for the cytoplasm, `p.cytoDomeSlope` for the dome over
+// the nucleus; um of height per um of distance; 0 = off, the legacy behaviour). Everywhere OUTSIDE the nucleus-margin band the cytoplasm
 // (the "cytoTerm" below) may not rise faster than that, in three ways, each
 // analytic and 1-Lipschitz-safe (dEdge and dNuc are true distances, so any
 // function of them has slope <= its own derivative; min/max preserve that):
@@ -6169,8 +6170,11 @@ function nucleusSignedDistLocal(c, lx0, ly0) {
 //     reach cytoMidHeight by the margin contour, the OUTLINE moves out instead
 //     (envelopNucleus's `extraUm`, cytoSlopeRunout) -- so the ceiling never
 //     clips the value the margin band starts from.
-// The margin band itself (dNuc < margin, the dome over the nucleus) is
-// exempt from the cap by design and is joined with max(), not clipped.
+//  4. the dome over the nucleus obeys its OWN cap (cytoDomeSlope): its flank falls from
+//     c.height to cytoMidHeight over cytoDomeReach() (>= nucMargin), wider than
+//     the margin, and is joined with max(). It is exempt from the EDGE ceiling
+//     only (that plateaus at 2x mid, far below c.height) -- the outline
+//     push-out (cytoSlopeRunout) reserves room for flank + ceiling together.
 function cytoSlopeCeiling(c, p, dEdge) {
   const s = p.cytoMaxSlope, Hc = 2 * c.cytoMidHeight; // plateau: 2x mid, so mid is reached at half of it
   return Hc * (1 - Math.exp(-s * dEdge / Hc));
@@ -6179,24 +6183,37 @@ function cytoSlopeCeiling(c, p, dEdge) {
 // (Hc(1-e^{-s d/Hc}) = Hc/2  =>  d = Hc ln2 / s). The outline must stay at
 // least this far (plus nucMargin) from the nucleus.
 function cytoSlopeRunout(c, p) {
-  if (!(p.cytoMaxSlope > 0)) return 0;
-  return 2 * c.cytoMidHeight * Math.LN2 / p.cytoMaxSlope;
+  const margin = Math.max(0.1, p.nucMargin);
+  const ceilRun = p.cytoMaxSlope > 0 ? 2 * c.cytoMidHeight * Math.LN2 / p.cytoMaxSlope : 0;
+  return Math.max(0, cytoDomeReach(c, p) + ceilRun - margin);
+}
+// Lateral reach of the dome flank over the nucleus: it falls from c.height (over the nucleus) to
+// cytoMidHeight along a smoothstep whose PEAK slope (1.5x the average) equals p.cytoDomeSlope --
+// a SEPARATE cap from p.cytoMaxSlope (the dome must climb several um, so at the cytoplasm's
+// gentle slope its flank would need ~10 um of room and double the cell size). Off (<=0): just
+// the nucleus margin.
+function cytoDomeReach(c, p) {
+  const margin = Math.max(0.1, p.nucMargin);
+  if (!(p.cytoDomeSlope > 0)) return margin;
+  const H = Math.max(c.height, c.cytoRimHeight, c.cytoMidHeight);
+  return Math.max(margin, 1.5 * (H - c.cytoMidHeight) / p.cytoDomeSlope);
 }
 function cytoHeightAt(c, p, dEdge, dNuc) {
   const margin = Math.max(0.1, p.nucMargin);
   const riseScale = Math.max(1e-6, c.cytoEdgeRise);
   const slopeOn = p.cytoMaxSlope > 0;
+  const inner = cytoDomeReach(c, p); // == margin when the cap is off
   let midDist = Math.max(0, c.cytoMidDistFrac) * c.rOuter;
   if (slopeOn) midDist = Math.max(midDist, 1.5 * Math.max(0, c.cytoMidHeight - c.cytoRimHeight) / p.cytoMaxSlope);
   const hEdge = c.cytoRimHeight * (1 - Math.exp(-dEdge / riseScale));
   // envelope term: the dome over the nucleus, only inside the margin band
   let hEnv = 0;
   if (dNuc <= 0) hEnv = c.height;
-  else if (dNuc < margin) hEnv = lerp(c.cytoMidHeight, c.height, smoothstep(1 - dNuc / margin));
+  else if (dNuc < inner) hEnv = lerp(c.cytoMidHeight, c.height, smoothstep(1 - dNuc / inner));
   // cytoplasm term: mid height in the band, ramping down to the rim outside it
   let hCyto;
-  if (dNuc < margin) hCyto = c.cytoMidHeight;
-  else if (dNuc < margin + midDist) hCyto = lerp(c.cytoRimHeight, c.cytoMidHeight, smoothstep(1 - (dNuc - margin) / Math.max(1e-6, midDist)));
+  if (dNuc < inner) hCyto = c.cytoMidHeight;
+  else if (dNuc < inner + midDist) hCyto = lerp(c.cytoRimHeight, c.cytoMidHeight, smoothstep(1 - (dNuc - inner) / Math.max(1e-6, midDist)));
   else hCyto = c.cytoRimHeight;
   hCyto = Math.max(hEdge, hCyto);
   if (slopeOn) hCyto = Math.min(hCyto, cytoSlopeCeiling(c, p, dEdge));
@@ -6308,7 +6325,7 @@ function cytoGeometrySignature(seed, p) {
     p.cellHeightMin, p.cellHeightMax, p.nucLongMin, p.nucLongMax, p.nucRatioMin, p.nucRatioMax,
     p.nucHeightMin, p.nucHeightMax, p.nucOffsetFrac, p.nucMargin,
     p.cytoRimHeightMin, p.cytoRimHeightMax, p.cytoEdgeRiseMin, p.cytoEdgeRiseMax,
-    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax, p.cytoMaxSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
+    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax, p.cytoMaxSlope, p.cytoDomeSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 function ensureCytoCacheFresh(seed, p) {
   const sig = cytoGeometrySignature(seed, p);
@@ -7871,7 +7888,7 @@ function mtResultSig(seed, cell, p) {
   // cached microtubule set built against the old clearance/height field.
   return [seed, mtCellShapeSig(cell), p.mtDensity, p.mtStartFracMin, p.mtStartFracMax,
     p.mtStartOffsetXY, p.mtEndFracMin, p.mtEndFracMax, p.mtEndJitterDeg, p.mtWobbleTurn,
-    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin, p.cytoMaxSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
+    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin, p.cytoMaxSlope, p.cytoDomeSlope, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 
 // The one entry point index.html's draw() calls: builds every microtubule for
@@ -7932,7 +7949,7 @@ function buildMicrotubulesForCell(seed, cx, cy, cell, p) {
     nucLongMin: 8, nucLongMax: 12, nucRatioMin: 0.6, nucRatioMax: 1, nucHeightMin: 0.3, nucHeightMax: 0.5,
     nucOffsetFrac: 0.1, nucMargin: 0.6,
     cytoRimHeightMin: 0.1, cytoRimHeightMax: 0.3, cytoEdgeRiseMin: 0.1, cytoEdgeRiseMax: 0.5,
-    cytoMidHeightMin: 1, cytoMidHeightMax: 2, cytoMidDistanceMin: 0.1, cytoMidDistanceMax: 0.3, cytoMaxSlope: 0.5, cytoSmoothPasses: 12, cytoRings: 60, cytoTheta: 128,
+    cytoMidHeightMin: 1, cytoMidHeightMax: 2, cytoMidDistanceMin: 0.1, cytoMidDistanceMax: 0.3, cytoMaxSlope: 0.5, cytoDomeSlope: 1.5, cytoSmoothPasses: 12, cytoRings: 60, cytoTheta: 128,
     enablePacking: true, allowPackRotation: true, packFrac: 1.0, relaxIters: 12, relaxDamping: 0.2,
     mtDensity: 0.45, mtStartFracMin: 0, mtStartFracMax: 0.3, mtStartOffsetXY: 0,
     mtEndFracMin: 0.01, mtEndFracMax: 0.4, mtEndJitterDeg: 145, mtWobbleTurn: 0.8, mtWobbleFactor: 1.05,
@@ -30453,8 +30470,9 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-24a — Microtubule cell field: the cytoplasm now has a slope cap (0.5 µm/µm,
-exponentially saturating from the edge); where a nucleus sits too close to the membrane for it, the cell outline moves out.
+log(`webSMLM v0.12.8-dev · build 2026-09-24b — Microtubule cell field: the cytoplasm (0.5 µm/µm, saturating from the edge)
+and the dome over the nucleus (1.5 µm/µm) now have separate slope caps; where a nucleus sits too close to the membrane
+for them, the cell outline moves out.
 — from build 2026-09-23c: cytoplasm mesh resolution (rings,
 angular samples) and smoothing passes are now parameters; new defaults give a taller, tighter cytoplasm dome.
 — from build 2026-09-23b: New: Structure type "Microtubules (cell field)" — a seeded

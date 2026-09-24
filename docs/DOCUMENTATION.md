@@ -1889,7 +1889,7 @@ elapsed time instead.
 | `simulation_mt_y` | View centre Y (µm) | number | -1000000 | 1000000 | 1 | 0 |
 | `simulation_mt_density` | Microtubule density (per µm² of cell footprint) | number | 0 | 2 | 0.005 | 0.45 |
 | `simulation_mt_cellDensity` | Cell density (occupancy — fraction of chunks holding a cell) | number | 0.05 | 1 | 0.01 | 0.25 |
-| `simulation_mt_focusZ` | Focus height above the coverslip (µm) — no sidebar control | number | 0 | 10 | 0.1 | 0.5 |
+| `simulation_mt_focusZ` | Focus height above the coverslip (nm) | number | 0 | 10000 | 10 | 250 |
 | `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
 | `simulation_nup_radius` | NPC ring radius (nm) | number | 20 | 150 | 0.5 | 53.5 |
 | `simulation_nup_cornerSpread` | Corner sub-point spread (nm) | number | 0 | 30 | 0.5 | 12 |
@@ -1958,8 +1958,7 @@ is the structure FOV (pixels × pixel size — 128 px at 100 nm is the central ~
 10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the prototype's defaults. The same <b>Microtubule seed</b> always gives the
 same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
 arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
-clipped to a slab of ±<b>Structure Z range</b> around 0.5 µm above the coverslip (<code>simulation_mt_focusZ</code>,
-no sidebar control) — an optical section that also keeps every site inside the PSF's z range; cells are
+clipped to a slab of ±<b>Structure Z range</b> around <b>Focus height</b> (<code>simulation_mt_focusZ</code>, default 250 nm above the coverslip, the surface the cells lie on) — an optical section that also keeps every site inside the PSF's z range; cells are
 ~3–6 µm tall. Generation takes about a second for a default window and does not consume the
 simulation's own random stream.</p>
 <!-- /HINT:simulation-type -->

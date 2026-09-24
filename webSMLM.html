@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24e; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24f; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -2804,7 +2804,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24e</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3114,8 +3114,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the prototype's defaults. The same <b>Microtubule seed</b> always gives the
           same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
           arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
-          clipped to a slab of ±<b>Structure Z range</b> around 0.5 µm above the coverslip (<code>simulation_mt_focusZ</code>,
-          no sidebar control) — an optical section that also keeps every site inside the PSF's z range; cells are
+          clipped to a slab of ±<b>Structure Z range</b> around <b>Focus height</b> (<code>simulation_mt_focusZ</code>, default 250 nm above the coverslip, the surface the cells lie on) — an optical section that also keeps every site inside the PSF's z range; cells are
           ~3–6 µm tall. Generation takes about a second for a default window and does not consume the
           simulation's own random stream.</p>
         </div>
@@ -3133,6 +3132,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="mtYRow" style="display:none" title="World Y (µm) of the centre of the simulated window.">View centre Y (µm) <input type="number" id="simulation_mt_y" min="-1000000" max="1000000" step="1" value="0" class="num"></label>
           <label class="row" id="mtCellDensRow" style="display:none" title="Fraction of world chunks holding a cell (occupancy). Higher = more, more crowded cells; packing drops the ones that would overlap.">Cell density <input type="number" id="simulation_mt_cellDensity" min="0.05" max="1" step="0.01" value="0.33" class="num"></label>
           <label class="row" id="mtDensRow" style="display:none" title="Microtubules per µm² of cell footprint.">Microtubule density (per µm²) <input type="number" id="simulation_mt_density" min="0" max="2" step="0.005" value="0.9" class="num"></label>
+          <label class="row" id="mtFocusRow" style="display:none" title="Height (nm) above the coverslip, the surface the cells lie on (z = 0), at which the optical section is centred. Microtubules within the Structure Z range either side of it are imaged.">Focus height (nm) <input type="number" id="simulation_mt_focusZ" min="0" max="10000" step="10" value="250" class="num"></label>
           <label class="row" id="mtMove1Row" style="display:none" title="Move the window across the sample by 1 µm (left/right/up/down).">Move 1 µm <span class="mtmove"><button type="button" onclick="moveMtView(-1,0)">&larr;</button><button type="button" onclick="moveMtView(1,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-1)">&uarr;</button><button type="button" onclick="moveMtView(0,1)">&darr;</button></span></label>
           <label class="row" id="mtMove5Row" style="display:none" title="Move the window across the sample by 5 µm (left/right/up/down).">Move 5 µm <span class="mtmove"><button type="button" onclick="moveMtView(-5,0)">&larr;</button><button type="button" onclick="moveMtView(5,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-5)">&uarr;</button><button type="button" onclick="moveMtView(0,5)">&darr;</button></span></label>
           <label class="row" id="mtMove10Row" style="display:none" title="Move the window across the sample by 10 µm (left/right/up/down).">Move 10 µm <span class="mtmove"><button type="button" onclick="moveMtView(-10,0)">&larr;</button><button type="button" onclick="moveMtView(10,0)">&rarr;</button><button type="button" onclick="moveMtView(0,-10)">&uarr;</button><button type="button" onclick="moveMtView(0,10)">&darr;</button></span></label>
@@ -4487,7 +4487,7 @@ const PARAMS = {
   simulation_mt_density: { type:'number', id:'simulation_mt_density', label:'Microtubule density (per µm²)', min:0, max:2, step:0.005, default:0.9, int:false },
   // Cell occupancy: the fraction of world chunks that hold a cell (the prototype's "Density (occupancy)").
   simulation_mt_cellDensity: { type:'number', id:'simulation_mt_cellDensity', label:'Cell density (occupancy)', min:0.05, max:1, step:0.01, default:0.33, int:false },
-  simulation_mt_focusZ: { type:'number', id:null, label:'Focus height above coverslip (µm)', min:0, max:10, step:0.1, default:0.5, int:false },
+  simulation_mt_focusZ: { type:'number', id:'simulation_mt_focusZ', label:'Focus height above coverslip (nm)', min:0, max:10000, step:10, default:250, int:false },
 
   // ---- NUP structure (nuclear pore complex, simulation_structureType==='nup') ----
   // Models the endogenously SNAP-tagged Nup96 reference standard from Thevathasan et al.,
@@ -8110,12 +8110,12 @@ function buildMicrotubuleStructure(w,h){
   const px=paramValue('simulation_pxnm');
   const res=CellField.buildWindow(w,h,{
     seed:paramValue('simulation_mt_seed'), xUm:paramValue('simulation_mt_x'), yUm:paramValue('simulation_mt_y'),
-    pxnm:px, mtDensity:paramValue('simulation_mt_density'), cellDensity:paramValue('simulation_mt_cellDensity'), focusUm:paramValue('simulation_mt_focusZ'),
+    pxnm:px, mtDensity:paramValue('simulation_mt_density'), cellDensity:paramValue('simulation_mt_cellDensity'), focusUm:paramValue('simulation_mt_focusZ')/1000,
     slabNm:paramValue('simulation_zRange')
   });
   log(`Microtubules (seed ${paramValue('simulation_mt_seed')}, centre ${paramValue('simulation_mt_x')}, ${paramValue('simulation_mt_y')} µm, `+
       `window ${(w*px/1000).toFixed(1)}×${(h*px/1000).toFixed(1)} µm): ${res.nCells} cell(s) reach the window, `+
-      `${res.nMt} microtubule(s) inside it, ${res.sites.length.toLocaleString()} dye site(s) within ±${paramValue('simulation_zRange')} nm of ${paramValue('simulation_mt_focusZ')} µm above the coverslip`+
+      `${res.nMt} microtubule(s) inside it, ${res.sites.length.toLocaleString()} dye site(s) within ±${paramValue('simulation_zRange')} nm of ${paramValue('simulation_mt_focusZ')} nm above the coverslip`+
       (res.packed?` (${res.removed} cell(s) dropped by packing).`:` (packing skipped: window too large).`));
   if(!res.sites.length) log('Microtubules: no dye sites landed in this window/slab — move the view (X/Y) or raise Structure Z range / Focus height.');
   return res.sites;
@@ -8346,7 +8346,7 @@ function structureZDescription(kind,zRange,sizeNm){
     case 'tiltedPlane':  return `tilted plane, z ramping linearly with x from −${zRange} to +${zRange} nm`;
     case 'uniform3D':    return `uniform 3D volume, z drawn uniformly over ±${zRange} nm`;
     case 'shell':        return `spherical shell of radius ${sizeNm} nm, so z spans ±${sizeNm} nm`;
-    case 'microtubules': return `microtubule network clipped to a ±${zRange} nm slab around ${paramValue('simulation_mt_focusZ')} µm above the coverslip`;
+    case 'microtubules': return `microtubule network clipped to a ±${zRange} nm slab around ${paramValue('simulation_mt_focusZ')} nm above the coverslip`;
     case 'nup':          return `nuclear pore complexes on a membrane patch, rings ${paramValue('simulation_nup_ringSeparation')} nm apart axially`;
     default:             return `filaments oscillate/offset in z over a ±${zRange} nm structure Z range`;
   }
@@ -28811,7 +28811,7 @@ updateSimulation3dUI();
 
 // Structure-type rows (simTypeBox) — same "one selector, a list of rows toggled together"
 // pattern as updatePsfModelUI() above, just for the NUP-only fields.
-const MT_ROW_IDS=['mtSeedRow','mtXRow','mtYRow','mtCellDensRow','mtDensRow','mtMove1Row','mtMove5Row','mtMove10Row'];
+const MT_ROW_IDS=['mtSeedRow','mtXRow','mtYRow','mtCellDensRow','mtDensRow','mtFocusRow','mtMove1Row','mtMove5Row','mtMove10Row'];
 const NUP_ROW_IDS=['nupRadiusRow','nupCornerSpreadRow','nupRingSeparationRow','nupLinkerMinRow','nupLinkerMaxRow','nupMembraneTypeRow','nupCountRow','nupMinSpacingRow','nupCurvatureRow','nupDebugBtnRow'];
 function updateStructureTypeUI(){
   const on = paramValue('simulation_structureType')==='nup';
@@ -30470,7 +30470,8 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-24e — Cell field defaults: elongation 0.5–1, microtubule density 0.9 µm⁻²; viewer 3D-view controls moved to the top.
+log(`webSMLM v0.12.8-dev · build 2026-09-24f — Microtubule focus height is now a sidebar field in nm, default 250 nm above the coverslip.
+— from build 2026-09-24e: Cell field defaults: elongation 0.5–1, microtubule density 0.9 µm⁻²; viewer 3D-view controls moved to the top.
 — from build 2026-09-24d: occupancy 0.33, blobbiness 1.75, 80 relaxation iterations (slider to 150), step 0.55.
 — from build 2026-09-24c: Microtubule cell field: the cytoplasm (1 µm/µm, saturating from the edge)
 and the dome over the nucleus (3 µm/µm) now have separate slope caps; where a nucleus sits too close to the membrane

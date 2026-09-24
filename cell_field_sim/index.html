@@ -20,8 +20,14 @@
   .pair span.k{flex:1}
   .pair input{width:56px}
   #canvasHost{position:relative}
-  canvas{display:block;background:#05070a;cursor:grab}
+  canvas{display:block;cursor:grab}
   canvas.dragging{cursor:grabbing}
+  /* Three stacked layers, all the same pixel size: #cvBase (grid + microtubules, 2D), #cvGl (cell bodies, WebGL2),
+     #cv (nuclei + scale bar, 2D, the interactive one). #cvGl/#cvBase are display:none when WebGL2 is unavailable. */
+  #cvBase{position:absolute;top:0;left:0;background:#05070a;pointer-events:none;z-index:0}
+  #cvGl{position:absolute;top:0;left:0;pointer-events:none;z-index:1}
+  #cv{position:relative;z-index:2;background:transparent}
+  #hud,#mtDebug,#legend{z-index:3}
   #hud{position:absolute;top:8px;left:8px;font-size:11px;background:rgba(10,13,18,.7);border:1px solid #232a35;border-radius:6px;padding:8px 10px;line-height:1.5;pointer-events:none;white-space:pre}
   #mtDebug{position:absolute;bottom:8px;right:8px;display:none;background:rgba(10,13,18,.92);border:1px solid #232a35;border-radius:6px;padding:6px}
   #mtDebug .t{font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;gap:12px}
@@ -131,6 +137,8 @@
   </div>
 
   <div id="canvasHost">
+    <canvas id="cvBase"></canvas>
+    <canvas id="cvGl"></canvas>
     <canvas id="cv"></canvas>
     <div id="hud"></div>
     <div id="mtDebug"><div class="t"><span id="mtDebugInfo"></span><a href="#" id="mtDebugClose">close</a></div><canvas id="mtDebugCv" width="800" height="280"></canvas></div>
@@ -774,8 +782,14 @@ function cytoGeometrySignature(seed, p) {
 }
 function ensureCytoCacheFresh(seed, p) {
   const sig = cytoGeometrySignature(seed, p);
-  if (sig !== cytoCacheSig) { cytoCache.clear(); cytoCacheSig = sig; }
-  else if (cytoCache.size > CYTO_CACHE_MAX) { cytoCache.clear(); }
+  if (sig !== cytoCacheSig) { clearCytoCache(); cytoCacheSig = sig; }
+  else if (cytoCache.size > CYTO_CACHE_MAX) { clearCytoCache(); }
+}
+// Entries also own GPU buffers (entry.gl, see the viewer's WebGL section) and
+// per-mesh render caches, so dropping them has to release those too.
+function clearCytoCache() {
+  for (const e of cytoCache.values()) freeMeshGl(e);
+  cytoCache.clear();
 }
 // n=64 (down from the silhouette's own 120-point sampling elsewhere) --
 // theta resolution directly multiplies quad count (rings*n, each its own
@@ -1177,18 +1191,24 @@ function prune(map, p) {
 // this project's own reference imagery -- makes the nucleus's 3D-ness legible
 // at a glance instead of just being a flat-shaded blob.
 const DEPTH_STOPS = [[0.15, 0.25, 0.9], [0.1, 0.75, 0.85], [0.25, 0.8, 0.25], [0.95, 0.85, 0.15], [0.9, 0.2, 0.15]];
-function depthColor(z, zmin, zmax, alpha) {
+function depthRGB(z, zmin, zmax) {
   const t = zmax > zmin ? (z - zmin) / (zmax - zmin) : 0.5;
   const f = Math.min(0.9999, Math.max(0, t)) * (DEPTH_STOPS.length - 1);
   const i = Math.floor(f), frac = f - i;
   const a = DEPTH_STOPS[i], b = DEPTH_STOPS[Math.min(DEPTH_STOPS.length - 1, i + 1)];
-  const r = lerp(a[0], b[0], frac) * 255, g = lerp(a[1], b[1], frac) * 255, bl = lerp(a[2], b[2], frac) * 255;
+  return [lerp(a[0], b[0], frac) * 255, lerp(a[1], b[1], frac) * 255, lerp(a[2], b[2], frac) * 255];
+}
+function depthColor(z, zmin, zmax, alpha) {
+  const [r, g, bl] = depthRGB(z, zmin, zmax);
   return `rgba(${r | 0},${g | 0},${bl | 0},${alpha})`;
 }
 
 // ---- viewer -----------------------------------------------------------------
 const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
+const cvBase = document.getElementById('cvBase'), cvGl = document.getElementById('cvGl');
+const ctxTop = cv.getContext('2d');
+const ctxBase = cvBase.getContext('2d');
+let ctx = ctxTop; // the layer the shared helpers (drawScaleBar, drawMtLabels, ...) currently paint on
 const hud = document.getElementById('hud');
 const host = document.getElementById('canvasHost');
 
@@ -1278,7 +1298,11 @@ function resizeCanvas() {
   cv.height = Math.round(r.height * devicePixelRatio);
   cv.style.width = r.width + 'px';
   cv.style.height = r.height + 'px';
-  draw();
+  for (const c of [cvBase, cvGl]) {
+    c.width = cv.width; c.height = cv.height;
+    c.style.width = cv.style.width; c.style.height = cv.style.height;
+  }
+  requestDraw();
 }
 
 // Simple oblique projection: x is unaffected by tilt, y is foreshortened by
@@ -1347,82 +1371,259 @@ function localToWorld(c, lx, ly) {
   return [c.x + lx * cr - ly * sr, c.y + lx * sr + ly * cr];
 }
 
-function drawCellBody(c, pxPerUm, p) {
-  const { localOutline, mesh } = getCytoGeometry(c, p);
-  const botPts = localOutline.map(([lx, ly]) => { const [wx, wy] = localToWorld(c, lx, ly); return project(wx, wy, 0); });
+// ---- per-cell mesh render cache + WebGL2 cell-body layer ---------------------
+// draw() runs on every pan/zoom event, so nothing here may redo work that a
+// pan/zoom cannot change. Everything below hangs off the getCytoGeometry entry
+// (one per chunk, dropped by clearCytoCache): flat typed-array copy of the mesh
+// (`render`), its depth-sorted quad order (only depends on tilt + packRot, both
+// constant during a drag -- the sort key's translation term is the same for every
+// quad, so it never enters it), cached contour segments, and the GPU buffers.
+function getMeshRender(entry, c) {
+  let r = entry.render;
+  if (r) return r;
+  const { rings, n, grid } = entry.mesh;
+  const nv = (rings + 1) * n, nq = rings * n;
+  r = {
+    nv, nq, n, rings,
+    lx: new Float32Array(nv), ly: new Float32Array(nv), h: new Float32Array(nv),
+    qidx: new Uint32Array(nq * 4), qcol: new Array(nq), qavgH: new Float32Array(nq),
+    sx: new Float32Array(nv), sy: new Float32Array(nv), // reused per-frame screen coords
+    order: null, orderKey: '',
+  };
+  for (let k = 0; k <= rings; k++) for (let i = 0; i < n; i++) {
+    const v = k * n + i, pt = grid[k][i];
+    r.lx[v] = pt.x; r.ly[v] = pt.y; r.h[v] = pt.h;
+  }
+  for (let k = 0; k < rings; k++) for (let i = 0; i < n; i++) {
+    const q = k * n + i, i2 = (i + 1) % n, b = q * 4;
+    const a = k * n + i, bb = k * n + i2, cc = (k + 1) * n + i2, d = (k + 1) * n + i;
+    r.qidx[b] = a; r.qidx[b + 1] = bb; r.qidx[b + 2] = cc; r.qidx[b + 3] = d;
+    const avgH = (r.h[a] + r.h[bb] + r.h[cc] + r.h[d]) / 4;
+    r.qavgH[q] = avgH;
+    r.qcol[q] = depthColor(avgH, 0, c.height, 0.6);
+  }
+  entry.render = r;
+  return r;
+}
 
-  // Faint footprint reference at z=0 -- still useful once tilted, and the top
-  // surface now tapers to ~0 height right at this same boundary by
-  // construction (cytoHeightAt(dEdge=0,...) = 0), so no separate wall lines
-  // are drawn any more -- a hard vertical cliff at the edge would misrepresent
-  // the smooth taper the height field now has there.
-  ctx.strokeStyle = 'rgba(90,169,230,0.25)';
-  ctx.lineWidth = 1;
-  polyPath(botPts); ctx.stroke();
+// Back-to-front order (see the note this replaced: no z-buffer anywhere, so quads
+// are painted farthest first). Depth is y*sin(tilt) + z*cos(tilt); the cell's own
+// world y adds the same constant to every quad, so only the packRot-rotated
+// local y and the height matter.
+function ensureQuadOrder(r, c, sinT, cosT) {
+  const rot = c.packRot || 0;
+  const key = sinT.toFixed(6) + '|' + rot;
+  if (r.orderKey === key) return;
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  const depth = new Float32Array(r.nq);
+  const { lx, ly, qidx } = r;
+  for (let q = 0; q < r.nq; q++) {
+    const b = q * 4;
+    let wy = 0;
+    for (let j = 0; j < 4; j++) { const v = qidx[b + j]; wy += lx[v] * sr + ly[v] * cr; }
+    depth[q] = (wy / 4) * sinT + r.qavgH[q] * cosT;
+  }
+  const idx = new Uint32Array(r.nq);
+  for (let q = 0; q < r.nq; q++) idx[q] = q;
+  idx.sort((a, b) => depth[a] - depth[b]);
+  r.order = idx; r.orderKey = key;
+}
 
-  const { rings, n, grid } = mesh;
+// Marching-squares segments depend only on the mesh + step, so they are cached
+// (local frame, flat x1,y1,x2,y2,z) and merely transformed per frame.
+function getContourSegs(entry, step) {
+  if (entry.contours && entry.contours.step === step) return entry.contours.segs;
+  const { grid } = entry.mesh;
+  let maxH = 0;
+  for (const row of grid) for (const pt of row) if (pt.h > maxH) maxH = pt.h;
+  const levels = [];
+  for (let lvl = step; lvl < maxH; lvl += step) levels.push(lvl);
+  const raw = marchingSquaresContours(entry.mesh, levels);
+  const segs = new Float32Array(raw.length * 5);
+  raw.forEach((s, i) => { segs[i * 5] = s.x1; segs[i * 5 + 1] = s.y1; segs[i * 5 + 2] = s.x2; segs[i * 5 + 3] = s.y2; segs[i * 5 + 4] = s.z; });
+  entry.contours = { step, segs };
+  return segs;
+}
 
-  // Shaded height-mapped surface: one quad per (ring, theta) cell, coloured
-  // by depth like the nucleus. This app has no real z-buffer anywhere (the
-  // nucleus's own slices rely on the same "draw in a sensible fixed order"
-  // convention), so quads are explicitly depth-sorted and painted back-to-
-  // front before drawing -- plain ring-then-theta draw order (tried first)
-  // is only a valid painter's-algorithm order when the tallest point sits at
-  // the mesh centre; once the nucleus (and therefore the height peak) sits
-  // off-centre, later/shorter quads can paint over earlier/taller ones and
-  // vice versa, which is exactly the tangled/self-overlapping look a real,
-  // reported screenshot showed on any cell with an off-centre or elongated
-  // nucleus. `project()`'s own screen-Y is `y*cos(tilt) - z*sin(tilt)`, so
-  // the orthogonal (into-the-screen) depth is `y*sin(tilt) + z*cos(tilt)`
-  // (a standard rotation-by-tilt decomposition): larger depth = nearer the
-  // camera, so sorting ascending and painting in that order draws farthest
-  // first, nearest last (on top).
-  const sinT = Math.sin(view.tiltRad), cosT = Math.cos(view.tiltRad);
-  const quads = [];
-  for (let k = 0; k < rings; k++) {
-    for (let i = 0; i < n; i++) {
-      const i2 = (i + 1) % n;
-      const p00 = grid[k][i], p10 = grid[k][i2], p11 = grid[k + 1][i2], p01 = grid[k + 1][i];
-      const w00 = localToWorld(c, p00.x, p00.y), w10 = localToWorld(c, p10.x, p10.y);
-      const w11 = localToWorld(c, p11.x, p11.y), w01 = localToWorld(c, p01.x, p01.y);
-      const avgWorldY = (w00[1] + w10[1] + w11[1] + w01[1]) / 4;
-      const avgH = (p00.h + p10.h + p11.h + p01.h) / 4;
-      const depth = avgWorldY * sinT + avgH * cosT;
-      const pts = [
-        project(w00[0], w00[1], p00.h),
-        project(w10[0], w10[1], p10.h),
-        project(w11[0], w11[1], p11.h),
-        project(w01[0], w01[1], p01.h),
-      ];
-      quads.push({ pts, depth, fill: depthColor(avgH, 0, c.height, 0.6) });
+// Screen transform of one cell's local-frame point, inlined (the old per-point
+// localToWorld()+project() allocated two arrays per call).
+function cellXform(c) {
+  const rot = c.packRot || 0, S = view.scale * devicePixelRatio;
+  return {
+    cr: Math.cos(rot), sr: Math.sin(rot), S,
+    ox: cv.width / 2 + (c.x - view.cx) * S, oy: c.y - view.cy,
+    H2: cv.height / 2, sinT: Math.sin(view.tiltRad), cosT: Math.cos(view.tiltRad),
+  };
+}
+
+function cellVisible(c) {
+  const S = view.scale * devicePixelRatio, cosT = Math.cos(view.tiltRad);
+  const sx = cv.width / 2 + (c.x - view.cx) * S, sy = cv.height / 2 + (c.y - view.cy) * cosT * S;
+  const r = (c.rOuter + c.height + 1) * S; // rOuter bounds the outline; height lifts it on screen when tilted
+  return sx + r >= 0 && sx - r <= cv.width && sy + r >= 0 && sy - r <= cv.height;
+}
+
+// Faint z=0 footprint outline; the caller batches every cell into one path.
+function addOutlinePath(c, entry) {
+  const t = cellXform(c), lo = entry.localOutline;
+  for (let i = 0; i < lo.length; i++) {
+    const lx = lo[i][0], ly = lo[i][1];
+    const sx = t.ox + (lx * t.cr - ly * t.sr) * t.S;
+    const sy = t.H2 + (t.oy + lx * t.sr + ly * t.cr) * t.cosT * t.S;
+    if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+  }
+  ctx.closePath();
+}
+
+function addContourPath(c, entry, step) {
+  const segs = getContourSegs(entry, step), t = cellXform(c);
+  for (let i = 0; i < segs.length; i += 5) {
+    const z = segs[i + 4];
+    for (let e = 0; e < 2; e++) {
+      const lx = segs[i + e * 2], ly = segs[i + e * 2 + 1];
+      const sx = t.ox + (lx * t.cr - ly * t.sr) * t.S;
+      const sy = t.H2 + ((t.oy + lx * t.sr + ly * t.cr) * t.cosT - z * t.sinT) * t.S;
+      if (e === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
     }
   }
-  quads.sort((a, b) => a.depth - b.depth);
-  // Fill only, no per-quad stroke: at cytoRings*cytoTheta quads per
-  // cell this loop is the dominant per-frame drawing cost (see buildCytoMesh's
-  // own comment), and a stroke pass doubled the canvas call count for very
-  // little visual gain once adjacent quads already share exact vertices.
-  for (const q of quads) {
-    ctx.fillStyle = q.fill;
-    polyPath(q.pts); ctx.fill();
-  }
+}
 
-  if (p.showCytoContours) {
-    let maxH = 0;
-    for (const row of grid) for (const pt of row) if (pt.h > maxH) maxH = pt.h;
-    const levels = [];
-    for (let lvl = p.cytoContourStep; lvl < maxH; lvl += p.cytoContourStep) levels.push(lvl);
-    const segs = marchingSquaresContours(mesh, levels);
-    ctx.strokeStyle = 'rgba(20,30,45,0.55)';
-    ctx.lineWidth = Math.max(1, 0.04 * pxPerUm);
+// 2D fallback: height-mapped surface, one filled quad per (ring, theta) cell in
+// the cached depth order, screen coords computed once per VERTEX (not per quad).
+function drawCellBody2D(c, entry) {
+  const r = getMeshRender(entry, c), t = cellXform(c);
+  ensureQuadOrder(r, c, t.sinT, t.cosT);
+  const { lx, ly, h, sx, sy, qidx, qcol, order } = r;
+  for (let v = 0; v < r.nv; v++) {
+    const x = lx[v], y = ly[v];
+    sx[v] = t.ox + (x * t.cr - y * t.sr) * t.S;
+    sy[v] = t.H2 + ((t.oy + x * t.sr + y * t.cr) * t.cosT - h[v] * t.sinT) * t.S;
+  }
+  let last = null;
+  for (let j = 0; j < order.length; j++) {
+    const q = order[j], b = q * 4;
+    const col = qcol[q];
+    if (col !== last) { ctx.fillStyle = col; last = col; }
     ctx.beginPath();
-    for (const s of segs) {
-      const wa = localToWorld(c, s.x1, s.y1), wb = localToWorld(c, s.x2, s.y2);
-      const a = project(wa[0], wa[1], s.z), b = project(wb[0], wb[1], s.z);
-      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
-    }
-    ctx.stroke();
+    ctx.moveTo(sx[qidx[b]], sy[qidx[b]]);
+    ctx.lineTo(sx[qidx[b + 1]], sy[qidx[b + 1]]);
+    ctx.lineTo(sx[qidx[b + 2]], sy[qidx[b + 2]]);
+    ctx.lineTo(sx[qidx[b + 3]], sy[qidx[b + 3]]);
+    ctx.fill();
   }
+}
+
+// ---- WebGL2 cell-body layer (#cvGl) ------------------------------------------
+// The same shaded mesh, drawn on the GPU: static vertex buffer per cell
+// (local x,y,height + depth colour), an index buffer in the cached back-to-front
+// order (re-uploaded only when tilt/packRot change), alpha-blended in that order so
+// the look matches the painter's-algorithm 2D path. Pan/zoom only change uniforms.
+// Falls back to the 2D path when WebGL2 is unavailable or the context is lost.
+let gl = null, useGl = false, glProg = null, glU = null;
+const GL_VS = `#version 300 es
+in vec3 a_pos; in vec4 a_col;
+uniform vec2 u_off, u_rot, u_canvas, u_tilt; uniform float u_scale;
+out vec4 v_col;
+void main() {
+  vec2 w = vec2(a_pos.x * u_rot.x - a_pos.y * u_rot.y, a_pos.x * u_rot.y + a_pos.y * u_rot.x) + u_off;
+  float sx = u_canvas.x * 0.5 + w.x * u_scale;
+  float sy = u_canvas.y * 0.5 + (w.y * u_tilt.y - a_pos.z * u_tilt.x) * u_scale;
+  gl_Position = vec4(sx / u_canvas.x * 2.0 - 1.0, 1.0 - sy / u_canvas.y * 2.0, 0.0, 1.0);
+  v_col = a_col;
+}`;
+const GL_FS = `#version 300 es
+precision mediump float;
+in vec4 v_col; out vec4 o;
+void main() { o = vec4(v_col.rgb * v_col.a, v_col.a); }`; // premultiplied
+function setLayerMode(gpu) {
+  useGl = gpu;
+  cvGl.style.display = gpu ? 'block' : 'none';
+  cvBase.style.display = gpu ? 'block' : 'none';
+  cv.style.background = gpu ? 'transparent' : '#05070a';
+  ctx = ctxTop;
+}
+function initGl() {
+  try { gl = cvGl.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) { gl = null; }
+  if (!gl) return false;
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null; };
+  const vs = sh(gl.VERTEX_SHADER, GL_VS), fs = sh(gl.FRAGMENT_SHADER, GL_FS);
+  if (!vs || !fs) return false;
+  glProg = gl.createProgram();
+  gl.attachShader(glProg, vs); gl.attachShader(glProg, fs);
+  gl.bindAttribLocation(glProg, 0, 'a_pos'); gl.bindAttribLocation(glProg, 1, 'a_col');
+  gl.linkProgram(glProg);
+  if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) return false;
+  glU = {};
+  for (const n of ['u_off', 'u_rot', 'u_canvas', 'u_tilt', 'u_scale']) glU[n] = gl.getUniformLocation(glProg, n);
+  cvGl.addEventListener('webglcontextlost', e => {
+    e.preventDefault();
+    for (const en of cytoCache.values()) en.gl = null; // buffers died with the context
+    setLayerMode(false); requestDraw();
+  });
+  return true;
+}
+function freeMeshGl(entry) {
+  const g = entry.gl;
+  if (!g) return;
+  entry.gl = null;
+  if (!gl || gl.isContextLost()) return;
+  gl.deleteBuffer(g.vbo); gl.deleteBuffer(g.ibo); gl.deleteVertexArray(g.vao);
+}
+function ensureMeshGl(entry, c) {
+  const r = getMeshRender(entry, c);
+  const t = cellXform(c);
+  ensureQuadOrder(r, c, t.sinT, t.cosT);
+  let g = entry.gl;
+  if (!g) {
+    g = entry.gl = { vbo: gl.createBuffer(), ibo: gl.createBuffer(), vao: gl.createVertexArray(), nIdx: 0, orderKey: '' };
+    const buf = new ArrayBuffer(r.nv * 16), f = new Float32Array(buf), u8 = new Uint8Array(buf);
+    const alpha = Math.round(0.6 * 255);
+    for (let v = 0; v < r.nv; v++) {
+      f[v * 4] = r.lx[v]; f[v * 4 + 1] = r.ly[v]; f[v * 4 + 2] = r.h[v];
+      const [R, G, B] = depthRGB(r.h[v], 0, c.height);
+      u8[v * 16 + 12] = R; u8[v * 16 + 13] = G; u8[v * 16 + 14] = B; u8[v * 16 + 15] = alpha;
+    }
+    gl.bindVertexArray(g.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, true, 16, 12);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.ibo);
+  }
+  if (g.orderKey !== r.orderKey) {
+    const idx = new Uint32Array(r.nq * 6), { order, qidx } = r;
+    for (let j = 0; j < r.nq; j++) {
+      const b = order[j] * 4, o = j * 6;
+      idx[o] = qidx[b]; idx[o + 1] = qidx[b + 1]; idx[o + 2] = qidx[b + 2];
+      idx[o + 3] = qidx[b]; idx[o + 4] = qidx[b + 2]; idx[o + 5] = qidx[b + 3];
+    }
+    gl.bindVertexArray(g.vao);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.DYNAMIC_DRAW);
+    g.nIdx = idx.length; g.orderKey = r.orderKey;
+  }
+  return g;
+}
+function drawBodiesGl(cells, p) {
+  const W = cvGl.width, H = cvGl.height, S = view.scale * devicePixelRatio;
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // premultiplied over
+  gl.useProgram(glProg);
+  gl.uniform2f(glU.u_canvas, W, H);
+  gl.uniform1f(glU.u_scale, S);
+  gl.uniform2f(glU.u_tilt, Math.sin(view.tiltRad), Math.cos(view.tiltRad));
+  for (const { cell: c } of cells) {
+    const g = ensureMeshGl(getCytoGeometry(c, p), c);
+    const rot = c.packRot || 0;
+    gl.uniform2f(glU.u_off, c.x - view.cx, c.y - view.cy);
+    gl.uniform2f(glU.u_rot, Math.cos(rot), Math.sin(rot));
+    gl.bindVertexArray(g.vao);
+    gl.drawElements(gl.TRIANGLES, g.nIdx, gl.UNSIGNED_INT, 0);
+  }
+  gl.bindVertexArray(null);
 }
 
 const NUC_SLICES = 9, NUC_PTS = 24;
@@ -1457,10 +1658,102 @@ function drawNucleus(c) {
 }
 
 const CHUNK_CAP = 3500;  // safety net: above this many extended-window chunks, skip packing rather than freeze the tab
-const PRUNE_ROUNDS = 6;  // cap on prune()+settle rounds per draw() -- see that call site's own comment
+const PRUNE_ROUNDS = 6;  // cap on prune()+settle rounds per pack -- see that call site's own comment
 const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip drawing entirely -- each cell body/nucleus
                           // is dozens of path points, so tens of thousands of them per frame would hang the tab outright,
                           // not just run slowly. Zoom in instead; this is a "mock explorer" limit, not a renderer.
+
+// ---- packed-map cache -----------------------------------------------------
+// STANDING RULE: draw() runs on every pan/zoom event, so it must not redo work a
+// pan/zoom cannot change. The candidate map + relax() + prune() over the extended
+// window is the expensive part, and it depends only on the seed and the
+// generation/packing params, never on the view -- so it is built once over the
+// view PADDED by half a view each side and reused until the needed extended
+// range (view + NR+2 chunks, which is what guarantees every visible cell sees all
+// its neighbours) leaves the cached window. Same algorithm as before, just not
+// re-run per event (which also stops cells shimmering as the window edge moved).
+// mt*/contour params are left out of the key: they cannot move a cell.
+let packCache = null;
+const PACK_KEY_SKIP = /^(mt|showCytoContours$|cytoContourStep$)/;
+function packKey(seed, p) {
+  const o = [seed];
+  for (const k in p) if (!PACK_KEY_SKIP.test(k)) o.push(k + '=' + p[k]);
+  return o.join('|');
+}
+function getPackedMap(seed, p, ex0, ey0, ex1, ey1) {
+  const key = packKey(seed, p), pc = packCache;
+  if (pc && pc.key === key && ex0 >= pc.ex0 && ex1 <= pc.ex1 && ey0 >= pc.ey0 && ey1 <= pc.ey1) return pc;
+  const padX = Math.ceil((ex1 - ex0 + 1) / 2), padY = Math.ceil((ey1 - ey0 + 1) / 2);
+  let a0 = ex0 - padX, a1 = ex1 + padX, b0 = ey0 - padY, b1 = ey1 + padY;
+  if ((a1 - a0 + 1) * (b1 - b0 + 1) > CHUNK_CAP) { a0 = ex0; a1 = ex1; b0 = ey0; b1 = ey1; }
+  const map = buildCandidateMap(seed, a0, b0, a1, b1, p);
+  let removed = 0;
+  if (p.enablePacking) {
+    // Always the full iteration count: cutting it left visibly under-relaxed,
+    // still-overlapping cells on screen ("packing doesn't work while dragging").
+    relax(map, p, p.relaxIters);
+    // prune()+settle to a fixed point (capped at PRUNE_ROUNDS so a pathologically
+    // dense view can't loop indefinitely): removing a cell from a crowded trio can
+    // leave its remaining two members newly resolved, or can just as easily still
+    // leave them overlapping each other -- one prune() pass, working off a single
+    // pre-removal snapshot, can't see that. Each round gets its own short settle
+    // relax so the NEXT round's overlap check reflects where survivors actually
+    // moved to, not their pre-removal positions.
+    for (let round = 0; round < PRUNE_ROUNDS; round++) {
+      const r = prune(map, p);
+      removed += r;
+      if (r === 0) break;
+      relax(map, p, Math.min(8, p.relaxIters));
+    }
+  }
+  packCache = { key, ex0: a0, ex1: a1, ey0: b0, ey1: b1, map, removed };
+  return packCache;
+}
+
+
+// Microtubule polylines as one Path2D per cell, built in the cell's own screen-
+// pixel frame (packRot, scale and tilt baked in, translation excluded) and
+// re-stroked under a plain translate: a pan never rebuilds it, only a zoom/tilt
+// change does. Points closer than MT_MIN_SEG_PX to the last kept one are dropped
+// (invisible sub-pixel detail when zoomed out).
+const MT_MIN_SEG_PX = 0.7, MT_MIN_SEG_PX_MOVING = 2.5; // coarser while a drag/zoom is in flight, full detail once it settles
+let interactingUntil = 0, settleTimer = 0;
+function noteInteraction() {
+  interactingUntil = performance.now() + 150;
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(requestDraw, 180);
+}
+const mtPathCache = new WeakMap();
+function getMtPath2D(mts, cell, t) {
+  const minPx = performance.now() < interactingUntil ? MT_MIN_SEG_PX_MOVING : MT_MIN_SEG_PX;
+  const key = t.S + '|' + t.sinT + '|' + t.cr + '|' + t.sr + '|' + minPx;
+  const hit = mtPathCache.get(mts);
+  if (hit && hit.key === key) return hit.path;
+  const path = new Path2D(), m2 = minPx * minPx;
+  for (const pts of mts) {
+    let lastX = 0, lastY = 0, ex = 0, ey = 0, pending = false;
+    for (let k = 0; k < pts.length; k++) {
+      const lx = pts[k].x, ly = pts[k].y;
+      const sx = (lx * t.cr - ly * t.sr) * t.S;
+      const sy = ((lx * t.sr + ly * t.cr) * t.cosT - pts[k].z * t.sinT) * t.S;
+      if (k === 0) { path.moveTo(sx, sy); lastX = sx; lastY = sy; pending = false; continue; }
+      const dx = sx - lastX, dy = sy - lastY;
+      if (dx * dx + dy * dy >= m2) { path.lineTo(sx, sy); lastX = sx; lastY = sy; pending = false; }
+      else { ex = sx; ey = sy; pending = true; }
+    }
+    if (pending) path.lineTo(ex, ey); // keep the true end point
+  }
+  mtPathCache.set(mts, { key, path });
+  return path;
+}
+
+// draw() calls are coalesced to one per animation frame.
+let drawQueued = false;
+function requestDraw() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => { drawQueued = false; draw(); });
+}
 
 function draw() {
   const p = params();
@@ -1468,15 +1761,20 @@ function draw() {
   const S = p.chunkSize;
   view.tiltRad = (+els.tiltDeg.value) * Math.PI / 180;
   ensureCytoCacheFresh(seed, p);
-  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctxTop.clearRect(0, 0, cv.width, cv.height);
+  if (useGl) ctxBase.clearRect(0, 0, cv.width, cv.height);
 
   const halfWUm = (cv.width / devicePixelRatio / 2) / view.scale;
   const halfHUm = (cv.height / devicePixelRatio / 2) / view.scale / Math.max(0.15, Math.cos(view.tiltRad));
   const cx0 = Math.floor((view.cx - halfWUm) / S) - 1, cx1 = Math.ceil((view.cx + halfWUm) / S) + 1;
   const cy0 = Math.floor((view.cy - halfHUm) / S) - 1, cy1 = Math.ceil((view.cy + halfHUm) / S) + 1;
   const coreCount = (cx1 - cx0 + 1) * (cy1 - cy0 + 1);
+  const pxPerUm = view.scale * devicePixelRatio;
+  const sinT = Math.sin(view.tiltRad);
+  const bg = useGl ? ctxBase : ctxTop;
 
   if (els.showGrid.checked && coreCount <= RENDER_CAP) {
+    ctx = bg;
     ctx.strokeStyle = '#3a4454';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1491,8 +1789,10 @@ function draw() {
     ctx.stroke();
   }
 
+  ctx = ctxTop;
   if (coreCount > RENDER_CAP) {
-    drawScaleBar(view.scale * devicePixelRatio);
+    if (useGl) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+    drawScaleBar(pxPerUm);
     hud.textContent =
       `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
       `${coreCount} chunks in view — zoom in to render (cap ${RENDER_CAP})`;
@@ -1505,79 +1805,87 @@ function draw() {
   const extCount = (ex1 - ex0 + 1) * (ey1 - ey0 + 1);
   const withinCap = extCount <= CHUNK_CAP;
 
-  const map = withinCap
-    ? buildCandidateMap(seed, ex0, ey0, ex1, ey1, p)
-    : buildCandidateMap(seed, cx0, cy0, cx1, cy1, p); // fall back to core range only, unpacked
-
-  let removed = 0;
-  if (p.enablePacking && withinCap) {
-    // Always run the full iteration count -- cutting it during an active drag
-    // (previously 6 iterations) left visibly under-relaxed, still-overlapping
-    // cells on screen until release, which read as "packing doesn't work
-    // while dragging." At the chunk counts CHUNK_CAP allows through, the full
-    // pass is cheap enough to run on every pointermove.
-    relax(map, p, p.relaxIters);
-    // prune()+settle to a fixed point (capped at PRUNE_ROUNDS so a
-    // pathologically dense view can't loop indefinitely): removing a cell
-    // from a crowded trio can leave its remaining two members newly
-    // resolved, or can just as easily still leave them overlapping each
-    // other -- one prune() pass, working off a single pre-removal snapshot,
-    // can't see that. Each round gets its own short settle relax so the
-    // NEXT round's overlap check reflects where survivors actually moved
-    // to, not their pre-removal positions.
-    for (let round = 0; round < PRUNE_ROUNDS; round++) {
-      const r = prune(map, p);
-      removed += r;
-      if (r === 0) break;
-      relax(map, p, Math.min(8, p.relaxIters));
-    }
+  let map, removed = 0;
+  if (withinCap) {
+    const pc = getPackedMap(seed, p, ex0, ey0, ex1, ey1);
+    map = pc.map; removed = pc.removed;
+  } else {
+    map = buildCandidateMap(seed, cx0, cy0, cx1, cy1, p); // fall back to core range only, unpacked
   }
 
   let nChunks = 0, nCells = 0, nMt = 0;
   mtDebugSource = null;
   mtLabelBudget = MT_LABEL_MAX_DRAWN; let labelNote = '';
-  const pxPerUm = view.scale * devicePixelRatio;
 
+  // Visible cells only: a cell whose bounding circle is off-screen costs nothing.
+  const vis = [];
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
       nChunks++;
       const cell = map.get(cx + ',' + cy);
       if (!cell) continue;
       nCells++;
-
-      if (els.showMt.checked) {
-        const mts = buildMicrotubulesForCell(seed, cx, cy, cell, p);
-        ctx.strokeStyle = '#e6c65a';
-        ctx.lineWidth = Math.max(0.6, p.mtLineWidth * pxPerUm);
-        ctx.globalAlpha = 0.8;
-        for (const pts of mts) {
-          if (!mtDebugSource || pts.length > mtDebugSource.pts.length) mtDebugSource = { pts, seed, cx, cy };
-          ctx.beginPath();
-          for (let k = 0; k < pts.length; k++) {
-            const [wx, wy] = localToWorld(cell, pts[k].x, pts[k].y);
-            const [px, py] = project(wx, wy, pts[k].z);
-            if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-          }
-          ctx.stroke();
-          nMt++;
-        }
-        ctx.globalAlpha = 1;
-        if (els.showMtLabels.checked) {
-          if (pxPerUm < MT_LABEL_MIN_PX_PER_UM) labelNote = 'zoom in to show MT labels';
-          else if (drawMtLabels(cell, mts, seed, cx, cy, pxPerUm)) labelNote = 'label cap reached, some not drawn';
-        }
-      }
-
-      if (els.showCyto.checked) drawCellBody(cell, pxPerUm, p);
-      if (els.showNucleus.checked) drawNucleus(cell);
+      if (cellVisible(cell)) vis.push({ cx, cy, cell });
     }
   }
+
+  // Pass 1 (base layer): footprint outlines + microtubules, each batched into ONE path.
+  ctx = bg;
+  if (els.showCyto.checked) {
+    ctx.strokeStyle = 'rgba(90,169,230,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const { cell } of vis) addOutlinePath(cell, getCytoGeometry(cell, p));
+    ctx.stroke();
+  }
+  if (els.showMt.checked) {
+    ctx.strokeStyle = '#e6c65a';
+    ctx.lineWidth = Math.max(0.6, p.mtLineWidth * pxPerUm);
+    ctx.globalAlpha = 0.8;
+    for (const { cx, cy, cell } of vis) {
+      const mts = buildMicrotubulesForCell(seed, cx, cy, cell, p);
+      const t = cellXform(cell);
+      for (const pts of mts) if (!mtDebugSource || pts.length > mtDebugSource.pts.length) mtDebugSource = { pts, seed, cx, cy };
+      nMt += mts.length;
+      ctx.save();
+      ctx.translate(t.ox, t.H2 + t.oy * t.cosT * t.S);
+      ctx.stroke(getMtPath2D(mts, cell, t));
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    if (els.showMtLabels.checked) {
+      if (pxPerUm < MT_LABEL_MIN_PX_PER_UM) labelNote = 'zoom in to show MT labels';
+      else for (const { cx, cy, cell } of vis) {
+        if (drawMtLabels(cell, buildMicrotubulesForCell(seed, cx, cy, cell, p), seed, cx, cy, pxPerUm)) { labelNote = 'label cap reached, some not drawn'; break; }
+      }
+    }
+  }
+
+  // Pass 2: cell bodies -- GPU layer, or the 2D fallback on the top canvas.
+  if (useGl) {
+    if (els.showCyto.checked) drawBodiesGl(vis, p);
+    else { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+  } else if (els.showCyto.checked) {
+    ctx = ctxTop;
+    for (const { cell } of vis) drawCellBody2D(cell, getCytoGeometry(cell, p));
+  }
+
+  // Pass 3 (top layer): contours, nuclei, scale bar.
+  ctx = ctxTop;
+  if (els.showCyto.checked && p.showCytoContours) {
+    ctx.strokeStyle = 'rgba(20,30,45,0.55)';
+    ctx.lineWidth = Math.max(1, 0.04 * pxPerUm);
+    ctx.beginPath();
+    for (const { cell } of vis) addContourPath(cell, getCytoGeometry(cell, p), p.cytoContourStep);
+    ctx.stroke();
+  }
+  if (els.showNucleus.checked) for (const { cell } of vis) drawNucleus(cell);
 
   drawScaleBar(pxPerUm);
 
   hud.textContent =
-    `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°\n` +
-    `chunks ${nChunks}   cells ${nCells}   removed (stuck) ${removed}   microtubules ${nMt}` +
+    `seed ${seed}   center (${view.cx.toFixed(1)}, ${view.cy.toFixed(1)}) um   scale ${view.scale.toFixed(2)} px/um   tilt ${(+els.tiltDeg.value)}°   ${useGl ? 'GPU' : '2D'}\n` +
+    `chunks ${nChunks}   cells ${nCells} (${vis.length} on screen)   removed (stuck) ${removed}   microtubules ${nMt}` +
     (withinCap ? '' : '   [packing skipped: zoom in, view too large]') +
     (labelNote ? '   [' + labelNote + ']' : '');
 }
@@ -1595,7 +1903,7 @@ cv.addEventListener('pointermove', e => {
   lastX = e.clientX; lastY = e.clientY;
   view.cx -= dx / view.scale;
   view.cy -= dy / (view.scale * Math.max(0.15, Math.cos(view.tiltRad)));
-  draw();
+  noteInteraction(); requestDraw();
 });
 window.addEventListener('pointerup', () => {
   if (!dragging) return;
@@ -1606,7 +1914,7 @@ cv.addEventListener('wheel', e => {
   e.preventDefault();
   const factor = Math.exp(-e.deltaY * 0.0015);
   view.scale = Math.max(0.3, view.scale * factor);
-  draw();
+  noteInteraction(); requestDraw();
 }, { passive: false });
 
 // ---- wiring -------------------------------------------------------------------
@@ -1641,16 +1949,16 @@ function syncLabels() {
 Object.keys(els).forEach(id => {
   const el = els[id];
   if (!el || id === 'reseed' || id === 'resetView' || id === 'mtLabelDebugBtn' || id.endsWith('Val')) return;
-  el.addEventListener('input', () => { syncLabels(); draw(); });
+  el.addEventListener('input', () => { syncLabels(); requestDraw(); });
 });
 
 els.reseed.addEventListener('click', () => {
   els.seed.value = (Math.random() * 2 ** 31) | 0;
-  draw();
+  requestDraw();
 });
 els.resetView.addEventListener('click', () => {
   view.cx = 0; view.cy = 0; view.scale = 9;
-  draw();
+  requestDraw();
 });
 
 // ---- microtubule label debug preview ----------------------------------------
@@ -1758,6 +2066,7 @@ document.getElementById('mtDebugClose').addEventListener('click', e => { e.preve
 
 window.addEventListener('resize', resizeCanvas);
 syncLabels();
+setLayerMode(!/[?&]2d/.test(location.search) && initGl()); // ?2d forces the 2D fallback (for testing)
 resizeCanvas();
 </script>
 </body>

@@ -41,6 +41,16 @@ copy of `cell_field_sim/`. Any change to `cell_field_sim/` (cell/nucleus/cytopla
 code, defaults, `CF_PARAMS`) must be re-copied into the matching `CellField` function in `webSMLM.html`
 in the same commit, and vice versa — nothing keeps them in sync automatically.
 
+**Viewer performance rule (`cell_field_sim/index.html`).** `draw()` runs on every pan/zoom event, so it
+must never do per-event work a pan/zoom cannot change: no `buildCandidateMap`/`relax`/`prune` outside
+`getPackedMap()`'s window check (`packCache`, view padded by half a view), no per-frame quad sorting or
+per-point array allocation (mesh render cache `getMeshRender()`/`ensureQuadOrder()`, cached contour
+segments, per-cell MT `Path2D` in `getMtPath2D()`), all draws go through `requestDraw()` (rAF), and
+off-screen cells are culled (`cellVisible()`). Cell bodies draw on a WebGL2 layer (`#cvGl`; `?2d` in the
+URL forces the 2D fallback, also used automatically if WebGL2 is missing). Any new per-frame cost must be
+justified against a pan benchmark (headless Playwright, 60 synthetic pointermoves: was ~2.2 s/frame,
+now ~0.1 s in software GL) — re-measure whenever `draw()`/`drawCellBody2D()` change.
+
 ## Editing model
 
 All work happens inside `webSMLM.html`. It is organized into commented `MODULE:` banners; find the

@@ -17,7 +17,7 @@
 -->
 <!--
   ============================================================================
-  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24b; may drift
+  MODULE INDEX — line numbers as of v0.12.8-dev build 2026-09-24c; may drift
   with edits, re-grep 'MODULE:' if this looks stale. Refresh alongside a
   build-letter bump when a change has moved things by more than a few lines.
   ============================================================================
@@ -2804,7 +2804,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24b</span></h1>
+    <h1>webSMLM <span class="pill">v0.12.8-dev · build 2026-09-24c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -7949,7 +7949,7 @@ function buildMicrotubulesForCell(seed, cx, cy, cell, p) {
     nucLongMin: 8, nucLongMax: 12, nucRatioMin: 0.6, nucRatioMax: 1, nucHeightMin: 0.3, nucHeightMax: 0.5,
     nucOffsetFrac: 0.1, nucMargin: 0.6,
     cytoRimHeightMin: 0.1, cytoRimHeightMax: 0.3, cytoEdgeRiseMin: 0.1, cytoEdgeRiseMax: 0.5,
-    cytoMidHeightMin: 1, cytoMidHeightMax: 2, cytoMidDistanceMin: 0.1, cytoMidDistanceMax: 0.3, cytoMaxSlope: 0.5, cytoDomeSlope: 1.5, cytoSmoothPasses: 12, cytoRings: 60, cytoTheta: 128,
+    cytoMidHeightMin: 1, cytoMidHeightMax: 2, cytoMidDistanceMin: 0.1, cytoMidDistanceMax: 0.3, cytoMaxSlope: 1, cytoDomeSlope: 3, cytoSmoothPasses: 12, cytoRings: 60, cytoTheta: 128,
     enablePacking: true, allowPackRotation: true, packFrac: 1.0, relaxIters: 12, relaxDamping: 0.2,
     mtDensity: 0.45, mtStartFracMin: 0, mtStartFracMax: 0.3, mtStartOffsetXY: 0,
     mtEndFracMin: 0.01, mtEndFracMax: 0.4, mtEndJitterDeg: 145, mtWobbleTurn: 0.8, mtWobbleFactor: 1.05,
@@ -30470,8 +30470,8 @@ function applyTheme(name){
 // line). Routing it through log() instead makes it a genuine logHistory
 // entry like everything else, so it gets a marker and re-renders correctly
 // either way. Update this string (not any HTML) on every build-letter bump.
-log(`webSMLM v0.12.8-dev · build 2026-09-24b — Microtubule cell field: the cytoplasm (0.5 µm/µm, saturating from the edge)
-and the dome over the nucleus (1.5 µm/µm) now have separate slope caps; where a nucleus sits too close to the membrane
+log(`webSMLM v0.12.8-dev · build 2026-09-24c — Microtubule cell field: the cytoplasm (1 µm/µm, saturating from the edge)
+and the dome over the nucleus (3 µm/µm) now have separate slope caps; where a nucleus sits too close to the membrane
 for them, the cell outline moves out.
 — from build 2026-09-23c: cytoplasm mesh resolution (rings,
 angular samples) and smoothing passes are now parameters; new defaults give a taller, tighter cytoplasm dome.

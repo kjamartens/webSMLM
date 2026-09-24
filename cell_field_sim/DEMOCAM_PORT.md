@@ -126,7 +126,7 @@ min turn radius 0.15, min separation 0.05, max z slope 5, line width (draw only,
 ### 4.3 The viewport-dependence trap (do not port this part as-is)
 `draw()` builds the candidate map over "visible chunks + margin", runs `relax`/`prune` over *that
 window*, and the README admits a cell near the window edge can resolve to a slightly different position
-depending on how far the margin extends (the viewer now packs once over the view padded by half a view and reuses that
+depending on how far the margin extends (the viewer now packs once over the view padded by 2 views each side and reuses that
 window until the view leaves it, so positions depend on where the last repack happened). That is fine for a viewer and **wrong for a moving stage**:
 panning the FOV away and back must reproduce identical cells.
 

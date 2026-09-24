@@ -1668,11 +1668,12 @@ const RENDER_CAP = 4000; // safety net: above this many VISIBLE chunks, skip dra
 // pan/zoom cannot change. The candidate map + relax() + prune() over the extended
 // window is the expensive part, and it depends only on the seed and the
 // generation/packing params, never on the view -- so it is built once over the
-// view PADDED by half a view each side and reused until the needed extended
+// view PADDED by PACK_PAD_VIEWS views each side and reused until the needed extended
 // range (view + NR+2 chunks, which is what guarantees every visible cell sees all
 // its neighbours) leaves the cached window. Same algorithm as before, just not
 // re-run per event (which also stops cells shimmering as the window edge moved).
 // mt*/contour params are left out of the key: they cannot move a cell.
+const PACK_PAD_VIEWS = 2;
 let packCache = null;
 const PACK_KEY_SKIP = /^(mt|showCytoContours$|cytoContourStep$)/;
 function packKey(seed, p) {
@@ -1683,9 +1684,14 @@ function packKey(seed, p) {
 function getPackedMap(seed, p, ex0, ey0, ex1, ey1) {
   const key = packKey(seed, p), pc = packCache;
   if (pc && pc.key === key && ex0 >= pc.ex0 && ex1 <= pc.ex1 && ey0 >= pc.ey0 && ey1 <= pc.ey1) return pc;
-  const padX = Math.ceil((ex1 - ex0 + 1) / 2), padY = Math.ceil((ey1 - ey0 + 1) / 2);
-  let a0 = ex0 - padX, a1 = ex1 + padX, b0 = ey0 - padY, b1 = ey1 + padY;
-  if ((a1 - a0 + 1) * (b1 - b0 + 1) > CHUNK_CAP) { a0 = ex0; a1 = ex1; b0 = ey0; b1 = ey1; }
+  // Pad by PACK_PAD_VIEWS whole views each side (2 => a 5x5-view window, only the
+  // central 1x1 visible), shrinking until it fits CHUNK_CAP.
+  const coreW = ex1 - ex0 + 1 - 2 * (interactionChunks(p) + 2), coreH = ey1 - ey0 + 1 - 2 * (interactionChunks(p) + 2);
+  let a0 = ex0, a1 = ex1, b0 = ey0, b1 = ey1;
+  for (let f = PACK_PAD_VIEWS; f > 0; f -= 0.5) {
+    const px = Math.ceil(coreW * f), py = Math.ceil(coreH * f);
+    if ((ex1 - ex0 + 1 + 2 * px) * (ey1 - ey0 + 1 + 2 * py) <= CHUNK_CAP) { a0 = ex0 - px; a1 = ex1 + px; b0 = ey0 - py; b1 = ey1 + py; break; }
+  }
   const map = buildCandidateMap(seed, a0, b0, a1, b1, p);
   let removed = 0;
   if (p.enablePacking) {

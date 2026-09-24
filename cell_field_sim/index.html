@@ -62,16 +62,19 @@
       <div class="pair"><span class="k">Short/long ratio min/max</span><input type="number" id="nucRatioMin" value="0.6" step="0.05"><input type="number" id="nucRatioMax" value="1" step="0.05"></div>
       <div class="pair"><span class="k">Height (× long axis) min/max</span><input type="number" id="nucHeightMin" value="0.3" step="0.05"><input type="number" id="nucHeightMax" value="0.5" step="0.05"></div>
       <label class="row">Offset from cell centre <input type="range" id="nucOffsetFrac" min="0" max="1" step="0.02" value="0.1"><span id="nucOffsetFracVal"></span></label>
-      <label class="row">Cell margin around nucleus (µm) <input type="range" id="nucMargin" min="0.1" max="1.5" step="0.1" value="1.5"><span id="nucMarginVal"></span></label>
+      <label class="row">Cell margin around nucleus (µm) <input type="range" id="nucMargin" min="0.1" max="1.5" step="0.1" value="0.6"><span id="nucMarginVal"></span></label>
     </fieldset>
 
     <fieldset>
       <legend>cytoplasm height (µm, per-cell min/max)</legend>
-      <div class="pair"><span class="k">Rim height min/max</span><input type="number" id="cytoRimHeightMin" value="0.05" step="0.1"><input type="number" id="cytoRimHeightMax" value="0.2" step="0.1"></div>
-      <div class="pair"><span class="k">Edge rise distance min/max</span><input type="number" id="cytoEdgeRiseMin" value="0.5" step="0.05"><input type="number" id="cytoEdgeRiseMax" value="1.0" step="0.05"></div>
-      <div class="pair"><span class="k">Mid height min/max</span><input type="number" id="cytoMidHeightMin" value="0.1" step="0.05"><input type="number" id="cytoMidHeightMax" value="0.2" step="0.05"></div>
-      <div class="pair"><span class="k">Dist. from nucleus for mid height min/max (× cell radius)</span><input type="number" id="cytoMidDistanceMin" value="0.3" step="0.05"><input type="number" id="cytoMidDistanceMax" value="0.6" step="0.05"></div>
+      <div class="pair"><span class="k">Rim height min/max</span><input type="number" id="cytoRimHeightMin" value="0.1" step="0.1"><input type="number" id="cytoRimHeightMax" value="0.3" step="0.1"></div>
+      <div class="pair"><span class="k">Edge rise distance min/max</span><input type="number" id="cytoEdgeRiseMin" value="0.1" step="0.05"><input type="number" id="cytoEdgeRiseMax" value="0.5" step="0.05"></div>
+      <div class="pair"><span class="k">Mid height min/max</span><input type="number" id="cytoMidHeightMin" value="1" step="0.05"><input type="number" id="cytoMidHeightMax" value="2" step="0.05"></div>
+      <div class="pair"><span class="k">Dist. from nucleus for mid height min/max (× cell radius)</span><input type="number" id="cytoMidDistanceMin" value="0.1" step="0.05"><input type="number" id="cytoMidDistanceMax" value="0.3" step="0.05"></div>
       <label class="row">Contour interval <input type="range" id="cytoContourStep" min="0.1" max="1" step="0.05" value="0.25"><span id="cytoContourStepVal"></span></label>
+      <label class="row">Smoothing passes <input type="range" id="cytoSmoothPasses" min="0" max="12" step="1" value="12"><span id="cytoSmoothPassesVal"></span></label>
+      <label class="row">Mesh rings <input type="range" id="cytoRings" min="4" max="60" step="1" value="60"><span id="cytoRingsVal"></span></label>
+      <label class="row">Mesh angular samples <input type="range" id="cytoTheta" min="32" max="128" step="4" value="128"><span id="cytoThetaVal"></span></label>
       <label class="row">Show contour lines <input type="checkbox" id="showCytoContours"></label>
     </fieldset>
 
@@ -635,7 +638,8 @@ function cytoHeightAt(c, p, dEdge, dNuc) {
 // fill+stroke) found THAT to be the larger cost, since drawing is inherently
 // per-frame regardless of caching -- `rings`/`n` (mesh resolution) is kept
 // modest for exactly that reason, not just to bound the math above.
-const CYTO_RINGS = 10, CYTO_RING_BIAS = 2.4;
+// Ring count is `p.cytoRings` (default 10).
+const CYTO_RING_BIAS = 2.4;
 // A few smoothing passes take the edge off facet-to-facet jumps in the raw
 // profile, purely cosmetic -- theta wraps around, the outer ring (k=rings) is
 // deliberately EXCLUDED so the true edge stays pinned at exactly 0 (the
@@ -653,9 +657,9 @@ const CYTO_RINGS = 10, CYTO_RING_BIAS = 2.4;
 // from 2) round it further. This only costs time once per chunk at mesh-build
 // time (getCytoGeometry's own cache) -- the per-frame cost this file's other
 // comments warn about is the CANVAS DRAW loop over rings*n quads, not this.
-const CYTO_SMOOTH_PASSES = 6;
-function smoothCytoGrid(grid, rings, n) {
-  for (let pass = 0; pass < CYTO_SMOOTH_PASSES; pass++) {
+// Pass count is `p.cytoSmoothPasses` (default 6; 0 = raw, unsmoothed profile).
+function smoothCytoGrid(grid, rings, n, passes) {
+  for (let pass = 0; pass < passes; pass++) {
     const next = new Array(rings + 1);
     for (let k = 1; k < rings; k++) {
       next[k] = new Array(n);
@@ -672,7 +676,7 @@ function smoothCytoGrid(grid, rings, n) {
   }
 }
 function buildCytoMesh(c, p, localOutlinePts) {
-  const rings = CYTO_RINGS;
+  const rings = Math.max(2, Math.round(p.cytoRings));
   const n = localOutlinePts.length;
   const grid = [];
   for (let k = 0; k <= rings; k++) {
@@ -687,7 +691,7 @@ function buildCytoMesh(c, p, localOutlinePts) {
     }
     grid.push(row);
   }
-  smoothCytoGrid(grid, rings, n);
+  smoothCytoGrid(grid, rings, n, p.cytoSmoothPasses);
   return { rings, n, grid };
 }
 
@@ -709,7 +713,7 @@ function cytoGeometrySignature(seed, p) {
     p.cellHeightMin, p.cellHeightMax, p.nucLongMin, p.nucLongMax, p.nucRatioMin, p.nucRatioMax,
     p.nucHeightMin, p.nucHeightMax, p.nucOffsetFrac, p.nucMargin,
     p.cytoRimHeightMin, p.cytoRimHeightMax, p.cytoEdgeRiseMin, p.cytoEdgeRiseMax,
-    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax].join('|');
+    p.cytoMidHeightMin, p.cytoMidHeightMax, p.cytoMidDistanceMin, p.cytoMidDistanceMax, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 function ensureCytoCacheFresh(seed, p) {
   const sig = cytoGeometrySignature(seed, p);
@@ -720,12 +724,12 @@ function ensureCytoCacheFresh(seed, p) {
 // theta resolution directly multiplies quad count (rings*n, each its own
 // canvas fill+stroke), the dominant per-frame drawing cost; 64 is still
 // smooth enough for the outer silhouette at any reasonable zoom.
-const CYTO_MESH_THETA = 64;
+// Angular sample count is `p.cytoTheta` (default 64).
 function getCytoGeometry(c, p) {
   const key = c.cx + ',' + c.cy;
   let entry = cytoCache.get(key);
   if (entry) return entry;
-  const localOutline = cellOutlineLocal(c, CYTO_MESH_THETA);
+  const localOutline = cellOutlineLocal(c, Math.max(8, Math.round(p.cytoTheta)));
   const mesh = buildCytoMesh(c, p, localOutline);
   entry = { localOutline, mesh };
   cytoCache.set(key, entry);
@@ -733,7 +737,7 @@ function getCytoGeometry(c, p) {
 }
 
 // Samples the ACTUAL rendered (smoothed) cytoplasm height-field at an
-// arbitrary local (x,y), not just at the CYTO_RINGS x CYTO_MESH_THETA grid
+// arbitrary local (x,y), not just at the p.cytoRings x p.cytoTheta grid
 // vertices buildCytoMesh() itself uses -- bilinear over (ring-fraction,
 // theta-index). Needed because mtClampIntoCytoplasm() (microtubules.js) used
 // to clamp against the raw analytic cytoHeightAt() while the surface actually
@@ -1141,7 +1145,7 @@ const els = {};
  'nucOffsetFrac', 'nucOffsetFracVal', 'nucMargin', 'nucMarginVal',
  'cytoRimHeightMin', 'cytoRimHeightMax', 'cytoEdgeRiseMin', 'cytoEdgeRiseMax',
  'cytoMidHeightMin', 'cytoMidHeightMax', 'cytoMidDistanceMin', 'cytoMidDistanceMax',
- 'cytoContourStep', 'cytoContourStepVal', 'showCytoContours',
+ 'cytoContourStep', 'cytoContourStepVal', 'cytoSmoothPasses', 'cytoSmoothPassesVal', 'cytoRings', 'cytoRingsVal', 'cytoTheta', 'cytoThetaVal', 'showCytoContours',
  'enablePacking', 'allowPackRotation', 'packFrac', 'packFracVal', 'relaxIters', 'relaxItersVal', 'relaxDamping', 'relaxDampingVal',
  'mtDensity', 'mtDensityVal', 'mtStartFracMin', 'mtStartFracMax', 'mtStartOffsetXY', 'mtStartOffsetXYVal',
  'mtEndFracMin', 'mtEndFracMax',
@@ -1182,6 +1186,9 @@ function params() {
     cytoMidDistanceMin: +els.cytoMidDistanceMin.value,
     cytoMidDistanceMax: Math.max(+els.cytoMidDistanceMin.value, +els.cytoMidDistanceMax.value),
     cytoContourStep: +els.cytoContourStep.value,
+    cytoSmoothPasses: +els.cytoSmoothPasses.value,
+    cytoRings: +els.cytoRings.value,
+    cytoTheta: +els.cytoTheta.value,
     showCytoContours: els.showCytoContours.checked,
     enablePacking: els.enablePacking.checked,
     allowPackRotation: els.allowPackRotation.checked,
@@ -1332,7 +1339,7 @@ function drawCellBody(c, pxPerUm, p) {
     }
   }
   quads.sort((a, b) => a.depth - b.depth);
-  // Fill only, no per-quad stroke: at CYTO_RINGS*CYTO_MESH_THETA quads per
+  // Fill only, no per-quad stroke: at cytoRings*cytoTheta quads per
   // cell this loop is the dominant per-frame drawing cost (see buildCytoMesh's
   // own comment), and a stroke pass doubled the canvas call count for very
   // little visual gain once adjacent quads already share exact vertices.
@@ -1550,6 +1557,9 @@ function syncLabels() {
   els.cellBlobVal.textContent = (+els.cellBlob.value).toFixed(2);
   els.nucOffsetFracVal.textContent = (+els.nucOffsetFrac.value).toFixed(2);
   els.nucMarginVal.textContent = (+els.nucMargin.value).toFixed(1) + ' um';
+  els.cytoSmoothPassesVal.textContent = els.cytoSmoothPasses.value;
+  els.cytoRingsVal.textContent = els.cytoRings.value;
+  els.cytoThetaVal.textContent = els.cytoTheta.value;
   els.cytoContourStepVal.textContent = (+els.cytoContourStep.value).toFixed(2) + ' um';
   els.packFracVal.textContent = (+els.packFrac.value).toFixed(2);
   els.relaxItersVal.textContent = els.relaxIters.value;

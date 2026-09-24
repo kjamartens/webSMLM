@@ -117,7 +117,7 @@ properties (section 9) and keep the rest as constants until asked.
 Field: `chunkSize 26`, `jitter 0.8`, `density (occupancy) 0.25`.
 Cell: diameter 25-35, elongation (short/long) 0.2-0.8, `cellBlob 1.5`, height 3-6.
 Nucleus: long axis 8-12, short/long 0.6-1, height 0.3-0.5 x long axis, offset 0.1, margin 1.5.
-Cytoplasm: rim height 0.05-0.2, edge rise 0.5-1.0, mid height 0.1-0.2, mid distance 0.3-0.6 x cell radius.
+Cytoplasm: rim height 0.1-0.3, edge rise 0.1-0.5, mid height 1-2, mid distance 0.1-0.3 x cell radius, `nucMargin` 0.6. `cytoSmoothPasses` (default 12, slider 0-12) is the number of 3x3 binomial smoothing passes `smoothCytoGrid` applies to the mesh; `cytoRings` (default 60, slider 4-60) is the mesh's radial ring count; `cytoTheta` (default 128, slider 32-128) is its angular sample count.
 Packing: enabled, min gap 1.0, relax iterations 12, step (damping) 0.2, rotation allowed.
 Microtubules: density 0.45 /µm², start offset 0-0.3, start XY jitter 0, end offset 0.01-0.4,
 end direction jitter 145 deg, wobble turn 0.8, wobble path x1.05, step length 0.05, path smoothing 1.5,

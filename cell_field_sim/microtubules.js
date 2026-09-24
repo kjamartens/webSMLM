@@ -64,7 +64,7 @@ const MT_STREAM_BASE = 1000;
 const MT_RESAMPLE_SPACING = 100000;
 
 // Direction weighting: how many azimuth bins to score around the nucleus
-// centre (see buildMtDirectionTable) -- 64 matches CYTO_MESH_THETA's own
+// centre (see buildMtDirectionTable) -- 64 matches the default cytoTheta's own
 // resolution choice in index.html for the same reason (smooth enough at any
 // reasonable zoom without the ray-march cost blowing up).
 const MT_N_DIR = 64;
@@ -1231,7 +1231,7 @@ function mtResultSig(seed, cell, p) {
   // cached microtubule set built against the old clearance/height field.
   return [seed, mtCellShapeSig(cell), p.mtDensity, p.mtStartFracMin, p.mtStartFracMax,
     p.mtStartOffsetXY, p.mtEndFracMin, p.mtEndFracMax, p.mtEndJitterDeg, p.mtWobbleTurn,
-    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin].join('|');
+    p.mtWobbleFactor, p.mtStepLen, p.mtSmoothLen, p.mtMinTurnRadius, p.mtMinSeparation, p.mtMaxZSlope, p.nucMargin, p.cytoSmoothPasses, p.cytoRings, p.cytoTheta].join('|');
 }
 
 // The one entry point index.html's draw() calls: builds every microtubule for

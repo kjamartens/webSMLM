@@ -1950,16 +1950,16 @@ instead, so two runs with the same seed and only <b>PSF placement interpolation<
 ONLY in the PSF placement itself — useful for A/B-comparing interpolation modes on identical
 underlying data.</p>
 <p><b>Microtubules (cell field)</b> — a window onto an effectively infinite, seed-addressed sample of
-cells with nuclei, each carrying a microtubule network (ported from <code>cell_field_sim/</code>). Every
+cells with nuclei, each carrying a microtubule network (the <a href="https://github.com/kjamartens/insiliscope">insiliscope</a> world model, compiled to WebAssembly). Every
 microtubule is a 25 nm cylinder with the 13-protofilament (13_3) lattice, and each lattice site carries
 a binder + dye at a random 2–5 nm linker offset; <b>each dye position is one emitter site</b>, so
 blinking happens exactly where the labels are (<b>Labeling efficiency</b> still thins them). The window
 is the structure FOV (pixels × pixel size — 128 px at 100 nm is the central ~12.8 µm, plus the usual
-10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the prototype's defaults. The same <b>Microtubule seed</b> always gives the
+10% margin) centred on <b>View centre X/Y (µm)</b>, with <b>Cell density</b> (how many cells) and <b>Microtubule density</b> (per µm² of cell footprint) as the two other exposed knobs; every other cell/cytoplasm setting is fixed at the model's defaults. The same <b>Microtubule seed</b> always gives the
 same sample, and a dye's position does not change when the window moves, so the <b>Move 1/5/10 µm</b>
 arrow buttons (← → ↑ ↓; +y is down, as in the image) pan across one continuous specimen. The network is
 clipped to a slab of ±<b>Structure Z range</b> around <b>Focus height</b> (<code>simulation_mt_focusZ</code>, default 250 nm above the coverslip, the surface the cells lie on) — an optical section that also keeps every site inside the PSF's z range; cells are
-~3–6 µm tall. Generation takes about a second for a default window and does not consume the
+~3–6 µm tall. Generation takes a few seconds for a default window (faster when panning back to a region already visited) and does not consume the
 simulation's own random stream.</p>
 <!-- /HINT:simulation-type -->
 

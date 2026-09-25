@@ -29,35 +29,18 @@ license honoured in the head banner. (`tools/` is the one exception: a separate,
 Node+Playwright CLI for headless/scripting use — see **pipeline** below — with its own scoped
 `package.json`, deliberately kept out of `webSMLM.html` so the app's own property is untouched.)
 
-## cell_field_sim / demoCam port spec
+## CellField (microtubule cell field) = generated insiliscope block
 
-`cell_field_sim/` is a standalone prototype (not part of `webSMLM.html`). `cell_field_sim/DEMOCAM_PORT.md`
-is the hand-off spec for porting it to `C:\GitHub\demoCam_SMLM_MM`. **While that file exists, keep it up
-to date**: any change to `cell_field_sim/` that affects what it describes (hash channels, defaults,
-geometry, dye/label model, function names) updates `DEMOCAM_PORT.md` in the same commit.
-
-**Two-way sync with `webSMLM.html`.** The `CellField` IIFE in `webSMLM.html` (MODULE: simulation) is a
-copy of `cell_field_sim/`. Any change to `cell_field_sim/` (cell/nucleus/cytoplasm/packing/microtubule
-code, defaults, `CF_PARAMS`) must be re-copied into the matching `CellField` function in `webSMLM.html`
-in the same commit, and vice versa — nothing keeps them in sync automatically.
-
-**Viewer performance rule (`cell_field_sim/index.html`).** `draw()` runs on every pan/zoom event, so it
-must never do per-event work a pan/zoom cannot change, and must never run the generator on the main
-thread when workers are available: window packing (`getPackedMapAsync()`, `packCache`, a 5x5-view
-window re-packed in the background before the view reaches its edge) and per-cell mesh + microtubules
-(`assets`, `pumpAssets()`) are built by Web Workers that run the same generator source as the main
-thread (index.html's generator half + `microtubules.js`, whose body is wrapped in `window.__MT_SRC`
-purely so its text is readable under file://). `draw()` only reads caches and skips cells not delivered
-yet (they pop in); without workers (`?nw`, or if they fail) `getPackedMapSync()`/`getAsset()` compute
-synchronously. Anything a worker needs must live above the `// ---- viewer ---` marker (the worker
-source is cut there) and be DOM-free; new worker-side calls into viewer-only functions need a stub in
-`genWorkerMain()` (see `freeMeshGl`). Also: no per-frame quad sorting/allocation (mesh render cache
-`getMeshRender()`/`ensureQuadOrder()`, cached contour segments, per-cell MT `Path2D` in
-`getMtPath2D()`), draws go through `requestDraw()` (rAF), off-screen cells are culled
-(`cellVisible()`). Cell bodies draw on a WebGL2 layer (`#cvGl`; `?2d` forces the 2D fallback, also
-automatic without WebGL2). Justify any new per-frame cost against a pan benchmark (headless
-Playwright, 300 synthetic pan frames: was ~2.2 s/frame; now p50 17 ms, p95 26 ms with workers in
-software GL) — re-measure whenever `draw()` or the worker plumbing change.
+The `'microtubules'` structure's world model (cells, nuclei, cytoplasm, packing, microtubules, dye
+lattice) is **not** webSMLM code: it is the [insiliscope](https://github.com/kjamartens/insiliscope)
+C++ core compiled to WASM, embedded in `webSMLM.html` (MODULE: simulation) as a generated block between
+`// ==== BEGIN insiliscope CellField block ====` / `// ==== END ... ====` (module text + a thin wrapper
+defining `const CellField`). **Never hand-edit the block.** To change the model, change insiliscope; its
+CI ("webSMLM block" workflow) builds and publishes `cellfield_block.js`; bring it in with
+`node tools/sync_cellfield.mjs <cellfield_block.js>` in a commit of its own (build-letter bump as usual).
+`node tools/sync_cellfield.mjs --check [<block.js>]` verifies the embedded block's checksum (and that it
+equals the given file). The former `cell_field_sim/` prototype, its viewer and `DEMOCAM_PORT.md` live in
+insiliscope now (`web/`, `web/prototype/`, `spec/`); there is no copy to keep in sync here.
 
 ## Editing model
 
@@ -266,25 +249,22 @@ in a module.
   change for a new structure type; a future structure type is just a third case in that switch.
 
   **Microtubule structure** (`'microtubules'`, `buildMicrotubuleStructure()` → `CellField.buildWindow()`,
-  MODULE: simulation, right above the NUP block) is `cell_field_sim/` copied into one IIFE (`CellField`,
-  so its ~100 helper names — `lerp`, `relax`, `prune`, `CH`, … — can't collide with the file's globals)
-  plus a small adapter at its end. The cell/nucleus/cytoplasm/packing/microtubule code is verbatim from
-  `cell_field_sim/index.html` + `microtubules.js` (DOM/drawing removed): **when the prototype changes,
-  re-copy the affected function** — nothing keeps them in sync automatically. Main thread only, never in a
-  worker. `simulation_mt_seed` (default 1249) picks the world; `simulation_mt_x`/`_y` (µm, default 0,0) are
+  MODULE: simulation, right above the NUP block) is the generated insiliscope block (see **CellField**
+  above): `buildWindow(w, h, {seed, xUm, yUm, pxnm, mtDensity, cellDensity, focusUm, slabNm})` →
+  `{sites, nCells, nMt, removed: null, packed}`. Its WASM module is instantiated synchronously on first use;
+  main thread only here (`CellField.workerSource()` exists if a worker ever needs it). Cells are packed on
+  fixed 8×8-chunk blocks (not per window), so a pan never re-packs. `simulation_mt_seed` (default 1249) picks the world; `simulation_mt_x`/`_y` (µm, default 0,0) are
   the window centre, moved by the **Move 1/5/10 µm** buttons (`moveMtView()`, +y is down); the window is the
   structure FOV (px × `simulation_pxnm`), so 128 px at 100 nm is the central 12.8 µm (+10% margin).
   Sidebar also exposes `simulation_mt_cellDensity` (cell occupancy, default 0.33) and `simulation_mt_density`
-  (microtubules/µm², 0.9); every other cell/cytoplasm knob stays at `CF_PARAMS` (cytoplasm: rim 0.1–0.3, edge rise 0.1–0.5, mid
-  height 1–2, mid distance 0.1–0.3 × radius, `nucMargin` 0.6, mesh 60 rings × 128 angular samples, 12 smoothing passes — same defaults as `cell_field_sim/`). `simulation_mt_focusZ`
+  (microtubules/µm², 0.9); every other cell/cytoplasm knob stays at the block's defaults (webSMLM's former `CF_PARAMS`; cytoplasm: rim 0.1–0.3, edge rise 0.1–0.5, mid
+  height 1–2, mid distance 0.1–0.3 × radius, `nucMargin` 0.6, mesh 60 rings × 128 angular samples, 12 smoothing passes). `simulation_mt_focusZ`
   (nm above the coverslip = z 0, the surface the cells lie on; default 250) is a sidebar field (Focus height) beside the density rows.
   Each microtubule centreline is decorated with the 13_3 lattice (25 nm cylinder, 12 nm binder, dye at a 2–5 nm
   uniform-in-volume linker offset) and **every dye is one candidate emitter site**, so blinking happens on the
-  dyes; `simulation_labelEfficiency` still thins them afterwards. Two deliberate differences from the
-  prototype's `buildMicrotubuleLabelPoints()`: only segments that can reach the window are decorated (a full
-  network is millions of sites), and each site's linker draw is *addressed* by (seed, cell, microtubule,
-  protofilament, lattice index) via `mtSiteUniforms()` rather than taken from a running stream, so a dye's
-  position doesn't change when the window moves. Sites are clipped to ±`simulation_zRange` around the focus
+  dyes; `simulation_labelEfficiency` still thins them afterwards. Only the 1 µm lattice blocks that can
+  reach the window are decorated (a full network is millions of sites), and every dye is addressed by
+  (seed, cell, microtubule, block), so its position doesn't change when the window moves. Sites are clipped to ±`simulation_zRange` around the focus
   height (an optical section that keeps them inside the PSF kernel's z range) — this applies in 2D too,
   where `buildStructure()` then flattens z to 0. Consumes nothing from the simulation's `mulberry32` stream.
 

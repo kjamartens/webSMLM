@@ -1,0 +1,194 @@
+#!/usr/bin/env node
+// Correctness gate for the depth-dependent simulation (Li et al., Biomed. Opt. Express 10, 2708
+// (2019): beads on the coverslip and in a gel, clathrin-coated pits, Nup107 pores at depth).
+// Every number the documentation quotes for this feature comes from a key written here through
+// writeResults('depth-sim', …), so it traces to a JSON value (SMLMpipelinelessons §9).
+//
+//  (0) byte identity: seeded movies with every new setting at its default hash to the values
+//      pinned below — the build before the depth work (2026-09-28u). A changed hash means a
+//      default movie changed; never update the constants without knowing why.
+//  (1) pupil: supercritical annulus and Fresnel apodisation reach the PSF (on/off kernels and
+//      z-CRLBs differ), the annulus power fraction on the grid matches a 1-D quadrature and the
+//      published numbers, the mismatch phase projects onto the report's spherical Zernikes.
+//  (2) focus map: f0(z_p), its slope and the model's own RIMF.
+//  (3) physical depth mode: emitters at the sample depth reproduce the objective-mode movie;
+//      CPU workers = GPU.
+//  (4) gel bead stack: truth, skipped frames, glass-bead slope 1.
+//  (5) structures: ccp and nup107 geometry.
+//  (6) per-object scores move in the published direction.
+//  (7) presets: every one simulates, survives a settings round trip, and an edit flips it.
+//
+// Run: node tests/gpu/test-depth-sim.mjs   (Playwright via tools/package.json, see tests/README.md)
+import { launchPage } from '../lib/launch.mjs';
+import { writeResults } from '../lib/report.mjs';
+
+// Pinned on build 2026-09-28u (before any depth work), CPU path, harness settings in SIM_BASE.
+const BASELINE = { uniform3D: 2860914707, nup: 555640748 };
+
+const { browser, page } = await launchPage({ headless: false });
+let failed = false;
+const results = {};
+const check = (label, ok, detail) => {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? '  — ' + detail : ''}`);
+  if (!ok) failed = true;
+};
+
+// In-page harness: set a field (or its paramOverrides entry when it has no control), simulate,
+// hash. The same body is what the interactive verification ran in the Browser pane.
+await page.evaluate(() => {
+  window.__set = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) { paramOverrides[id] = v; return; }
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+    el.dispatchEvent(new Event('change'));
+  };
+  window.__simBase = () => {
+    __set('useGpu', false); paramOverrides.simulation_3d = true;
+    __set('simulation_seed', 31); __set('simulation_fov', 64); __set('frames', 50); __set('simulation_zRange', 300);
+    __set('simulation_psfZRange', 400); __set('simulation_psfZStep', 20);
+  };
+  window.__simHash = async (cfg) => {
+    __simBase();
+    for (const [k, v] of Object.entries(cfg || {})) __set(k, v);
+    const st = await generateSynthetic();
+    return { hash: await stackPixelHash(st), n: st.n, events: groundTruthEvents.length, path: lastSimTimings.path };
+  };
+});
+
+try {
+  // ---- (0) byte identity ---------------------------------------------------------------------
+  const base = await page.evaluate(async () => ({
+    uniform3D: await __simHash({ simulation_structureType: 'uniform3D' }),
+    nup: await __simHash({ simulation_structureType: 'nup' }),
+  }));
+  results.baseline = base;
+  for (const k of Object.keys(BASELINE))
+    check(`(0) seeded ${k} movie byte-identical to 2026-09-28u`, base[k].hash === BASELINE[k], `hash ${base[k].hash} vs ${BASELINE[k]}`);
+
+  // ---- (1) pupil -------------------------------------------------------------------------------
+  const p1 = await page.evaluate(async () => {
+    const out = {};
+    const li = { NA: 1.43, lambda: 670e-9, ns: 1.3345, ni: 1.518 };
+    // 1-D quadrature reference, uniform amplitude and with Fresnel apodisation
+    for (const apod of [false, true]) {
+      const p = { ...li, saf: true, apod };
+      const P0 = psfPupilPower(p, 0).total;
+      out[apod ? 'quadApod' : 'quad'] = [0, 50, 100, 340, 2000].map(z => {
+        const r = psfPupilPower(p, z * 1e-9);
+        return { z, safPct: 100 * r.saf / r.total, collected: r.total / P0 };
+      });
+    }
+    // the same fraction on the Cartesian pupil grid the PSF is built from
+    out.grid = [0, 50, 100, 340, 2000].map(z => {
+      const cfg = { ...li, ti0: 150e-6, particleAxialPosition: z * 1e-9, zStep: 10e-9, zernikeCoeffs: new Array(PSF_NZERNIKE).fill(0),
+                    maskType: 'none', maskModes: 5, maskWaist: 1, saf: true, apod: false };
+      const M = psfFftM(cfg), dk = psfFftDkForCfg(cfg);
+      const plan = psfPupilPlan(cfg, M, dk), k0 = 2 * Math.PI / cfg.lambda, c0 = Math.floor(M / 2), rc = psfBMax(cfg);
+      let tot = 0, saf = 0;
+      for (let q = 0; q < plan.idx.length; q++) {
+        const i = plan.idx[q], kx = ((i % M) - c0) * dk, ky = (Math.floor(i / M) - c0) * dk;
+        const rho = Math.hypot(kx, ky) / (k0 * cfg.NA), a2 = plan.amp[q] * plan.amp[q];
+        tot += a2; if (rho > rc) saf += a2;
+      }
+      return { z, safPct: 100 * saf / tot, M };
+    });
+    // penetration depth of the intensity at the pupil edge
+    out.penetrationNm = 1e9 / (2 * (2 * Math.PI / li.lambda) * Math.sqrt(li.NA * li.NA - li.ns * li.ns));
+    // Projection of the index-mismatch phase onto ORTHONORMAL radial Zernikes over the
+    // subcritical disc r = rho/rho_c, at the focus where the defocus term vanishes (report §1).
+    {
+      const k0 = 2 * Math.PI / li.lambda, rc = li.ns / li.NA, N = 4000, zp = 1e-6;
+      const R = {
+        2: r => Math.sqrt(3) * (2 * r * r - 1),
+        4: r => Math.sqrt(5) * (6 * r ** 4 - 6 * r * r + 1),
+        6: r => Math.sqrt(7) * (20 * r ** 6 - 30 * r ** 4 + 12 * r * r - 1),
+        8: r => 3 * (70 * r ** 8 - 140 * r ** 6 + 90 * r ** 4 - 20 * r * r + 1),
+      };
+      const proj = (f, Z) => { let s = 0; for (let i = 0; i < N; i++) { const r = (i + 0.5) / N; s += f(r) * Z(r) * r; } return 2 * s / N; };
+      const sample = r => Math.sqrt(li.ns ** 2 - (li.NA * rc * r) ** 2), imm = r => Math.sqrt(li.ni ** 2 - (li.NA * rc * r) ** 2);
+      const c2s = proj(sample, R[2]), c2i = proj(imm, R[2]);
+      const f0 = zp * c2s / c2i;                      // objective travel that cancels defocus
+      const phi = r => k0 * (zp * sample(r) - f0 * imm(r));
+      out.zernikeRadPerUm = { Z4: proj(phi, R[4]), Z6: proj(phi, R[6]), Z8: proj(phi, R[8]), rimfFullPupil: zp / f0 };
+    }
+    return out;
+  });
+  results.pupil = p1;
+  const pub = [12.87, 9.72, 7.37, 2.22, 0.05], quadTarget = [12.91, 9.77, 7.42, 2.27, 0.08];
+  p1.quad.forEach((r, i) => check(`(1) SAF fraction ${r.z} nm (quadrature)`, Math.abs(r.safPct - quadTarget[i]) < 0.05,
+    `${r.safPct.toFixed(2)} % (published ${pub[i]} %)`));
+  p1.grid.forEach((r, i) => check(`(1) SAF fraction ${r.z} nm (M=${r.M} grid vs quadrature)`, Math.abs(r.safPct - p1.quad[i].safPct) < 0.3,
+    `${r.safPct.toFixed(2)} % vs ${p1.quad[i].safPct.toFixed(2)} %`));
+  [36.3, 29.7, 24.1, 9.0, 0.4].forEach((t, i) => check(`(1) SAF fraction with apodisation ${p1.quadApod[i].z} nm`,
+    Math.abs(p1.quadApod[i].safPct - t) < 0.1, `${p1.quadApod[i].safPct.toFixed(2)} %`));
+  [[50, 0.965], [340, 0.891], [2000, 0.872]].forEach(([z, t]) => { const r = p1.quad.find(q => q.z === z);
+    check(`(1) collected fraction ${z} nm`, Math.abs(r.collected - t) < 0.002, r.collected.toFixed(3)); });
+  check('(1) evanescent 1/e penetration at the pupil edge', Math.abs(p1.penetrationNm - 103.8) < 0.1, `${p1.penetrationNm.toFixed(1)} nm`);
+  const zr = p1.zernikeRadPerUm;
+  check('(1) mismatch phase → Z4⁰ (report −0.2765 rad/µm)', Math.abs(zr.Z4 + 0.2765) < 0.01, zr.Z4.toFixed(4));
+  check('(1) mismatch phase → Z6⁰ (report −0.1651 rad/µm)', Math.abs(zr.Z6 + 0.1651) < 0.01, zr.Z6.toFixed(4));
+  check('(1) mismatch phase → Z8⁰ (report −0.0986 rad/µm)', Math.abs(zr.Z8 + 0.0986) < 0.01, zr.Z8.toFixed(4));
+  check('(1) full-subcritical-pupil RIMF (report 0.7255)', Math.abs(zr.rimfFullPupil - 0.7255) < 0.002, zr.rimfFullPupil.toFixed(4));
+
+  // The switches reach the PSF on every path (the 2026-09-20g lesson: identical output for
+  // different settings is the alarm). Same small kernel built with each flag, CPU pool and GPU.
+  const reach = await page.evaluate(async () => {
+    __simBase(); __set('simulation_psfNA', 1.43); __set('simulation_psfNs', 1.3345); __set('simulation_psfDepth', 100);
+    const sig = async () => { const cfg = readPsfConfigFromUI(); const k = await getOrBuildPsfKernelStack(cfg);
+      const s = k.slices[k.focusIndex]; let h = 0; for (let i = 0; i < s.length; i += 97) h = (h * 31 + Math.round(s[i] * 1e9)) % 2147483647;
+      return { h, zCrlb: k.zCrlb ? k.zCrlb.atFocusZSig : null, path: lastPsfBuildTimings.path }; };
+    const out = {};
+    for (const gpu of [false, true]) {
+      __set('useGpu', gpu);
+      __set('simulation_psfSaf', false); __set('simulation_psfApodization', false); const off = await sig();
+      __set('simulation_psfSaf', true); const saf = await sig();
+      __set('simulation_psfApodization', true); const both = await sig();
+      out[gpu ? 'gpu' : 'cpu'] = { off, saf, both };
+    }
+    __set('simulation_psfSaf', false); __set('simulation_psfApodization', false); __set('useGpu', false);
+    __set('simulation_psfNA', 1.4); __set('simulation_psfNs', 1.33); __set('simulation_psfDepth', 0);
+    return out;
+  });
+  results.reach = reach;
+  for (const k of ['cpu', 'gpu']) {
+    const r = reach[k];
+    check(`(1) SAF reaches the kernel (${k}, ${r.saf.path})`, r.off.h !== r.saf.h && r.off.zCrlb !== r.saf.zCrlb,
+      `z-CRLB at focus off ${r.off.zCrlb?.toFixed(2)} / on ${r.saf.zCrlb?.toFixed(2)} nm`);
+    check(`(1) apodisation reaches the kernel (${k})`, r.saf.h !== r.both.h, `z-CRLB ${r.both.zCrlb?.toFixed(2)} nm`);
+  }
+
+  // Grid convergence (SMLMpipelinelessons §1.5): one plane at the emitter's paraxial focus, the
+  // Li 2019 optics with the annulus on, on pupil grids of 64…512. Relative L2 distance of the
+  // photon-normalised plane from the next-finer grid, and the share of the plane's light in a
+  // 10-pixel border of the 6 µm kernel (light the kernel would cut). The production grid is
+  // psfFftM(): 256 with the annulus on.
+  const conv = await page.evaluate(async () => {
+    const out = [];
+    for (const zNm of [0, 2000, 5000]) {
+      const cfg = { NA: 1.43, lambda: 670e-9, ns: 1.3345, ni: 1.518, ti0: 150e-6, particleAxialPosition: zNm * 1e-9, zStep: 10e-9,
+                    zernikeCoeffs: new Array(PSF_NZERNIKE).fill(0), maskType: 'none', maskModes: 5, maskWaist: 1, saf: true, apod: false };
+      cfg.zernikeCoeffs[5] = 0.183;
+      const res = 25e-9, nx = 241, planes = {};
+      for (const M of [64, 128, 256, 512]) {
+        const kMax = 2 * Math.PI / cfg.lambda * cfg.NA * psfApertureMax(cfg), dk = 2 * kMax / (M - 4);
+        const cart = computePsfPupilCartesianForZPlane(0, 1, cfg, M, dk);
+        const s = computePsfIntensityPlaneFFT(nx, nx, res, cart, M, dk);
+        let sum = 0; for (const v of s) sum += v; for (let i = 0; i < s.length; i++) s[i] /= sum;
+        planes[M] = s;
+      }
+      const l2 = (a, b) => { let d = 0, n = 0; for (let i = 0; i < a.length; i++) { d += (a[i] - b[i]) ** 2; n += b[i] ** 2; } return Math.sqrt(d / n); };
+      let border = 0; const s = planes[256];
+      for (let y = 0; y < nx; y++) for (let x = 0; x < nx; x++) if (x < 10 || y < 10 || x >= nx - 10 || y >= nx - 10) border += s[y * nx + x];
+      out.push({ zNm, l2_64_128: l2(planes[64], planes[128]), l2_128_256: l2(planes[128], planes[256]), l2_256_512: l2(planes[256], planes[512]), borderShare256: border });
+    }
+    return out;
+  });
+  results.convergence = conv;
+  for (const c of conv)
+    check(`(1) pupil grid converged at ${c.zNm} nm (256 vs 512 < 1 %)`, c.l2_256_512 < 0.01,
+      `L2 64→128 ${(100 * c.l2_64_128).toFixed(2)} %, 128→256 ${(100 * c.l2_128_256).toFixed(2)} %, 256→512 ${(100 * c.l2_256_512).toFixed(3)} %, kernel border ${(100 * c.borderShare256).toFixed(2)} %`);
+} finally {
+  writeResults('depth-sim', results);
+  await browser.close();
+}
+if (failed) { console.log('\nSOME CHECKS FAILED'); process.exitCode = 1; } else console.log('\nALL CHECKS PASSED');

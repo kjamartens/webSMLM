@@ -257,7 +257,10 @@ try {
 
     const f = await page.evaluate(async () => {
       const set = (id, v) => { const el = document.getElementById(id); if (el.type === 'checkbox') el.checked = !!v; else el.value = v; el.dispatchEvent(new Event('change')); };
-      set('simulation_seed', 31); set('simulation_fov', 64); set('frames', 20); set('simulation_3d', true); set('simulation_zRange', 300);
+      // simulation_3d has had no sidebar control since build 2026-09-28b (PARAMS id:null): set it
+      // through paramOverrides, the path paramValue() reads for control-less fields.
+      paramOverrides.simulation_3d = true;
+      set('simulation_seed', 31); set('simulation_fov', 64); set('frames', 20); set('simulation_zRange', 300);
       set('dens', 0.4); set('simbg', 8); set('simulation_bgCellContrast', 3); set('simulation_hazeRatio', 0.5);
       const out = [];
       for (const camType of ['scmos', 'emccd']) {

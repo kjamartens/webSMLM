@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2648   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3647   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3875   synthetic stack generator ("Simulate movie")
-    validation      7291   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8241   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8497   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9107   super-resolution accumulation, view, colour maps, plots
-    workers         10631  frame-parallel detect/fit worker pool
-    gpu             11277  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13606  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  13897  astigmatic width-vs-z bead calibration
-    drift           14296  AIM and cross-correlation drift correction
-    locprecision    14954  NeNA and FRC
-    sSMLM           16093  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2651   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3686   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3914   synthetic stack generator ("Simulate movie")
+    validation      7426   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8376   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8632   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9242   super-resolution accumulation, view, colour maps, plots
+    workers         10766  frame-parallel detect/fit worker pool
+    gpu             11412  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13741  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14032  astigmatic width-vs-z bead calibration
+    drift           14431  AIM and cross-correlation drift correction
+    locprecision    15089  NeNA and FRC
+    sSMLM           16228  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             18806  single-particle tracking and diffusion coefficients
-    pipeline        19856  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   20896  Micro-Manager/pycromanager bridge (experimental)
-    table           23320  localizations table, filters, histograms, clustering
-    headless API    24005  window.webSMLM.analyze()/analyzeBatch()
+    spt             18941  single-particle tracking and diffusion coefficients
+    pipeline        19991  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21031  Micro-Manager/pycromanager bridge (experimental)
+    table           23460  localizations table, filters, histograms, clustering
+    headless API    24145  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29d</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29e</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1921,7 +1921,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
       </details>
       <details class="sim" id="simBox">
         <summary title="Settings for Simulate movie: a synthetic test movie with a known answer — structure, blinking, background, camera and PSF">Simulation</summary>
-        <label class="row" title="The labelled object emitters attach to. Microtubules (default) is a window onto a seed-addressed field of cells, each with a microtubule network; the others are simple geometric test objects. Every structure is simulated in 3D.">Structure type <select id="simulation_structureType" class="sel"><option value="microtubules" selected>Microtubules (cells)</option><option value="nup">Nuclear pore complex (NPC)</option><option value="filaments_ring">Filaments + ring</option><option value="tiltedPlane">Tilted plane</option><option value="uniform3D">Uniform 3D volume</option><option value="shell">Spherical shell</option></select></label>
+        <label class="row" title="The labelled object emitters attach to. Microtubules (default) is a window onto a seed-addressed field of cells, each with a microtubule network; the others are simple geometric test objects. Every structure is simulated in 3D.">Structure type <select id="simulation_structureType" class="sel"><option value="microtubules" selected>Microtubules (cells)</option><option value="nup">Nuclear pore complex (NPC)</option><option value="filaments_ring">Filaments + ring</option><option value="tiltedPlane">Tilted plane</option><option value="uniform3D">Uniform 3D volume</option><option value="shell">Spherical shell</option><option value="ccp">Clathrin-coated pits</option></select></label>
         <label class="row" title="Length of the simulated movie, in frames.">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="2000" class="num"></label>
         <label class="row" title="How many emitters are ON per µm² in an average frame: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Sets Emitter density under Sample; editing that by hand switches this to Custom.">Emitter density <select id="simulation_densityPreset" class="sel"><option value="low">Low (0.05)</option><option value="med">Medium (0.2)</option><option value="high" selected>High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
         <label class="row" title="How much physics — and compute — a simulation spends. Basic: every molecule blinks once at constant brightness on a flat, dark background (fastest). Realistic: molecules blink repeatedly and bleach, brightness varies, and the background fades and carries out-of-focus haze — nearly free per frame. Full: also adds blinking out-of-focus emitters rendered with the real defocused PSF — roughly doubles the simulation time. It only writes fields under Fluorophore and Background; edit any of them and this switches to Custom.">Physics detail <select id="simulation_realism" class="sel"><option value="min">Basic (fastest)</option><option value="med" selected>Realistic</option><option value="max">Full (slowest)</option><option value="custom">Custom</option></select></label>
@@ -1958,6 +1958,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="simulation_zRangeRow" title="Half-height of the structure in z. For microtubules it is the optical section: the slab of ±this around Focus height that is imaged. For the geometric structures it scales their z extent.">Structure Z range (± nm) <input type="number" id="simulation_zRange" min="0" max="5000" step="10" value="1000" class="num"></label>
           <label class="row" id="mtFocusRow" style="display:none" title="Height (nm) above the coverslip — the surface the cells lie on, z = 0 — at which the optical section is centred. Microtubules within ±Structure Z range of it are imaged.">Focus height (nm) <input type="number" id="simulation_mt_focusZ" min="0" max="10000" step="10" value="250" class="num"></label>
           <label class="row" id="mtMoveRow" style="display:none" title="Pan the microtubule window across the sample (+y is down, as in the image). The sample is the same whichever way you get there, so moving back returns the same cells and dyes. Takes effect on the next Simulate movie.">Move view <span class="mtmove"><select id="mtMoveStep" class="sel" style="flex:0 0 62px" title="Step size of one arrow click"><option value="1">1 µm</option><option value="5" selected>5 µm</option><option value="10">10 µm</option></select><button type="button" onclick="moveMtViewStep(-1,0)">&larr;</button><button type="button" onclick="moveMtViewStep(1,0)">&rarr;</button><button type="button" onclick="moveMtViewStep(0,-1)">&uarr;</button><button type="button" onclick="moveMtViewStep(0,1)">&darr;</button></span></label>
+          <label class="row" id="nupVariantRow" style="display:none;padding-left:40px" title="Which nucleoporin carries the label. Nup96: 4 copies per corner (Thevathasan et al. 2019). Nup107: 2 copies per corner 12 nm apart, rings 53.7 nm in radius and 56.5 nm apart (Li et al. 2019).">NPC model
+            <select id="simulation_nup_variant" class="sel"><option value="nup96" selected>Nup96</option><option value="nup107">Nup107</option></select></label>
+          <label class="row" id="ccpCountRow" style="display:none" title="How many clathrin-coated pits are scattered across the field of view. Radius, closing angle, coat and labelling come from the Sample preset (or a settings file).">Number of pits <input type="number" id="simulation_ccp_count" min="1" max="500" step="1" value="60" class="num"></label>
           <label class="row" id="nupCountRow" style="display:none" title="How many nuclear pore complexes are scattered across the field of view.">Number of NPCs <input type="number" id="simulation_nup_count" min="1" max="500" step="1" value="100" class="num"></label>
           <label class="row" id="structureSizeRow" style="display:none" title="Radius of the spherical shell, in nm.">Structure size (nm) <input type="number" id="simulation_structureSize" min="10" max="5000" step="10" value="500" class="num"></label>
           <label class="row" title="Total sample drift over the whole movie, in camera pixels, in a random direction and linear in time. 0 = none. The true drift is kept for scoring drift correction.">Drift (px, total) <input type="number" id="driftpx" min="0" max="30" step="0.5" value="0" class="num"></label>
@@ -3095,7 +3098,7 @@ const PARAMS = {
   // lateral spread ~50% at equal density through self-crowding along its 1-D curves, so quote
   // accuracy figures from 'uniform3D' and diagnose with 'tiltedPlane' (see MODULE: validation).
   simulation_structureType: { type:'enum', id:'simulation_structureType', label:'Structure type',
-    options:['filaments_ring','nup','tiltedPlane','uniform3D','shell','microtubules'], default:'microtubules' },
+    options:['filaments_ring','nup','tiltedPlane','uniform3D','shell','microtubules','ccp'], default:'microtubules' },
   // simulation_structureSize = the spherical shell's radius, the one structure with a dimension
   // of its own (the others are sized by simulation_zRange or their own NUP parameters). Kept as a
   // general "structure size" rather than a shell-specific field so a future structure with its
@@ -3148,6 +3151,37 @@ const PARAMS = {
   simulation_nup_linkerLengthMax: { type:'number', id:null, label:'Linker length, max (nm)', min:0, max:30, step:0.5, default:5, int:false },
   // simulation_nup_count = number of NPCs scattered across the simulated FOV's membrane patch.
   simulation_nup_count: { type:'number', id:'simulation_nup_count', label:'Number of NPCs', min:1, max:500, step:1, default:100, int:true },
+  // Which nucleoporin carries the label. 'nup96' (default): the Thevathasan et al. 2019 standard,
+  // 4 copies per corner on a small arc (buildNupAttachmentPoints()). 'nup107': Li et al. 2019's
+  // label, 2 copies per corner 12 nm apart AZIMUTHALLY on the ring (adjacent Y-complexes), ring
+  // radius 53.7 nm and 56.5 nm between the rings unless simulation_nup_radius/_ringSeparation
+  // are set explicitly (settings JSON / paramOverrides) — 32 sites per pore either way it is built.
+  simulation_nup_variant: { type:'enum', id:'simulation_nup_variant', label:'NPC model', options:['nup96','nup107'], default:'nup96' },
+  // Per-pore tip/tilt (deg): each pore's axis is tipped by a random angle up to this, about a
+  // random horizontal axis. 0 = every pore along the optical axis (the original model, which
+  // draws no extra random numbers). Li et al. fit and remove exactly this before measuring the
+  // ring distance — the ground truth keeps each pore's true axis (groundTruthObjects) for that.
+  simulation_nup_tiltDeg: { type:'number', id:null, label:'NPC tilt (deg, max)', min:0, max:60, step:1, default:0, int:false },
+  // 'flat' (default): pores on the gentle bowl of simulation_nup_curvature around z = 0. 'dome':
+  // pores on an ellipsoidal cap simulation_nup_domeHeight tall across the field — the top of a
+  // nucleus seen from below (Li et al. Fig. 4: 4.4-5.3 um above the coverslip) — each pore's axis
+  // along the local surface normal.
+  simulation_nup_membrane: { type:'enum', id:null, label:'NPC membrane', options:['flat','dome'], default:'flat' },
+  simulation_nup_domeHeight: { type:'number', id:null, label:'NPC dome height (nm)', min:0, max:5000, step:10, default:900, int:false },
+  // Clathrin-coated pits (structure 'ccp'; Li et al. 2019 Fig. 3, geometry after Mund et al.):
+  // a thick spherical cap of radius _radius and closing angle _closingAngleDeg (the rim, at the
+  // membrane, is z = 0 of the pit; 180 deg = a closed vesicle), coat _shellThickness thick, each
+  // epitope displaced by the antibody linkage error (isotropic Gaussian, _linkerSigma) and carrying
+  // Poisson(_dol) dyes. 'up' = the dome points into the cell from the basal membrane, 'down' from
+  // the apical one. Only the count has a control; the presets set the rest.
+  simulation_ccp_count: { type:'number', id:'simulation_ccp_count', label:'Number of pits', min:1, max:500, step:1, default:60, int:true },
+  simulation_ccp_radius: { type:'number', id:null, label:'Pit radius (nm)', min:20, max:200, step:1, default:72, int:false },
+  simulation_ccp_closingAngleDeg: { type:'number', id:null, label:'Pit closing angle (deg)', min:10, max:180, step:1, default:120, int:false },
+  simulation_ccp_shellThickness: { type:'number', id:null, label:'Coat thickness (nm)', min:0, max:50, step:1, default:15, int:false },
+  simulation_ccp_linkerSigma: { type:'number', id:null, label:'Antibody linkage error σ (nm)', min:0, max:30, step:0.5, default:5, int:false },
+  simulation_ccp_orientation: { type:'enum', id:null, label:'Pit orientation', options:['up','down'], default:'up' },
+  simulation_ccp_dol: { type:'number', id:null, label:'Dyes per antibody (mean)', min:0.1, max:10, step:0.1, default:1.5, int:false },
+  simulation_ccp_sitesPerPit: { type:'number', id:null, label:'Epitopes per pit', min:1, max:2000, step:1, default:120, int:true },
   // simulation_nup_minSpacing = minimum centre-to-centre distance (nm) enforced between NPCs
   // during placement (rejection sampling), so rings don't overlap.
   simulation_nup_minSpacing: { type:'number', id:null, label:'Min. NPC-NPC spacing (nm)', min:0, max:2000, step:10, default:200, int:false },
@@ -3634,6 +3668,11 @@ let simTrueDrift=null;   // ground-truth per-frame drift from the simulator (for
 // groundTruth/simTrueDrift everywhere a new stack replaces the simulated one, so a score can
 // never silently run against a PREVIOUS simulation's truth after a real dataset is loaded.
 let groundTruthEvents=null;
+// The objects a structure is made of, when it is made of objects (NPCs, clathrin-coated pits):
+// [{id, kind, cx, cy (camera px), cz (nm), axis:[ax,ay,az], params}], one per object, id = the
+// objectId its sites and events carry. Built by the structure builder, shifted with the structure,
+// read by the per-object scores (scoreTruthCore()). null for every other structure.
+let groundTruthObjects=null;
 // GT localizations viewer state ("View GT localizations" button, genBtn's own row) —
 // groundTruthLocs is a {x,y,z,photons} array built from groundTruthEvents right after a
 // successful Simulate movie (one entry per simulated blink, the fair thing to compare against a
@@ -4008,11 +4047,15 @@ function buildFilamentsRingStructure(w,h,zRange=0){
 // structure" block below, MODULE: simulation). Same return shape either way: an array of
 // [x,y,z] candidate emitter-site triples (x,y in camera px, z in nm) — generateSynthetic()'s
 // own call site needs no further changes for a new structure type.
+// Objects of the structure last built (see groundTruthObjects); builders that make objects push here.
+let _structureObjects=[];
 function buildStructure(w,h,zRange=0,rng=Math.random){
+  _structureObjects=[];
   const kind=paramValue('simulation_structureType');
   let pts;
   switch(kind){
     case 'nup': pts=buildNupStructure(w,h,zRange,rng); break;
+    case 'ccp': pts=buildCcpStructure(w,h,rng); break;
     case 'microtubules': pts=buildMicrotubuleStructure(w,h); break;
     case 'tiltedPlane': case 'uniform3D': case 'shell':
       pts=buildGeometricStructure(w,h,zRange,kind,paramValue('simulation_structureSize'),
@@ -4313,9 +4356,27 @@ function displaceByLinker(p, minNm, maxNm, rng){
 }
 // One NUP's 64 emitter positions (post-linker-displacement), in the same local (a,b,c) frame as
 // buildNupAttachmentPoints(). Returns {attachment, emitter}.
+// Nup107 (Li et al. 2019): 2 copies per corner, 12 nm apart along the ring (adjacent Y-complexes),
+// the two rings in register. Radius and ring separation follow nupGeometry().
+function buildNup107AttachmentPoints(){
+  const {R, sep}=nupGeometry(), halfSep=sep/2, dphi=12/R, pts=[];
+  for(const c of [-halfSep, halfSep])
+    for(let k=0;k<8;k++) for(const m of [-1,1]){
+      const th=k*Math.PI/4+m*dphi/2; pts.push({a:R*Math.cos(th), b:R*Math.sin(th), c});
+    }
+  return pts;   // 2 rings * 8 corners * 2 copies = 32
+}
+// Ring radius and separation for the selected variant: an explicit setting (paramOverrides /
+// settings JSON) wins; otherwise Nup107 takes the Li et al. values and Nup96 the PARAMS defaults.
+function nupGeometry(){
+  const v=paramValue('simulation_nup_variant');
+  const R = ('simulation_nup_radius' in paramOverrides || v!=='nup107') ? paramValue('simulation_nup_radius') : 53.7;
+  const sep = ('simulation_nup_ringSeparation' in paramOverrides || v!=='nup107') ? paramValue('simulation_nup_ringSeparation') : 56.5;
+  return {R, sep};
+}
 function buildNupLocalPoints(rng){
   const minL=paramValue('simulation_nup_linkerLengthMin'), maxL=paramValue('simulation_nup_linkerLengthMax');
-  const attachment=buildNupAttachmentPoints();
+  const attachment = paramValue('simulation_nup_variant')==='nup107' ? buildNup107AttachmentPoints() : buildNupAttachmentPoints();
   const emitter=attachment.map(p=>displaceByLinker(p, minL, maxL, rng));
   return {attachment, emitter};
 }
@@ -4346,19 +4407,82 @@ function buildNupStructure(w,h,zRange=0,rng=Math.random){
   const cx0=w/2, cy0=h/2, maxR2=Math.max(1,(w/2)**2+(h/2)**2);
   const bowl=(x,y)=>curveAmp*(((x-cx0)**2+(y-cy0)**2)/maxR2 - 0.5);
 
+  // Optional per-pore tilt and a dome-shaped membrane (Li et al. 2019's nucleus top). With both
+  // off, nothing below draws a random number or changes an operation, so a seeded movie is the
+  // one it always was; each site just carries its pore id and ring as two extra elements.
+  const tiltMax=paramValue('simulation_nup_tiltDeg')*Math.PI/180;
+  const dome=paramValue('simulation_nup_membrane')==='dome', domeH=paramValue('simulation_nup_domeHeight');
+  const Rd=Math.max(1, Math.hypot(w/2,h/2))*px;                  // dome footprint radius (nm), the field's half diagonal
+  const domeZ=(x,y)=>{ const r=Math.hypot((x-cx0)*px,(y-cy0)*px)/Rd; return domeH*(Math.sqrt(Math.max(0,1-r*r))-0.5); };
+  const rotAbout=(v,k,t)=>{ const c=Math.cos(t), s=Math.sin(t), d=k[0]*v[0]+k[1]*v[1]+k[2]*v[2];   // Rodrigues, k unit
+    return [v[0]*c+(k[1]*v[2]-k[2]*v[1])*s+k[0]*d*(1-c), v[1]*c+(k[2]*v[0]-k[0]*v[2])*s+k[1]*d*(1-c), v[2]*c+(k[0]*v[1]-k[1]*v[0])*s+k[2]*d*(1-c)]; };
+  const {R:ringR, sep:ringSep}=nupGeometry();
   const pts=[];
+  let poreId=0;
   for(const [ccx,ccy] of centers){
-    const {emitter}=buildNupLocalPoints(rng);
+    poreId++;
+    const {attachment, emitter}=buildNupLocalPoints(rng);
     const rot=rng()*2*Math.PI, cr=Math.cos(rot), sr=Math.sin(rot);
-    for(const {a,b,c} of emitter){
+    // tip/tilt, then the dome's surface normal; both identity when off
+    let tilt=null, normal=null;
+    if(tiltMax>0){ const th=rng()*tiltMax, ps=rng()*2*Math.PI; tilt={k:[Math.cos(ps),Math.sin(ps),0], th}; }
+    if(dome){ const e=1e-3, gx=(domeZ(ccx+e,ccy)-domeZ(ccx-e,ccy))/(2*e*px), gy=(domeZ(ccx,ccy+e)-domeZ(ccx,ccy-e))/(2*e*px);
+      const n=[-gx,-gy,1], L=Math.hypot(n[0],n[1],n[2]); normal=[n[0]/L,n[1]/L,n[2]/L]; }
+    const orient=v=>{ let r=v;
+      if(tilt) r=rotAbout(r, tilt.k, tilt.th);
+      if(normal && (normal[0]||normal[1])){ const kk=[-normal[1],normal[0],0], s=Math.hypot(kk[0],kk[1]);
+        r=rotAbout(r, [kk[0]/s,kk[1]/s,0], Math.acos(Math.max(-1,Math.min(1,normal[2])))); }
+      return r; };
+    const zc = dome ? domeZ(ccx,ccy) : bowl(ccx,ccy);
+    const axis=orient([0,0,1]);
+    _structureObjects.push({id:poreId, kind:'nup', cx:ccx, cy:ccy, cz:zc, axis, params:{R:ringR, sep:ringSep, variant:paramValue('simulation_nup_variant')}});
+    for(let i=0;i<emitter.length;i++){
+      const {a,b,c}=emitter[i], ring=attachment[i].c>0 ? 1 : -1;
       const ra=a*cr-b*sr, rb=a*sr+b*cr;   // random azimuthal rotation within the ring plane
-      // pore axis along optical Z: ring plane -> world X,Y; ring separation + curvature -> Z.
-      pts.push([ccx + ra/px, ccy + rb/px, bowl(ccx,ccy) + c]);
+      if(!tilt && !normal){
+        // pore axis along optical Z: ring plane -> world X,Y; ring separation + curvature -> Z.
+        pts.push([ccx + ra/px, ccy + rb/px, zc + c, poreId, ring]);
+      } else {
+        const v=orient([ra,rb,c]);
+        pts.push([ccx + v[0]/px, ccy + v[1]/px, zc + v[2], poreId, ring]);
+      }
     }
   }
   return pts;
 }
 
+// Clathrin-coated pits (Li et al. 2019 Fig. 3; geometry as in Mund et al.'s LocMoFit model): a
+// thick spherical cap whose rim lies on the membrane (pit z = 0), radius R, closing angle theta_c,
+// pointing into the cell ('up', basal membrane) or out of it ('down', apical). Epitopes are uniform
+// over the cap's area (u = cos(polar angle) uniform on [cos theta_c, 1]) and uniform through the
+// coat's thickness; each antibody sits at a Gaussian linkage error from its epitope and carries
+// Poisson(DOL) dyes, every dye a site. Pits are scattered with rejection sampling so no two caps
+// overlap. Draws only from `rng` (the movie's seeded stream).
+function buildCcpStructure(w,h,rng=Math.random){
+  const px=paramValue('simulation_pxnm'), count=paramValue('simulation_ccp_count');
+  const R=paramValue('simulation_ccp_radius'), thc=paramValue('simulation_ccp_closingAngleDeg')*Math.PI/180;
+  const t=paramValue('simulation_ccp_shellThickness'), sig=paramValue('simulation_ccp_linkerSigma');
+  const s=paramValue('simulation_ccp_orientation')==='down' ? -1 : 1, dol=paramValue('simulation_ccp_dol');
+  const nEpi=paramValue('simulation_ccp_sitesPerPit');
+  const marginPx=Math.ceil((R+3*sig+t)/px)+2, minSpacingPx=(2*R+100)/px;
+  const centers=[]; let tries=0;
+  while(centers.length<count && tries<count*200){ tries++;
+    const cx=marginPx+rng()*(w-2*marginPx), cy=marginPx+rng()*(h-2*marginPx);
+    if(centers.every(([x0,y0])=>Math.hypot(cx-x0,cy-y0)>=minSpacingPx)) centers.push([cx,cy]); }
+  const zs=-s*R*Math.cos(thc);                 // sphere centre: puts the rim (polar angle theta_c) at z = 0
+  const cosLo=Math.cos(thc), pts=[];
+  centers.forEach(([cx,cy],i)=>{
+    const id=i+1;
+    _structureObjects.push({id, kind:'ccp', cx, cy, cz:zs, axis:[0,0,s], params:{R, thetaDeg:thc*180/Math.PI, apexZ:zs+s*R, rimZ:0}});
+    for(let j=0;j<nEpi;j++){
+      const u=cosLo+(1-cosLo)*rng(), th=Math.acos(u), ph=2*Math.PI*rng(), r=R+(rng()-0.5)*t;
+      const ex=r*Math.sin(th)*Math.cos(ph)+sig*gauss(rng), ey=r*Math.sin(th)*Math.sin(ph)+sig*gauss(rng), ez=zs+s*r*Math.cos(th)+sig*gauss(rng);
+      const k=poisson(dol, rng);
+      for(let q=0;q<k;q++) pts.push([cx+ex/px, cy+ey/px, ez, id]);
+    }
+  });
+  return pts;
+}
 // Roughly how many candidate sites each non-filament structure generates. Matched to what
 // buildFilaments() happens to produce (~1400) so switching structure doesn't visibly change the
 // simulation's character. The count does NOT set emitter density — `dens` is a physical areal
@@ -4451,6 +4575,7 @@ function buildGeometricStructure(w,h,zRange,kind,sizeNm,px,rng){
 function structureZExtent(kind,zRange,sizeNm){
   switch(kind){
     case 'shell':          return sizeNm;
+    case 'ccp':            return paramValue('simulation_ccp_radius')*(1-Math.cos(paramValue('simulation_ccp_closingAngleDeg')*Math.PI/180));
     case 'microtubules':   return zRange;           // clipped to the ±zRange slab around the focus height
     case 'filaments_ring': return 1.5*zRange;
     case 'nup':            return zRange + paramValue('simulation_nup_ringSeparation')/2
@@ -4465,6 +4590,8 @@ function structureZExtent(kind,zRange,sizeNm){
 function structureZDescription(kind,zRange,sizeNm){
   switch(kind){
     case 'tiltedPlane':  return `tilted plane, z ramping linearly with x from −${zRange} to +${zRange} nm`;
+    case 'ccp':          return `clathrin-coated pits, radius ${paramValue('simulation_ccp_radius')} nm, closing angle ${paramValue('simulation_ccp_closingAngleDeg')}°, `+
+                                `${paramValue('simulation_ccp_orientation')==='down'?'pointing down (apical membrane)':'pointing up (basal membrane)'}`;
     case 'uniform3D':    return `uniform 3D volume, z drawn uniformly over ±${zRange} nm`;
     case 'shell':        return `spherical shell of radius ${sizeNm} nm, so z spans ±${sizeNm} nm`;
     case 'microtubules': return `microtubule network clipped to a ±${zRange} nm slab around ${paramValue('simulation_mt_focusZ')} nm above the coverslip`;
@@ -4864,8 +4991,10 @@ async function generateSynthetic(){
     ? paramValue('simulation_structureFov') : Math.round(w*1.1);
   const structShift=(structFov-w)/2;
   let gtAll=buildStructure(structFov, structFov, zRange, rng);
+  const structObjects=_structureObjects;
   if(structShift!==0){
     for(const p of gtAll){ p[0]-=structShift; p[1]-=structShift; }
+    for(const o of structObjects){ o.cx-=structShift; o.cy-=structShift; }
     log(`Structure FOV: ${structFov}px, `+(structFov>w
         ? `${(structFov-w)/2}px beyond the camera FOV on every side — some structure starts outside the frame and only enters view if Drift (px, total) carries it in.`
         : `smaller than the camera FOV (${w}px) — the whole structure sits inside the frame, centred.`));
@@ -4968,11 +5097,13 @@ async function generateSynthetic(){
   const offLife=paramValue('simulation_offLifetime'), photCV=paramValue('simulation_photCV');
   const richPhotophysics = pBleach<1 || photCV>0;
   let nMolecules=0;
-  const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol,haze)=>{
+  const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol,haze,obj,ring)=>{
     if(tEnd<=0 || tStart>=n) return;                // never overlaps the movie — nothing to record
     if(physical) bright*=cfOf(ez);
-    events.push(physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze, depth:zpOf(ez)}
-                         : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze});
+    const ev = physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze, depth:zpOf(ez)}
+                        : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze};
+    if(obj){ ev.objectId=obj; if(ring) ev.ring=ring; }   // the object (pore, pit) this site belongs to
+    events.push(ev);
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
@@ -5004,7 +5135,7 @@ async function generateSynthetic(){
         // feeds BOTH the rendered frame and the ground-truth rate (addBlink) — one factor, no
         // chance of the movie and the truth disagreeing about how bright an emitter was
         const bright = (photCV>0 ? Math.exp(-s2/2+sLn*gauss(r)) : 1) * illumOf(ex,ey);
-        addBlink(ex,ey,ez,t,tEnd,bright,idBase+m,haze);
+        addBlink(ex,ey,ez,t,tEnd,bright,idBase+m,haze, haze?0:gt[gi][3], haze?0:gt[gi][4]);
         if(r()<pBleach) break;                      // this ON period ended in bleaching
         t=tEnd-offLife*Math.log(1-r());             // otherwise: dark, then blink again
       }
@@ -5020,8 +5151,10 @@ async function generateSynthetic(){
     const tStart=-lead+rng()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-rng());   // exponential duration, mean=lifetime
     const ill=illumOf(ex,ey)*cfOf(ez);   // exactly 1 on the default flat profile (and outside physical depth mode)
-    events.push(physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e, depth:zpOf(ez)}
-                         : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e});
+    const ev = physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e, depth:zpOf(ez)}
+                        : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e};
+    if(gt[gi][3]){ ev.objectId=gt[gi][3]; if(gt[gi][4]) ev.ring=gt[gi][4]; }
+    events.push(ev);
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
@@ -5086,8 +5219,10 @@ async function generateSynthetic(){
     const rate = e.rate===undefined ? photPerFrame : e.rate;   // per-blink once brightness varies
     const g={x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, haze:!!e.haze, photonsTotal:rate*Math.max(0,t-s)};
     if(e.depth!==undefined) g.depth=e.depth;   // physical depth mode: the emitter's height above the coverslip
+    if(e.objectId!==undefined){ g.objectId=e.objectId; if(e.ring!==undefined) g.ring=e.ring; }
     return g;
   });
+  groundTruthObjects = structObjects.length ? structObjects.map(o=>({...o, depthNm: physical ? depthNm+o.cz : undefined})) : null;
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
   // per-pixel property, so it's drawn once per stack and reused for every frame, not resampled.
@@ -21614,6 +21749,7 @@ function clearAnalysisOutputs(){
 // Drops the simulator's ground truth (it describes a stack that is gone, or
 // one rotated or cropped away from it) and the controls that read it.
 function clearSimGroundTruth(){
+  groundTruthObjects=null;
   groundTruth=null; groundTruthEvents=null; groundTruthLocs=null; simTrueDrift=null; gtShowing=false; srFullBeforeGT=null;
   $('truthBtn').disabled=true; setViewGtBtn(false);
 }
@@ -21965,10 +22101,13 @@ updatePsfModelUI();
 // Structure-type rows (simTypeBox) — same "one selector, a list of rows toggled together"
 // pattern as updatePsfModelUI() above, just for the per-structure fields.
 const MT_ROW_IDS=['mtFocusRow','mtMoveRow','mtSeedRow'];
-const NUP_ROW_IDS=['nupCountRow'];
+const NUP_ROW_IDS=['nupCountRow','nupVariantRow'];
+const CCP_ROW_IDS=['ccpCountRow'];
 function updateStructureTypeUI(){
   const on = paramValue('simulation_structureType')==='nup';
   for(const id of NUP_ROW_IDS){ const r=$(id); if(r) r.style.display = on ? 'flex' : 'none'; }
+  const ccpOn = paramValue('simulation_structureType')==='ccp';
+  for(const id of CCP_ROW_IDS){ const r=$(id); if(r) r.style.display = ccpOn ? 'flex' : 'none'; }
   const mtOn = paramValue('simulation_structureType')==='microtubules';
   for(const id of MT_ROW_IDS){ const r=$(id); if(r) r.style.display = mtOn ? 'flex' : 'none'; }
   // nupInfoBtnRow is a bare .infobtn (not a label.row, see wireInfoButtons()'s
@@ -23220,7 +23359,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29d — Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.
+log(`webSMLM v0.13.0-dev · build 2026-10-29e — Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.
+— from build 2026-10-29d: Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.
 — from build 2026-10-29c: Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.
 — from build 2026-10-29b: Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.
 — from build 2026-10-29a: Simulation: Supercritical angle (SAF) and Fresnel apodisation switches (Advanced → PSF, both off); "Emitter depth into sample" is now "Sample depth".

@@ -327,6 +327,51 @@ try {
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) if (bs[j].depth - bs[i].depth > 100) { pairs++; if (bs[j].slope < bs[i].slope) concordant++; }
     check('(4) squeezing grows with depth (≥ 90% of bead pairs > 100 nm apart in order)', concordant / pairs >= 0.9, `${concordant}/${pairs}`);
   }
+
+  // ---- (5) structures ------------------------------------------------------------------------
+  const st = await page.evaluate(async () => {
+    // defaults untouched (the NPC builder now tags sites with pore and ring)
+    __set('simulation_psfSaf', false); __set('simulation_psfZernikeCustom', ''); __set('simulation_psfNA', 1.4);
+    __set('simulation_psfWavelength', 660); __set('simulation_psfNs', 1.33); __set('simulation_psfNi', 1.518);
+    __set('simulation_psfDepth', 0); __set('simulation_pxnm', 100); __set('phot', 900); __set('simbg', 10);
+    const base = { uniform3D: await __simHash({ simulation_structureType: 'uniform3D' }), nup: await __simHash({ simulation_structureType: 'nup' }) };
+    const nupObjects = groundTruthObjects ? groundTruthObjects.length : 0;
+    const nupTagged = groundTruthEvents.filter(e => e.objectId > 0).length / groundTruthEvents.length;
+    // Nup107 geometry, attachment points (no linker): 32 per pore, pair 12 nm apart, rings 56.5 nm
+    __set('simulation_nup_variant', 'nup107');
+    const A = buildNup107AttachmentPoints(), byRing = [A.filter(p => p.c < 0), A.filter(p => p.c > 0)];
+    const pairD = []; for (const ring of byRing) for (let i = 0; i < ring.length; i += 2) pairD.push(Math.hypot(ring[i].a - ring[i + 1].a, ring[i].b - ring[i + 1].b));
+    const radii = A.map(p => Math.hypot(p.a, p.b)), sep = byRing[1][0].c - byRing[0][0].c;
+    __set('simulation_nup_variant', 'nup96');
+    // CCP: no linker error, the cap's own geometry
+    const save = { ...paramOverrides };
+    paramOverrides.simulation_ccp_linkerSigma = 0; paramOverrides.simulation_ccp_dol = 3;
+    __set('simulation_ccp_count', 20); __set('simulation_structureType', 'ccp');
+    const pts = buildStructure(128, 128, 0, mulberry32(5)), objs = _structureObjects;
+    const R = paramValue('simulation_ccp_radius'), thc = paramValue('simulation_ccp_closingAngleDeg'), t = paramValue('simulation_ccp_shellThickness');
+    let rOk = 0, aOk = 0;
+    for (const p of pts) { const o = objs[p[3] - 1], dx = (p[0] - o.cx) * 100, dy = (p[1] - o.cy) * 100, dz = p[2] - o.cz;
+      const r = Math.hypot(dx, dy, dz); if (r >= R - t / 2 - 1e-6 && r <= R + t / 2 + 1e-6) rOk++;
+      const polar = Math.acos(Math.max(-1, Math.min(1, dz * o.axis[2] / r))) * 180 / Math.PI; if (polar <= thc + 1e-6) aOk++; }
+    for (const k of Object.keys(paramOverrides)) delete paramOverrides[k]; Object.assign(paramOverrides, save);
+    // a CCP movie: every in-focus event tagged with its pit
+    const ccp = await __simHash({ simulation_structureType: 'ccp', simulation_ccp_count: 30 });
+    const ccpTagged = groundTruthEvents.filter(e => !e.haze && e.objectId > 0).length / groundTruthEvents.filter(e => !e.haze).length;
+    __set('simulation_structureType', 'uniform3D');
+    return { base, nupObjects, nupTagged, n107: A.length, pairD: [Math.min(...pairD), Math.max(...pairD)], radius: [Math.min(...radii), Math.max(...radii)], sep,
+             ccp: { n: pts.length, nObj: objs.length, rFrac: rOk / pts.length, angFrac: aOk / pts.length, movieEvents: ccp.events, tagged: ccpTagged } };
+  });
+  results.structures = st;
+  for (const k of Object.keys(BASELINE))
+    check(`(5) seeded ${k} movie still byte-identical`, st.base[k].hash === BASELINE[k], `hash ${st.base[k].hash}`);
+  check('(5) NPC movie: one object per pore, every event tagged', st.nupObjects > 0 && st.nupTagged === 1, `${st.nupObjects} pores, ${(100 * st.nupTagged).toFixed(1)}% tagged`);
+  check('(5) Nup107: 32 attachment sites per pore', st.n107 === 32, `${st.n107}`);
+  check('(5) Nup107: copies 12 nm apart, radius 53.7 nm, rings 56.5 nm apart',
+    Math.abs(st.pairD[0] - 12) < 0.1 && Math.abs(st.pairD[1] - 12) < 0.1 && Math.abs(st.radius[0] - 53.7) < 1e-6 && Math.abs(st.sep - 56.5) < 1e-6,
+    `pair ${st.pairD.map(v => v.toFixed(2)).join('–')} nm, R ${st.radius[0].toFixed(2)}, sep ${st.sep.toFixed(2)}`);
+  check('(5) CCP: every dye on the coat shell and within the closing angle (no linker error)', st.ccp.rFrac === 1 && st.ccp.angFrac === 1,
+    `${st.ccp.n} dyes on ${st.ccp.nObj} pits`);
+  check('(5) CCP movie: every in-focus event tagged with its pit', st.ccp.tagged === 1, `${st.ccp.movieEvents} events`);
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

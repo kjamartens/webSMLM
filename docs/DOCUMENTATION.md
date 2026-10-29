@@ -702,6 +702,7 @@ estimate**, or photon counts and precisions come out on the wrong scale (positio
 | Uniform 3D volume | **Accuracy figures** | x, y, z independent and uniform — the fair object for numbers you quote |
 | Tilted plane | **Diagnosing 3D**: bias, axial compression, fold-back | z ramps linearly across x — errors show as a bent line |
 | Spherical shell | Seeing an axial scale error | radius = **Structure size**; a flattened sphere means a wrong z scale |
+| Clathrin-coated pits | The depth-calibration samples of Li et al. (2019) | thick spherical caps, rim on the membrane; **Number of pits**; the rest from a Sample preset ([Recipe H](#simulation-guide)) |
 
 **Microtubules.** **Move view** (Sample, below Focus height) pans the window across the sample by
 the chosen step (1, 5 or 10 µm; ↑ is towards the top of the image); the dyes are fixed in the world,
@@ -715,9 +716,10 @@ Cell and microtubule densities have no sidebar field (settings JSON / `paramOver
 region takes a few seconds to generate.
 
 **NPC.** With **Labeling efficiency** at 70%, about 45 of 64 sites per pore carry a label — lower it
-to see how an incomplete ring reconstructs. Ring geometry (radius, corner spread, ring separation,
-linker lengths, spacing, curvature) is set by the published values and changeable only through a
-settings file or `paramOverrides`.
+to see how an incomplete ring reconstructs. **NPC model** = Nup107 gives Li et al.'s label (32 sites
+per pore, rings 56.5 nm apart). Ring geometry (radius, corner spread, ring separation, linker lengths,
+spacing, curvature, tilt, a dome-shaped membrane) is set by the published values and changeable
+through a settings file, a Sample preset or `paramOverrides`.
 
 #### Depth
 
@@ -736,9 +738,10 @@ simulation (all z = 0, one PSF plane) is `paramOverrides.simulation_3d = false`.
 
 1. **PSF model**: keep **Zernike-aberrated** unless you want the fastest possible flat movie; the
    Gaussian model has no depth dependence.
-2. **Optics**: **NA** and **Wavelength** here; refractive indices, **Emitter depth into sample**
+2. **Optics**: **NA** and **Wavelength** here; refractive indices, **Sample depth**
    (spherical aberration from imaging into a lower-index sample; the focal shift is compensated so
-   the z sweep stays centred on the true focus) and working distance under Advanced → PSF.
+   the z sweep stays centred on the true focus), **Supercritical angle** and **Fresnel apodisation**,
+   and working distance under Advanced → PSF.
 3. **Aberration preset**: *Astigmatism* is the standard 3D encoding (moderate is the default);
    *coma*, *spherical*, *trefoil* and *mixed* are for robustness tests. The engineered presets trade
    precision at focus for range:
@@ -876,7 +879,7 @@ GT, note recall, lateral median and the 50%-detection photons. Repeat at density
 5. Fit method *Gauss MLE elliptical*, Localize, Compare to GT. Read the axial median, the effective z
    range and the *fitted vs true* plot; compare with the z-CRLB from Preview PSF.
 
-**C. The calibration/sample depth mismatch.** Calibrate at **Emitter depth into sample** = 0 (recipe
+**C. The calibration/sample depth mismatch.** Calibrate at **Sample depth** = 0 (recipe
 B, steps 1–3), then set the depth to 2000 nm and simulate a movie without recalibrating. The axial
 scale drops to ~0.65 while detection barely changes — the failure that silently corrupts real 3D
 data. With *Spherical shell* it shows as a flattened sphere. (Numbers in [§2](#validation).)
@@ -894,6 +897,60 @@ localizations from out-of-focus emitters. Try **Fade time constant** with and wi
 **G. NPC resolution.** Structure *Nuclear pore complex*, Structure Z range small (e.g. 100),
 labelling 50–100%, density Medium. Localize and inspect single pores next to **View GT**.
 
+**H. Li et al. (2019): depth-dependent calibration.** The calibration and test samples of Li, Wu,
+Hoess, Mund & Ries, "Depth-dependent PSF calibration and aberration correction for 3D
+single-molecule localization", *Biomed. Opt. Express* 10, 2708 (2019) — a PSF calibrated on beads
+on the coverslip, applied deeper in the sample, compresses z. Every step is one **Sample preset**:
+1. *Li 2019 — beads on coverslip* → **Calib. stack** → 3D calibration **Calibrate**.
+2. Localisation: **Gain** 0.34, **Camera offset** 100, **Excess noise F²** 2 (the presets simulate an
+   EMCCD and never touch Localisation settings), Fit method *Gauss MLE elliptical* (3D).
+3. *Li 2019 — beads in gel* → **Calib. stack** (beads at random heights up to 5 µm, the objective
+   scanned through all of them) → **Localize** → **Compare to GT** → **Show bead z** (the paper's
+   Fig. 2).
+4. *Li 2019 — pits at coverslip* / *pits at 2 µm* / *NPC at 340 nm* / *NPC at 5 µm* → **Simulate
+   movie** → **Localize** → **Compare to GT** → **Show objects** (Fig. 3–5).
+
+What the presets set: NA 1.43 oil, 670 nm, 100 nm pixels, vertical astigmatism 183 milliwaves (OSA
+j = 5; 1.15 rad, the cylinder lens), sample index 1.3345 / oil 1.518, EMCCD (EM gain 350, QE 0.9),
+flat-top illumination, **Supercritical angle** on, the physical depth model (`simulation_depthMode`:
+every emitter imaged at its own height, the objective fixed at the measured focus of the sample
+depth), calibration ±500 nm at 20 nm. Photons per *frame*: 2000 (pores; fit3Dcspline's
+`example_3D_fit.m`) and 7000 (pits, with COT: ×3.5, Olivier et al. 2013) — the 3823 photons often
+quoted for Alexa Fluor 647 are per switching *cycle* (Dempsey et al. 2011). Dark lifetime 2000
+frames (duty cycle 0.0005) and bleach probability 0.23 per blink (4.4 blinks per dye). Density 0.1
+µm⁻² keeps the overlap K = ρ·π·s50² below 0.1 (logged with every movie). Geometry: pits radius 72 nm,
+closing angle 120°, coat 15 nm, antibody error 5 nm, 1.5 dyes per antibody (Mund et al.); Nup107
+radius 53.7 nm, rings 56.5 nm apart, pairs 12 nm apart (Li et al.; Otsuka et al. 2016), each pore
+tipped up to 10°; 340 nm: a 600 nm membrane bowl, ~5 µm: a 900 nm dome (the top of the nucleus).
+Sources for every value: the depth-calibration report (*Fysica en Simulatie 3D-SMLM*, with its
+reference list) and the paper's §3.
+
+Measured on this build (`tests/gpu/test-depth-sim.mjs`, one seed each; MLE elliptical with the
+coverslip calibration):
+
+| | measured | the paper (cubic-spline fit) |
+|---|---|---|
+| supercritical light at 0 / 50 / 340 / 2000 nm | 12.91 / 9.77 / 2.27 / 0.08 % | 12.87 / 9.72 / 2.22 / 0.05 % (report) |
+| model RIMF at 340 / 2000 / 3500 nm (focus where σx = σy) | 0.709 / 0.764 / 0.784 | 0.70 / 0.76 / 0.79 (report) |
+| gel beads, fitted vs nominal z slope | 1.05–1.07 on the glass, 0.84–0.93 at 0.5–0.9 µm, 0.65–0.68 at 2.6–2.9 µm | squeezing growing with depth (Fig. 2) |
+| gel beads, RMS / Pearson c within ±500 nm | 63 nm / 0.982 | 171 nm / 0.9847 (±1 µm, beads to 5 µm) |
+| pits, within-pit axial scale × RIMF | 0.92 at the coverslip, 0.64 at 2 µm | flattened at 2 µm (Fig. 3b) |
+| Nup107 at 340 nm, ring distance × RIMF | 55.2 nm (true 56.5) | 56.5 ± 6.6 nm after correction |
+| Nup107 dome at ~5 µm, pore-centre spread × RIMF | 95 nm (true 212) | flattened (Fig. 4c) |
+
+The coverslip beads' slope of ~1.05 rather than 1 is the ±500 nm quadratic σ(z) calibration model
+itself (calibrating over ±1 µm, past this astigmatism's ±400 nm single-valued range, gave 1.4).
+
+Same samples, same optics, and the same *direction* of every bias — not the paper's numbers: the
+pupil here is scalar with the supercritical annulus (not vectorial), the fitter is a Gaussian σ(z)
+fit (not a cubic spline), and the correction step is not part of this release. One result does not
+follow the paper: at 340 nm the ring distance *falls* with the pore's centre z here (Pearson c
+−0.17 to −0.25 over the runs made), where Li et al. find it rising (c 0.55). Dividing each pore by
+its own local focus slope f0′ removed the trend on the run where that was checked (c −0.14 →
+−0.05): in this model the dependence at 340 nm is the focus scale changing fast near the glass (f0′
+1.44 at the coverslip, 1.36 at 500 nm), not the defocus asymmetry of a cubic-spline fit of a
+mismatched PSF.
+
 #### Performance
 
 Frames render on a simulation worker pool, or on the GPU when **Use GPU acceleration** is on (the
@@ -906,8 +963,10 @@ the time; the Gaussian model is fastest.
 
 - `runSimulation()`, `runCalibrationSimulation()`, `previewPsf()`, `toggleGtLocalizations()`,
   `computeTruthScore()` run the matching buttons with the current sidebar values.
-- `paramOverrides.simulation_structureFov = 200`, `paramOverrides.simulation_3d = false`, and the
-  NPC/microtubule geometry keys set fields without a sidebar control (then `runSimulation()`).
+- `paramOverrides.simulation_structureFov = 200`, `paramOverrides.simulation_3d = false`,
+  `paramOverrides.simulation_depthMode = 'physical'`, and the NPC/pit/microtubule geometry keys set
+  fields without a sidebar control (then `runSimulation()`); a Sample preset sets them for you, and
+  a logged Simulate movie command repeats every one it set.
 - `moveMtView(dxUm, dyUm)` pans the microtubule window.
 - There is no headless `analyze()` path that *generates* a movie; `analyze({scoreVsTruth:true, …})`
   scores against a movie simulated earlier in the same page session.
@@ -917,7 +976,10 @@ the time; the Gaussian model is fastest.
 - Ground truth lives only in the page session and is dropped on load, crop or rotation.
 - The Gaussian model is depth-independent; FFT placement and the Gaussian model do not use the GPU.
 - Not modelled: per-pixel sCMOS gain/read-noise maps, triplet states, fixed dipoles, field-dependent
-  aberrations.
+  aberrations, a vectorial pupil (the supercritical annulus is the scalar approximation).
+- The physical depth model builds one small PSF stack per depth bin (25 nm bins below 200 nm, 50 nm
+  below 500 nm, 250 nm beyond); a structure several µm deep costs proportionally more planes (the
+  log reports count and MB). The 6 µm kernel cuts ~1.4% of the light of an emitter 5 µm deep.
 
 ### Localisation (`detect`) {#detect}
 
@@ -2181,14 +2243,17 @@ elapsed time instead.
 | id | Label | Type | Min | Max | Step | Default |
 |---|---|---|---|---|---|---|
 | `frames` | Frames | number (int) | 50 | 5000 | 50 | 2000 |
-| `simulation_structureType` | Structure type | enum (`microtubules`, `nup`, `filaments_ring`, `tiltedPlane`, `uniform3D`, `shell`) | — | — | — | `microtubules` |
+| `simulation_structureType` | Structure type | enum (`microtubules`, `nup`, `filaments_ring`, `tiltedPlane`, `uniform3D`, `shell`, `ccp`) | — | — | — | `microtubules` |
 | `simulation_densityPreset` | Emitter density | enum (`low` 0.05, `med` 0.2, `high` 0.5, `veryhigh` 2, `custom`) | — | — | — | `high` |
 | `simulation_realism` | Physics detail | enum (`min` Basic, `med` Realistic, `max` Full, `custom`) | — | — | — | `med` |
+| `simulation_samplePreset` | Sample preset — the samples of Li et al. (2019); see [Recipe H](#simulation-guide) | enum (`custom`, `li2019_beadsGlass`, `li2019_beadsGel`, `li2019_ccpGlass`, `li2019_ccp2um`, `li2019_npc340`, `li2019_npc5um`) | — | — | — | `custom` |
 | `dens` | Emitter density (µm⁻²·frame⁻¹) | number | 0 | 5 | 0.01 | 0.5 |
 | `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
 | `simulation_mt_focusZ` | Focus height (nm) | number | 0 | 10000 | 10 | 250 |
 | `simulation_nup_count` | Number of NPCs | number (int) | 1 | 500 | 1 | 100 |
+| `simulation_nup_variant` | NPC model — `nup107`: 2 copies per corner 12 nm apart, radius 53.7 nm, rings 56.5 nm apart | enum (`nup96`, `nup107`) | — | — | — | `nup96` |
+| `simulation_ccp_count` | Number of pits (Clathrin-coated pits) | number (int) | 1 | 500 | 1 | 60 |
 | `simulation_structureSize` | Structure size (nm) — the spherical shell's radius | number | 10 | 5000 | 10 | 500 |
 | `driftpx` | Drift (px, total) | number | 0 | 30 | 0.5 | 0 |
 | `phot` | Photons/emitter/frame | number (int) | 0 | 50000 | 50 | 900 |
@@ -2225,9 +2290,14 @@ elapsed time instead.
 | `simulation_offset_std` | *Camera:* Offset std (ADU, per-pixel) | number | 0 | 200 | 0.5 | 3 |
 | `simulation_cic` | *Camera:* Clock-induced charge (e⁻/px), EMCCD | number | 0 | 1 | 0.001 | 0.002 |
 | `simulation_bitDepth` | *Camera:* Bit depth, EMCCD | number | 8 | 16 | 1 | 16 |
-| `simulation_psfNs` | *PSF:* Sample refractive index (ns) | number | 1 | 1.7 | 0.001 | 1.33 |
+| `simulation_psfNs` | *PSF:* Sample refractive index (ns) | number | 1 | 1.7 | 0.0001 | 1.33 |
 | `simulation_psfNi` | *PSF:* Immersion refractive index (ni) | number | 1 | 1.7 | 0.001 | 1.518 |
-| `simulation_psfDepth` | *PSF:* Emitter depth into sample (nm) | number | 0 | 5000 | 10 | 0 |
+| `simulation_psfDepth` | *PSF:* Sample depth (nm) — height above the coverslip the sample sits at and the objective is focused on | number | 0 | 5000 | 10 | 0 |
+| `simulation_psfSaf` | *PSF:* Supercritical angle (SAF) — open the pupil past the critical angle; that light is evanescent in the sample and fades within ~100 nm of the glass | bool | — | — | — | off |
+| `simulation_psfApodization` | *PSF:* Fresnel apodisation — weight the pupil with the interface's scalar Fresnel transmission | bool | — | — | — | off |
+| `simulation_calibDepthMax` | *PSF:* Bead depth range (nm) — Calib. stack in a gel above 0 | number | 0 | 6000 | 50 | 0 |
+| `simulation_beadDiameter` | *PSF:* Bead diameter (nm) — 0 = point sources | number | 0 | 500 | 10 | 0 |
+| `simulation_calibSeed` | *PSF:* Calib. stack seed (0 = random) | number (int) | 0 | 2147483647 | 1 | 0 |
 | `simulation_psfTi0` | *PSF:* Working distance (µm) | number | 100 | 250 | 1 | 150 |
 | `simulation_psfZernikeCustom` | *PSF:* Custom Zernike (mWave) — 15 or 28 comma-separated values; blank = use the preset | text | — | — | — | blank |
 | `simulation_bgHazeWeight` | *Background:* Out-of-focus haze (weight) | number | 0 | 10 | 0.1 | 1 |
@@ -2258,10 +2328,21 @@ No sidebar control (Settings JSON, `paramOverrides`, or the log terminal):
 | `simulation_nup_linkerLengthMax` | Linker length, max (nm) | number | 0 | 30 | 0.5 | 5 |
 | `simulation_nup_minSpacing` | Min. NPC-NPC spacing (nm) | number | 0 | 2000 | 10 | 200 |
 | `simulation_nup_curvature` | Membrane curvature amplitude (nm) | number | 0 | 2000 | 10 | 150 |
+| `simulation_nup_tiltDeg` | NPC tilt (deg, max) — each pore tipped by a random angle up to this | number | 0 | 60 | 1 | 0 |
+| `simulation_nup_membrane` | NPC membrane — `dome`: an ellipsoidal cap (the top of a nucleus), pore axes along the surface normal | enum (`flat`, `dome`) | — | — | — | `flat` |
+| `simulation_nup_domeHeight` | NPC dome height (nm) | number | 0 | 5000 | 10 | 900 |
+| `simulation_depthMode` | Depth model — `physical`: z is height in the sample, each emitter imaged at its own height with the objective fixed; `objective`: z is objective travel (every movie before 2026-10-29) | enum (`objective`, `physical`) | — | — | — | `objective` |
+| `simulation_ccp_radius` | Pit radius (nm) | number | 20 | 200 | 1 | 72 |
+| `simulation_ccp_closingAngleDeg` | Pit closing angle (deg; 180 = a closed vesicle) | number | 10 | 180 | 1 | 120 |
+| `simulation_ccp_shellThickness` | Coat thickness (nm) | number | 0 | 50 | 1 | 15 |
+| `simulation_ccp_linkerSigma` | Antibody linkage error σ (nm) | number | 0 | 30 | 0.5 | 5 |
+| `simulation_ccp_orientation` | Pit orientation — `up` into the cell (basal), `down` (apical) | enum (`up`, `down`) | — | — | — | `up` |
+| `simulation_ccp_dol` | Dyes per antibody (mean, Poisson) | number | 0.1 | 10 | 0.1 | 1.5 |
+| `simulation_ccp_sitesPerPit` | Epitopes per pit | number (int) | 1 | 2000 | 1 | 120 |
 
 The sidebar's Simulation panel keeps the everyday choices at the
-top — **Structure type**, **Frames**, **Emitter density** (a preset) and
-**Physics detail** (a preset), plus a 2×2 grid of **Preview PSF**, **Calib.
+top — **Structure type**, **Frames**, **Emitter density** (a preset),
+**Physics detail** (a preset) and **Sample preset**, plus a 2×2 grid of **Preview PSF**, **Calib.
 stack**, **View GT** and **Compare to GT** — and puts the detail in collapsible
 sub-groups: **Sample**, **Fluorophore**, **Background**, **Camera**, **PSF**,
 **Ground-truth comparison** (the settings for Compare to GT) and, last,
@@ -2301,6 +2382,11 @@ a binder + dye at a random 2–5 nm linker offset; <b>each dye is one emitter si
 window moves, so panning back returns the same cells. Which cell field is used is set by Advanced →
 <b>Cell field seed</b> (0 = random; each seed starts at a fixed, well-covered view); the view offset and the cell and microtubule densities have no sidebar field —
 set them from a settings file or the log terminal (<code>paramOverrides.simulation_mt_x</code> etc.).</p>
+<p><b>Clathrin-coated pits</b> (Li <i>et al.</i> 2019, geometry after Mund <i>et al.</i>): each pit is a
+thick spherical cap — radius 72 nm, closing angle 120°, coat 15 nm — whose rim lies on the membrane;
+epitopes are uniform over the cap, each antibody sits a Gaussian 5 nm from its epitope and carries on
+average 1.5 dyes. <b>Number of pits</b> is the one sidebar field; the Sample preset sets the rest,
+including whether the dome points into the cell (basal membrane) or out of it (apical).</p>
 <p><b>Drift (px, total)</b> — total sample drift over the movie, in a random direction and linear in
 time; 0 = none. The true drift is kept for scoring drift correction. The <b>Movie seed</b> that makes
 placement, blinking, drift direction and camera noise reproducible is under Advanced.</p>
@@ -2317,11 +2403,14 @@ superresolution microscopy", <i>Nat. Methods</i> 16, 1045–1053 (2019),
 an 8-fold symmetric ring of 32 Nup96 (8 corners of 4, on a 12 nm half-circle arc), radius 53.5 nm,
 two such rings 50 nm apart along the pore axis, viewed top-down (pore axis along the optical axis).
 Each of the 64 attachment points carries its dye 2–5 nm away in a random direction. The NPCs are
-scattered at least 200 nm apart on a gently curved membrane patch (150 nm bowl). <b>Number of NPCs</b>
-is the one sidebar field; the geometry is fixed at these values and can be changed only from a
-settings file or the log terminal (<code>simulation_nup_radius</code>, <code>_ringSeparation</code>,
-<code>_cornerSpread</code>, <code>_linkerLengthMin/Max</code>, <code>_minSpacing</code>,
-<code>_curvature</code>), following the parametrized approach of Wanninger <i>et al.</i> ("CIR4MICS"),
+scattered at least 200 nm apart on a gently curved membrane patch (150 nm bowl). <b>NPC model</b> =
+<b>Nup107</b> switches to the label of Li <i>et al.</i> (2019): 2 copies per corner 12 nm apart along the ring,
+radius 53.7 nm, rings 56.5 nm apart — 32 sites per pore. <b>Number of NPCs</b> and <b>NPC model</b> are the
+sidebar fields; the rest of the geometry is set from a settings file, a Sample preset or the log terminal
+(<code>simulation_nup_radius</code>, <code>_ringSeparation</code>, <code>_cornerSpread</code>,
+<code>_linkerLengthMin/Max</code>, <code>_minSpacing</code>, <code>_curvature</code>, <code>_tiltDeg</code> —
+each pore tipped by a random angle up to this — and <code>_membrane</code> = <code>dome</code>, pores on the
+top of a nucleus), following the parametrized approach of Wanninger <i>et al.</i> ("CIR4MICS"),
 <i>Bioinformatics</i> 39(10), btad587 (2023),
 <a href="https://doi.org/10.1093/bioinformatics/btad587" target="_blank" rel="noopener">doi:10.1093/bioinformatics/btad587</a>.</p>
 <!-- /HINT:simulation-nup -->
@@ -2460,8 +2549,8 @@ not calibrated ones. <b>Saddle point</b> and <b>Extended depth</b> stack astigma
 to lengthen the depth range over which z is readable, at the cost of precision at focus.
 <b>NA</b> and <b>Wavelength</b> set the objective and the dye. The pupil is turned into an image with
 a chirp-Z transform, which matches an ideal Airy disk out to the edge of the kernel. The refractive
-indices, emitter depth, working distance and a custom Zernike vector are under Advanced → PSF; the
-kernel numerics under Advanced → Performance.</p>
+indices, sample depth, the supercritical-angle and apodisation switches, working distance and a custom
+Zernike vector are under Advanced → PSF; the kernel numerics under Advanced → Performance.</p>
 <p><b>Preview PSF</b> (top of the panel) builds this (cached) kernel and shows it as a z-scrollable
 stack in the raw panel: its z-plane slider takes the place of the Frame slider, and Contrast
 stretches each plane to its own range (Auto) until you move a handle. Click it again (<b>Hide
@@ -2484,12 +2573,18 @@ runs that differ in one setting can be compared pixel for pixel.</p>
 separate from the Gain/Camera offset used for localization. <b>Offset std</b> is the fixed per-pixel
 spread of the offset map, the static pattern a real sCMOS has. <b>Clock-induced charge</b> and <b>Bit
 depth</b> apply to the EMCCD model only.</p>
-<p><b>PSF</b> (Zernike model). <b>Sample</b>/<b>immersion refractive index</b> and <b>Emitter depth into
-sample</b> (where the focal plane sits above the coverslip) set the depth-induced aberration; the focal
-shift is compensated, so the kernel's z range is centred on the emitter's actual focus. <b>Working
-distance</b> is the Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b>
-overrides the aberration preset with 15 or 28 comma-separated milliwave coefficients (OSA indices 0–14
-or 0–27; 1000 = one full wave).</p>
+<p><b>PSF</b> (Zernike model). <b>Sample</b>/<b>immersion refractive index</b> and <b>Sample depth</b>
+(the height above the coverslip the sample sits at and the objective is focused on) set the
+depth-induced aberration; the focal shift is compensated, so the kernel's z range is centred on the
+emitter's actual focus. <b>Supercritical angle (SAF)</b> lets the light past the critical angle through —
+it is evanescent in the sample, so an emitter at the glass is brighter and sharper than one a few
+hundred nm up; <b>Fresnel apodisation</b> weights the pupil with the interface's transmission (off by
+default: published SAF fractions assume a uniform pupil). <b>Bead depth range</b> (above 0) makes Calib.
+stack a gel of beads at random heights, with ground truth; <b>Bead diameter</b> averages each bead over
+its volume; <b>Calib. stack seed</b> makes the stack reproducible. <b>Working distance</b> is the
+Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b> overrides the
+aberration preset with 15 or 28 comma-separated milliwave coefficients (OSA indices 0–14 or 0–27; 1000
+= one full wave).</p>
 <p><b>Background.</b> <b>Out-of-focus haze</b> adds the labelled structure's own projected density,
 blurred to <b>Haze blur σ</b>, relative to the flat/cell part — a static stand-in for light from far
 above and below the focal plane.</p>
@@ -2509,15 +2604,21 @@ exact but slow FFT phase shift kept for comparison.</p>
 <p>"Simulate movie" builds a fully synthetic ground-truth stack — emitters on a labelled 3D structure,
 physically modelled blinking, a vectorial PSF, background and a camera noise model — for validating
 and teaching the rest of the pipeline against known-correct answers.</p>
-<p>The top of the panel holds the everyday choices: <b>Structure type</b>, <b>Frames</b>, <b>Emitter density</b> (a preset; the exact value is under Sample) and
-<b>Physics detail</b>. Physics detail is a preset for how much physics — and compute — the simulation
+<p>The top of the panel holds the everyday choices: <b>Structure type</b>, <b>Frames</b>, <b>Emitter density</b> (a preset; the exact value is under Sample),
+<b>Physics detail</b> and <b>Sample preset</b>. <b>Sample preset</b> loads the calibration and test samples of Li <i>et al.</i>,
+<i>Biomed. Opt. Express</i> 10, 2708 (2019) — beads on the coverslip and in a gel, clathrin-coated pits at the
+coverslip and 2 µm deep, Nup107 pores at 340 nm and ~5 µm — on that paper's microscope, every emitter
+imaged at its own height; like every preset it only writes ordinary fields.</p>
+<p><b>Physics detail</b> Physics detail is a preset for how much physics — and compute — the simulation
 spends: <b>Basic</b> blinks every molecule once at constant brightness on a flat, dark background;
 <b>Realistic</b> adds repeated blinking with bleaching, brightness spread, a fading background and
 out-of-focus haze, at almost no cost; <b>Full</b> also adds blinking out-of-focus emitters rendered with
 the defocused PSF, roughly doubling the time. It only writes fields under Fluorophore and Background,
 and editing any of them switches it to Custom.</p>
 <p>The four buttons: <b>Preview PSF</b> shows the PSF kernel as a z-stack in the raw panel; <b>Calib.
-stack</b> simulates a bead z-stack from the same kernel for 3D calibration; <b>View GT</b> shows the
+stack</b> simulates a bead z-stack from the same kernel for 3D calibration — or, with <b>Bead depth range</b>
+above 0 (Advanced → PSF), beads in a gel at random heights with the objective scanned through all of them,
+which can be localized and scored like a movie; <b>View GT</b> shows the
 true emitter positions of the last simulated movie in the reconstruction panel; <b>Compare to GT</b>
 scores a Localize result against them (settings under Ground-truth comparison).</p>
 <p>The sub-groups hold the detail: <b>Sample</b>, <b>Fluorophore</b>, <b>Background</b>,
@@ -2610,6 +2711,11 @@ edit here, then run the script, never edit the `.hint` div directly):
   <li><b>Min photons/frame</b> and <b>Edge exclusion</b> — emitter-frames too dim, or too close to the edge, to be found are "don't care": detecting one is not a false positive, missing one is not a miss.</li>
   <li><b>Crowding radius</b> splits the result into isolated and crowded emitters; <b>Score z bins</b> sets the depth resolution of the plots.</li>
 </ul>
+<p>For a gel bead stack the first view is <b>bead z</b> — fitted against nominal z, each bead's nominal
+position where its own fitted z crosses 0 (Li <i>et al.</i> Fig. 2); for pores and pits it is <b>objects</b> —
+ring distance against each pore's centre z, or a side view of every pit. In the physical depth mode the
+fit returns objective travel, so the log also gives the axial scale times the model's own refractive-index
+mismatch factor (RIMF), and counts axial failures beyond max(5 × CRLB, d/4).</p>
 <p>The raw-panel toggle cycles the plot between z error vs depth, fitted vs true z, Jaccard vs depth, the lateral and axial (signed) error histograms, recall vs photons, Jaccard vs match radius, fitted vs true photons, and measured precision vs the reported CRLB. Each plot's legend names every mark; a box in its corner gives the numbers and how to read it. Median and percentiles are the headline numbers, not RMSE — the axial error has heavy tails. Set Localisation <b>Gain</b>/<b>Camera offset</b> to the simulated camera's values, or photometry and the CRLB comparison measure that mismatch instead of the fitter.</p>
 <!-- /HINT:validation -->
 

@@ -319,7 +319,7 @@ try {
   check('(4) every bead scored', gel.beadZ && gel.beadZ.beads.length === 9, gel.beadZ ? `${gel.beadZ.beads.length} beads` : 'no bead score');
   if (gel.beadZ) {
     const bs = [...gel.beadZ.beads].sort((a, b) => a.depth - b.depth), glass = bs.filter(b => b.depth < 100), deep = bs.filter(b => b.depth > 1500);
-    check('(4) coverslip beads on the 1:1 line (slope 1 ± 0.05)', glass.every(b => Math.abs(b.slope - 1) < 0.05), glass.map(b => b.slope.toFixed(3)).join(', '));
+    check('(4) coverslip beads on the 1:1 line (slope 1 ± 0.08; ~1.05 is the quadratic σ(z) calibration)', glass.every(b => Math.abs(b.slope - 1) < 0.08), glass.map(b => b.slope.toFixed(3)).join(', '));
     check('(4) coverslip beads cross z = 0 within 20 nm of the model focus', glass.every(b => Math.abs(b.cross - b.model) < 20),
       glass.map(b => `${b.cross.toFixed(0)}/${b.model.toFixed(0)}`).join(', '));
     check('(4) deep beads squeezed (slope < 0.8) — Li et al. Fig. 2', deep.length > 0 && deep.every(b => b.slope < 0.8), deep.map(b => `${b.depth.toFixed(0)} nm: ${b.slope.toFixed(3)}`).join(', '));

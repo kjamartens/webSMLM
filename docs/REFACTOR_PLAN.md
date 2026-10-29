@@ -55,6 +55,26 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
     footprints instead.
 
 
+- **Depth-dependent calibration (Li et al. 2019), after the 2026-10-29 simulation work** — the
+  samples can be simulated (Sample preset, DOCUMENTATION.md Recipe H); what is still open:
+  - **The analysis half of the paper**: a cubic-spline PSF fitter and the Δz(z_fitted, f_obj)
+    B-spline correction with RIMF (`calibrate3Daberrations`/`correct_3Daberrations`). The gel stack
+    already carries everything that correction is built from (per-bead nominal z per frame).
+  - **The 340 nm ring-distance sign**: here the trend comes from the focus scale f0′ changing near
+    the glass (c −0.25), in the paper from the defocus asymmetry of a cubic-spline fit (c +0.55).
+    Re-check once a PSF-model fitter exists — it should move toward the paper if that explanation is
+    right.
+  - **A vectorial pupil** (dipole Green's tensor, Fresnel per polarisation) instead of the scalar
+    model plus supercritical annulus; compare side by side before switching (SMLMpipelinelessons
+    §1.1: at NA ≥ 1.2 the scalar model is wrong for *precision*).
+  - **A finite molecule pool**: `dens` is an infinite reservoir (the stationary equivalent of the
+    paper's 405 nm feedback), so molecules per NPC are not observable, positions are.
+  - **Per-object fits**: the NPC ring distance uses ground-truth ring membership and axis; a real
+    two-ring MLE fit with tip/tilt (as the paper does) would give the number a user can measure.
+  - The physical depth mode builds one stack per depth bin; a several-µm-deep structure at a fine
+    z step is memory-heavy. A plane-level LRU (per depth bin and objective index) was planned and is
+    not built — the per-bin stacks are only as large as their emitters need.
+
 - **Double-helix mask: shape, not sign.** The sign of z is recovered decisively since the worker
   dispatch was fixed (build 2026-09-20g). What remains is cosmetic-but-real: this phase-only
   Gauss-Laguerre construction throws a lot of light into satellite rings (8-14 maxima above 40% of

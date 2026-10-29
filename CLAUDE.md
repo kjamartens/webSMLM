@@ -542,6 +542,56 @@ the cell-field seed + settings only, ~1 s/try, cached; origin-first keeps alread
 unchanged. `simulation_mt_x/_y` (no control) are an OFFSET from it, moved with `moveMtViewStep()` →
 `moveMtView()` (+y down, logged); seed under Advanced.
 
+**Depth: the Li et al. (2019) samples (2026-10-29).** One **Sample preset** (`simulation_samplePreset`)
+writes everything; the physics underneath, all default-off so a seeded movie stays byte-identical
+(`tests/gpu/test-depth-sim.mjs` pins two hashes):
+- **Pupil** (`psfPupilPlan()`): `simulation_psfSaf` opens the aperture from ns/NA to the full NA;
+  the annulus carries evanescent light, amplitude `exp(-k0 z sqrt(NA²ρ²-ns²))` (`psfPupilAmplitude()`;
+  the sign must make the annulus fraction FALL with z). `simulation_psfApodization` adds the report's
+  scalar Fresnel amplitude. **The Zernike radius stays ns/NA** (`psfBMax()`) whatever the aperture
+  (`psfApertureMax()`), continued past 1 by `psfZernikeValueExt()`, so presets keep their meaning; the
+  mask clamps to u ≤ 1 (flat in the annulus). The plan carries an `amp` array only when a flag is on.
+  SAF on → `psfFftM()` = 256 (the annulus is 2 cells wide at 64; converged to 0.23% at 5 µm).
+  **`params` in the PSF worker is its plan-cache key** — a new optical field goes in the message
+  (`buildPsfPlanesParallel()`), the worker destructure AND `params`, or it is dropped and not
+  re-keyed (the 2026-09-20g lesson, one layer in). `psfPupilPower()`/`psfCollectedFraction()`: 1-D
+  quadrature, Parseval — never the Cartesian grid.
+- **Focus map** (`psfFocusMap()`/`psfFocusForDepth()`): objective position f (nm of travel, f = ti0 − ti)
+  at which an emitter at depth d is in focus, MEASURED as the zero of ln(σy/σx) (width fits via
+  `psfWidthRatios()`, factored out of `psfUsableZRange()`), brightest plane when there is no
+  astigmatism; anchors on a fixed depth ladder, cached, interpolated. Never the paraxial d·ni/ns
+  (off by >1 µm at 5 µm). A higher plane index = objective further from the sample = emitter above
+  focus. `buildPsfKernelStack()` uses it for `focusIndex` when SAF/apod/physical is on.
+- **`simulation_depthMode`** ('objective' default | 'physical', no control): physical = structure z
+  is height relative to Sample depth, objective fixed at the measured focus. `buildPhysicalDepthStack()`
+  bins emitters (25/50/250 nm), builds a small stack per bin on the shared objective axis
+  (`sweepCenterM`), maps a residual δ to plane offset f0′(z_b)·δ/zStep, and concatenates all bins
+  into ONE virtual stack (focusIndex 0) whose index rides in each frame entry's z slot — so serial,
+  worker and GPU frame code are unchanged. Truth keeps physical z plus `depth`; `bright` carries
+  `psfCollectedFraction()`. `simDepthInfo` keeps the model's RIMF for the score.
+- **Gel Calib. stack** (`generateGelBeadStack()`, `simulation_calibDepthMax` > 0): 3×3 beads, 18% on
+  the glass, objective −1 µm → deepest focus + 1 µm, each bead drawn within ±1 µm of its own focus
+  (skipped, never clamped), through the movie machinery; truth = one always-on event per bead with
+  `bead`, `f0Nm`, `fObj`. `simulation_beadDiameter` (`beadConvolvedPlane()`: 5 slabs, weight R²−dz²,
+  each disc-convolved — lateral is the larger term) applies to the coverslip stack too, never cached.
+  `simulation_calibSeed` 0 = the old unseeded stack.
+- **Structures**: `ccp` (`buildCcpStructure()`, thick cap, rim at z = 0) and `simulation_nup_variant`
+  'nup107' (`buildNup107AttachmentPoints()`, `nupGeometry()`), plus control-less `_tiltDeg` and
+  `_membrane` 'dome'. Their sites are `[x,y,z,objectId,ring]`; `addBlink()` carries both onto events;
+  `groundTruthObjects` (one record per pore/pit, true axis) is published next to the events.
+- **Score**: `beadZ` (nominal z from each bead's own fitted-z = 0 crossing — the steepest falling zero
+  of a running median, NOT a fit through every small |z|, which catches fold-back — scored within
+  ±`BEAD_Z_WINDOW_NM`), `objects` (NPC ring distance on the true axis, ring membership from truth;
+  CCP within-pit slope of fitted on TRUE z — a height ratio is inflated by precision), `failRule`
+  (max(5·CRLB, d/4)), `axialSlope` and `rimf`. Views `beadz`, `objects`. Overlap K logged per movie.
+- **Measured and documented** (DOCUMENTATION.md Recipe H): published SAF fractions and RIMF reproduced;
+  gel/pit/dome squeezing in the paper's direction. **The 340 nm Nup107 ring-distance trend has the
+  OPPOSITE sign to the paper** (c −0.17…−0.25 vs +0.55) and vanished with each pore's local f0′: in this
+  model it is the focus scale changing near the glass, not a cubic-spline defocus asymmetry. Don't
+  "fix" it by tuning; it is what this scalar model + Gaussian σ(z) fitter predict.
+- `wirePreset()` writes control-less fields through `paramOverrides`; `_presetTables`/`presetHolds()`
+  let the Sample preset set Physics detail / Emitter density to Custom where it overrode them.
+
 **Around it**: `toggleGtLocalizations()` swaps `srFull` directly (stashing the previous one and its
 title/info, since `lastResult` is null before a Localize) and mirrors `rerender()`'s depth-colour
 logic (auto-tick, `turbo`, cached `_zr`, `srFull._zColor`). `runCalibrationSimulation()` renders a

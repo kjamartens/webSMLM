@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2652   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3703   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3931   synthetic stack generator ("Simulate movie")
-    validation      7469   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8544   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8800   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9410   super-resolution accumulation, view, colour maps, plots
-    workers         10934  frame-parallel detect/fit worker pool
-    gpu             11580  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13909  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  14200  astigmatic width-vs-z bead calibration
-    drift           14599  AIM and cross-correlation drift correction
-    locprecision    15257  NeNA and FRC
-    sSMLM           16396  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2677   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3728   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3956   synthetic stack generator ("Simulate movie")
+    validation      7498   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8573   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8829   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9439   super-resolution accumulation, view, colour maps, plots
+    workers         10963  frame-parallel detect/fit worker pool
+    gpu             11609  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13938  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14229  astigmatic width-vs-z bead calibration
+    drift           14628  AIM and cross-correlation drift correction
+    locprecision    15286  NeNA and FRC
+    sSMLM           16425  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             19109  single-particle tracking and diffusion coefficients
-    pipeline        20159  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   21199  Micro-Manager/pycromanager bridge (experimental)
-    table           23693  localizations table, filters, histograms, clustering
-    headless API    24378  window.webSMLM.analyze()/analyzeBatch()
+    spt             19138  single-particle tracking and diffusion coefficients
+    pipeline        20188  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21228  Micro-Manager/pycromanager bridge (experimental)
+    table           23723  localizations table, filters, histograms, clustering
+    headless API    24408  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29g</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29h</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1928,7 +1928,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" title="Ready-made samples from Li et al., Biomed. Opt. Express 10, 2708 (2019): the Li microscope (NA 1.43, 670 nm, 100 nm pixels, astigmatism, EMCCD) with each sample at its own depth, every emitter imaged at its own height. Beads: click Calib. stack (coverslip beads to Calibrate on; gel beads to score). Pits and pores: Simulate movie. It only writes ordinary settings — choosing one also sets Physics detail and Emitter density to Custom, and editing any field it wrote sets this back to Custom.">Sample preset <select id="simulation_samplePreset" class="sel"><option value="custom" selected>Custom</option><option value="li2019_beadsGlass">Li 2019 — beads on coverslip</option><option value="li2019_beadsGel">Li 2019 — beads in gel</option><option value="li2019_ccpGlass">Li 2019 — pits at coverslip</option><option value="li2019_ccp2um">Li 2019 — pits at 2 µm</option><option value="li2019_npc340">Li 2019 — NPC at 340 nm</option><option value="li2019_npc5um">Li 2019 — NPC at 5 µm</option></select></label>
         <div class="btnrow" id="simToolsRow">
           <button type="button" id="psfPreviewBtn" title="Build the PSF kernel from the PSF settings and show it in the raw panel as a z-scrollable stack. Zernike PSF model only.">Preview PSF</button>
-          <button type="button" id="genCalBtn" title="Simulate a bead z-stack from the same PSF kernel as Preview PSF (PSF z range/step), focus exactly on the centre frame, and write z-step/z=0 ref frame into the 3D calibration section — Calibrate then needs no other setting changed. Zernike PSF model only.">Calib. stack</button>
+          <button type="button" id="genCalBtn" title="Simulate a bead z-stack from the same PSF kernel as Preview PSF (PSF z range/step), focus exactly on the centre frame, and write z-step/z=0 ref frame into the 3D calibration section — Calibrate then needs no other setting changed. With Bead depth range above 0 (Advanced → PSF): beads in a gel at random heights, the objective scanned through all of them, with ground truth — Localize it and Compare to GT. Zernike PSF model only.">Calib. stack</button>
           <button type="button" id="viewGtBtn" disabled title="Render the true simulated emitter positions (one point per simulated blink) into the reconstruction panel, the same way a real reconstruction is drawn. Available after Simulate movie.">View GT</button>
           <button type="button" id="truthBtn" disabled title="Compare the localizations with the simulation's ground truth: detection rate, lateral and axial error versus true depth, per-molecule precision. Available after Simulate movie and Localize; settings under Ground-truth comparison.">Compare to GT</button>
         </div>
@@ -1937,15 +1937,21 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <p>"Simulate movie" builds a fully synthetic ground-truth stack — emitters on a labelled 3D structure,
           physically modelled blinking, a vectorial PSF, background and a camera noise model — for validating
           and teaching the rest of the pipeline against known-correct answers.</p>
-          <p>The top of the panel holds the everyday choices: <b>Structure type</b>, <b>Frames</b>, <b>Emitter density</b> (a preset; the exact value is under Sample) and
-          <b>Physics detail</b>. Physics detail is a preset for how much physics — and compute — the simulation
+          <p>The top of the panel holds the everyday choices: <b>Structure type</b>, <b>Frames</b>, <b>Emitter density</b> (a preset; the exact value is under Sample),
+          <b>Physics detail</b> and <b>Sample preset</b>. <b>Sample preset</b> loads the calibration and test samples of Li <i>et al.</i>,
+          <i>Biomed. Opt. Express</i> 10, 2708 (2019) — beads on the coverslip and in a gel, clathrin-coated pits at the
+          coverslip and 2 µm deep, Nup107 pores at 340 nm and ~5 µm — on that paper's microscope, every emitter
+          imaged at its own height; like every preset it only writes ordinary fields.</p>
+          <p><b>Physics detail</b> Physics detail is a preset for how much physics — and compute — the simulation
           spends: <b>Basic</b> blinks every molecule once at constant brightness on a flat, dark background;
           <b>Realistic</b> adds repeated blinking with bleaching, brightness spread, a fading background and
           out-of-focus haze, at almost no cost; <b>Full</b> also adds blinking out-of-focus emitters rendered with
           the defocused PSF, roughly doubling the time. It only writes fields under Fluorophore and Background,
           and editing any of them switches it to Custom.</p>
           <p>The four buttons: <b>Preview PSF</b> shows the PSF kernel as a z-stack in the raw panel; <b>Calib.
-          stack</b> simulates a bead z-stack from the same kernel for 3D calibration; <b>View GT</b> shows the
+          stack</b> simulates a bead z-stack from the same kernel for 3D calibration — or, with <b>Bead depth range</b>
+          above 0 (Advanced → PSF), beads in a gel at random heights with the objective scanned through all of them,
+          which can be localized and scored like a movie; <b>View GT</b> shows the
           true emitter positions of the last simulated movie in the reconstruction panel; <b>Compare to GT</b>
           scores a Localize result against them (settings under Ground-truth comparison).</p>
           <p>The sub-groups hold the detail: <b>Sample</b>, <b>Fluorophore</b>, <b>Background</b>,
@@ -1988,6 +1994,11 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           window moves, so panning back returns the same cells. Which cell field is used is set by Advanced →
           <b>Cell field seed</b> (0 = random; each seed starts at a fixed, well-covered view); the view offset and the cell and microtubule densities have no sidebar field —
           set them from a settings file or the log terminal (<code>paramOverrides.simulation_mt_x</code> etc.).</p>
+          <p><b>Clathrin-coated pits</b> (Li <i>et al.</i> 2019, geometry after Mund <i>et al.</i>): each pit is a
+          thick spherical cap — radius 72 nm, closing angle 120°, coat 15 nm — whose rim lies on the membrane;
+          epitopes are uniform over the cap, each antibody sits a Gaussian 5 nm from its epitope and carries on
+          average 1.5 dyes. <b>Number of pits</b> is the one sidebar field; the Sample preset sets the rest,
+          including whether the dome points into the cell (basal membrane) or out of it (apical).</p>
           <p><b>Drift (px, total)</b> — total sample drift over the movie, in a random direction and linear in
           time; 0 = none. The true drift is kept for scoring drift correction. The <b>Movie seed</b> that makes
           placement, blinking, drift direction and camera noise reproducible is under Advanced.</p>
@@ -2001,11 +2012,14 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           an 8-fold symmetric ring of 32 Nup96 (8 corners of 4, on a 12 nm half-circle arc), radius 53.5 nm,
           two such rings 50 nm apart along the pore axis, viewed top-down (pore axis along the optical axis).
           Each of the 64 attachment points carries its dye 2–5 nm away in a random direction. The NPCs are
-          scattered at least 200 nm apart on a gently curved membrane patch (150 nm bowl). <b>Number of NPCs</b>
-          is the one sidebar field; the geometry is fixed at these values and can be changed only from a
-          settings file or the log terminal (<code>simulation_nup_radius</code>, <code>_ringSeparation</code>,
-          <code>_cornerSpread</code>, <code>_linkerLengthMin/Max</code>, <code>_minSpacing</code>,
-          <code>_curvature</code>), following the parametrized approach of Wanninger <i>et al.</i> ("CIR4MICS"),
+          scattered at least 200 nm apart on a gently curved membrane patch (150 nm bowl). <b>NPC model</b> =
+          <b>Nup107</b> switches to the label of Li <i>et al.</i> (2019): 2 copies per corner 12 nm apart along the ring,
+          radius 53.7 nm, rings 56.5 nm apart — 32 sites per pore. <b>Number of NPCs</b> and <b>NPC model</b> are the
+          sidebar fields; the rest of the geometry is set from a settings file, a Sample preset or the log terminal
+          (<code>simulation_nup_radius</code>, <code>_ringSeparation</code>, <code>_cornerSpread</code>,
+          <code>_linkerLengthMin/Max</code>, <code>_minSpacing</code>, <code>_curvature</code>, <code>_tiltDeg</code> —
+          each pore tipped by a random angle up to this — and <code>_membrane</code> = <code>dome</code>, pores on the
+          top of a nucleus), following the parametrized approach of Wanninger <i>et al.</i> ("CIR4MICS"),
           <i>Bioinformatics</i> 39(10), btad587 (2023),
           <a href="https://doi.org/10.1093/bioinformatics/btad587" target="_blank" rel="noopener">doi:10.1093/bioinformatics/btad587</a>.</p>
         </div>
@@ -2143,8 +2157,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           to lengthen the depth range over which z is readable, at the cost of precision at focus.
           <b>NA</b> and <b>Wavelength</b> set the objective and the dye. The pupil is turned into an image with
           a chirp-Z transform, which matches an ideal Airy disk out to the edge of the kernel. The refractive
-          indices, emitter depth, working distance and a custom Zernike vector are under Advanced → PSF; the
-          kernel numerics under Advanced → Performance.</p>
+          indices, sample depth, the supercritical-angle and apodisation switches, working distance and a custom
+          Zernike vector are under Advanced → PSF; the kernel numerics under Advanced → Performance.</p>
           <p><b>Preview PSF</b> (top of the panel) builds this (cached) kernel and shows it as a z-scrollable
           stack in the raw panel: its z-plane slider takes the place of the Frame slider, and Contrast
           stretches each plane to its own range (Auto) until you move a handle. Click it again (<b>Hide
@@ -2177,6 +2191,11 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <li><b>Min photons/frame</b> and <b>Edge exclusion</b> — emitter-frames too dim, or too close to the edge, to be found are "don't care": detecting one is not a false positive, missing one is not a miss.</li>
           <li><b>Crowding radius</b> splits the result into isolated and crowded emitters; <b>Score z bins</b> sets the depth resolution of the plots.</li>
           </ul>
+          <p>For a gel bead stack the first view is <b>bead z</b> — fitted against nominal z, each bead's nominal
+          position where its own fitted z crosses 0 (Li <i>et al.</i> Fig. 2); for pores and pits it is <b>objects</b> —
+          ring distance against each pore's centre z, or a side view of every pit. In the physical depth mode the
+          fit returns objective travel, so the log also gives the axial scale times the model's own refractive-index
+          mismatch factor (RIMF), and counts axial failures beyond max(5 × CRLB, d/4).</p>
           <p>The raw-panel toggle cycles the plot between z error vs depth, fitted vs true z, Jaccard vs depth, the lateral and axial (signed) error histograms, recall vs photons, Jaccard vs match radius, fitted vs true photons, and measured precision vs the reported CRLB. Each plot's legend names every mark; a box in its corner gives the numbers and how to read it. Median and percentiles are the headline numbers, not RMSE — the axial error has heavy tails. Set Localisation <b>Gain</b>/<b>Camera offset</b> to the simulated camera's values, or photometry and the CRLB comparison measure that mismatch instead of the fitter.</p>
         </div>
         </details>
@@ -2229,12 +2248,18 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           separate from the Gain/Camera offset used for localization. <b>Offset std</b> is the fixed per-pixel
           spread of the offset map, the static pattern a real sCMOS has. <b>Clock-induced charge</b> and <b>Bit
           depth</b> apply to the EMCCD model only.</p>
-          <p><b>PSF</b> (Zernike model). <b>Sample</b>/<b>immersion refractive index</b> and <b>Emitter depth into
-          sample</b> (where the focal plane sits above the coverslip) set the depth-induced aberration; the focal
-          shift is compensated, so the kernel's z range is centred on the emitter's actual focus. <b>Working
-          distance</b> is the Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b>
-          overrides the aberration preset with 15 or 28 comma-separated milliwave coefficients (OSA indices 0–14
-          or 0–27; 1000 = one full wave).</p>
+          <p><b>PSF</b> (Zernike model). <b>Sample</b>/<b>immersion refractive index</b> and <b>Sample depth</b>
+          (the height above the coverslip the sample sits at and the objective is focused on) set the
+          depth-induced aberration; the focal shift is compensated, so the kernel's z range is centred on the
+          emitter's actual focus. <b>Supercritical angle (SAF)</b> lets the light past the critical angle through —
+          it is evanescent in the sample, so an emitter at the glass is brighter and sharper than one a few
+          hundred nm up; <b>Fresnel apodisation</b> weights the pupil with the interface's transmission (off by
+          default: published SAF fractions assume a uniform pupil). <b>Bead depth range</b> (above 0) makes Calib.
+          stack a gel of beads at random heights, with ground truth; <b>Bead diameter</b> averages each bead over
+          its volume; <b>Calib. stack seed</b> makes the stack reproducible. <b>Working distance</b> is the
+          Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b> overrides the
+          aberration preset with 15 or 28 comma-separated milliwave coefficients (OSA indices 0–14 or 0–27; 1000
+          = one full wave).</p>
           <p><b>Background.</b> <b>Out-of-focus haze</b> adds the labelled structure's own projected density,
           blurred to <b>Haze blur σ</b>, relative to the flat/cell part — a static stand-in for light from far
           above and below the focal plane.</p>
@@ -6279,10 +6304,21 @@ async function buildPsfPlanesQuiet(cfg, nx, ny){
     if(e && e.available){ try{ return {...await gpuPsfPlanes(e, cfg, nx, ny), pool}; }catch(_){ /* fall back to the CPU */ } } }
   return {...(pool ? await buildPsfPlanesParallel(cfg, nx, ny, pool) : await buildPsfPlanesSerial(cfg, nx, ny)), pool};
 }
-// One measured anchor: f0 (nm) for an emitter dNm above the coverslip. guessNm centres the sweep.
+// One measured anchor: f0 (nm) for an emitter dNm above the coverslip. The sweep is centred on a
+// CANONICAL guess, d/0.78 (between the paraxial 0.879 and the full-pupil 0.7255), never on a value
+// chained from an earlier anchor: the crossing is interpolated on a 25 nm grid, so where the grid
+// sits moves it by a few nm, and a guess that depended on call order made the cached anchor — and
+// with it the measured focus, calRef and the bead convolution — depend on which feature asked
+// first. If the crossing lands near the sweep's edge the sweep is re-centred once on it.
 async function psfFocusForDepth(cfg, dNm, guessNm){
   const key=psfFocusKey(cfg)+'|'+dNm;
   if(_psfFocusCache.has(key)) return _psfFocusCache.get(key);
+  let r=await psfFocusMeasure(cfg, dNm, guessNm!==undefined ? guessNm : dNm/0.78);
+  if(r.atEdge) r=await psfFocusMeasure(cfg, dNm, r.f0Nm);
+  _psfFocusCache.set(key, r);
+  return r;
+}
+async function psfFocusMeasure(cfg, dNm, guessNm){
   const resNm=cfg.cameraPxNm/cfg.oversample;
   const halfWidthPx=Math.ceil(1500/resNm);            // 3 um is plenty to fit the core's widths
   const stepNm=25, half=Math.round((400+0.15*dNm)/stepNm), nz=2*half+1;
@@ -6313,10 +6349,8 @@ async function psfFocusForDepth(cfg, dNm, guessNm){
     let kc=k; if(k>0 && k<pk.length-1){ const d=pk[k-1]-2*pk[k]+pk[k+1]; if(d<0) kc=k+0.5*(pk[k-1]-pk[k+1])/d; }
     f0=fAt(kc); how='peak';
   }
-  const atEdge = how==='width' ? (best.kc<1 || best.kc>nz-2) : false;
-  const r={dNm, f0Nm:f0, how, atEdge};
-  _psfFocusCache.set(key, r);
-  return r;
+  const atEdge = how==='width' ? (best.kc<3 || best.kc>nz-4) : false;
+  return {dNm, f0Nm:f0, how, atEdge};
 }
 // The focus map over [dLoNm, dHiNm]: anchors at a fixed ladder of depths (dense near the glass,
 // where the supercritical light changes fastest), each measured once and cached.
@@ -6331,12 +6365,7 @@ async function psfFocusMap(cfg, dLoNm, dHiNm){
   if(above!==undefined) ds.push(above); else if(ds[ds.length-1]<hi) ds.push(hi);
   ds=[...new Set(ds)].sort((a,b)=>a-b);
   const anchors=[];
-  let prev=null;
-  for(const d of ds){
-    const guess = prev ? prev.f0Nm+(d-prev.dNm)*(prev.dNm>0 ? prev.f0Nm/prev.dNm : 1.2) : d/0.80;
-    const a=await psfFocusForDepth(cfg, d, guess);
-    anchors.push(a); prev=a;
-  }
+  for(const d of ds) anchors.push(await psfFocusForDepth(cfg, d));
   const seg=d=>{ let i=0; while(i<anchors.length-2 && d>anchors[i+1].dNm) i++; return i; };
   const f0=d=>{ if(anchors.length===1) return anchors[0].f0Nm;
     const i=seg(d), a=anchors[i], b=anchors[i+1]; return a.f0Nm+(d-a.dNm)*(b.f0Nm-a.f0Nm)/(b.dNm-a.dNm); };
@@ -23590,7 +23619,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29g — Simulation: Sample preset — the calibration and test samples of Li et al. (2019) in one choice (beads on coverslip / in gel, pits, Nup107 pores).
+log(`webSMLM v0.13.0-dev · build 2026-10-29h — Docs: Recipe H (Li et al. 2019) in the Simulation guide, every new field in the parameter tables, hints for the Sample preset, pits, Nup107, SAF and bead z / objects.
+— from build 2026-10-29g: Simulation: Sample preset — the calibration and test samples of Li et al. (2019) in one choice (beads on coverslip / in gel, pits, Nup107 pores).
 — from build 2026-10-29f: Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.
 — from build 2026-10-29e: Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.
 — from build 2026-10-29d: Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.

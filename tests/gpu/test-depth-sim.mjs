@@ -187,6 +187,27 @@ try {
   for (const c of conv)
     check(`(1) pupil grid converged at ${c.zNm} nm (256 vs 512 < 1 %)`, c.l2_256_512 < 0.01,
       `L2 64→128 ${(100 * c.l2_64_128).toFixed(2)} %, 128→256 ${(100 * c.l2_128_256).toFixed(2)} %, 256→512 ${(100 * c.l2_256_512).toFixed(3)} %, kernel border ${(100 * c.borderShare256).toFixed(2)} %`);
+
+  // ---- (2) focus map: Li 2019 optics, astigmatism 183 mλ at OSA j=5, annulus on ----------------
+  const fmap = await page.evaluate(async () => {
+    const z = new Array(PSF_NZERNIKE).fill(0); z[5] = 183;
+    __set('simulation_psfNA', 1.43); __set('simulation_psfWavelength', 670); __set('simulation_psfNs', 1.3345);
+    __set('simulation_psfNi', 1.518); __set('simulation_psfSaf', true); __set('simulation_psfZernikeCustom', z.join(','));
+    const fm = await psfFocusMap(readPsfConfigFromUI(), 0, 5000);
+    return { j5: psfIndexToNM(5), anchors: fm.anchors.map(a => ({ d: a.dNm, f0: a.f0Nm, how: a.how, atEdge: a.atEdge })),
+             at: [340, 2000, 3500, 5000].map(d => ({ d, f0: fm.f0(d), rimf: fm.rimf(d), slope: fm.f0prime(d) })) };
+  });
+  results.focusMap = fmap;
+  check('(2) OSA j=5 is vertical astigmatism (n=2, m=+2)', fmap.j5[0] === 2 && fmap.j5[1] === 2, JSON.stringify(fmap.j5));
+  check('(2) every focus anchor found by the width zero, none at the sweep edge',
+    fmap.anchors.every(a => a.how === 'width' && !a.atEdge), `${fmap.anchors.length} anchors`);
+  check('(2) f0 at the coverslip is 0', Math.abs(fmap.anchors[0].f0) < 2, `${fmap.anchors[0].f0.toFixed(1)} nm`);
+  const at = d => fmap.at.find(a => a.d === d);
+  check('(2) f0(2000) within [paraxial 2283, full-pupil 2760] nm (report MLE 2619)', at(2000).f0 > 2283 && at(2000).f0 < 2760, `${at(2000).f0.toFixed(0)} nm`);
+  check('(2) f0(5000) within [5688, 6892] nm', at(5000).f0 > 5688 && at(5000).f0 < 6892, `${at(5000).f0.toFixed(0)} nm`);
+  check('(2) model RIMF at 340/2000/3500 nm near report 0.70/0.76/0.79',
+    [[340, 0.70], [2000, 0.76], [3500, 0.79]].every(([d, t]) => Math.abs(at(d).rimf - t) < 0.02),
+    [340, 2000, 3500].map(d => at(d).rimf.toFixed(3)).join(' / '));
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

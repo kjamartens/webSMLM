@@ -25,25 +25,25 @@
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
     params          2645   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3623   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3851   synthetic stack generator ("Simulate movie")
-    validation      6919   ground-truth scoring for simulated data ("Compare to GT")
-    detect          7778   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8034   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          8644   super-resolution accumulation, view, colour maps, plots
-    workers         10168  frame-parallel detect/fit worker pool
-    gpu             10814  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13143  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  13434  astigmatic width-vs-z bead calibration
-    drift           13833  AIM and cross-correlation drift correction
-    locprecision    14491  NeNA and FRC
-    sSMLM           15630  spectral SMLM pairing (distance/angle fit, pairCore())
+    in/out          3630   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3858   synthetic stack generator ("Simulate movie")
+    validation      7044   ground-truth scoring for simulated data ("Compare to GT")
+    detect          7903   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8159   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          8769   super-resolution accumulation, view, colour maps, plots
+    workers         10293  frame-parallel detect/fit worker pool
+    gpu             10939  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13268  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  13559  astigmatic width-vs-z bead calibration
+    drift           13958  AIM and cross-correlation drift correction
+    locprecision    14616  NeNA and FRC
+    sSMLM           15755  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             18343  single-particle tracking and diffusion coefficients
-    pipeline        19393  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   20433  Micro-Manager/pycromanager bridge (experimental)
-    table           22844  localizations table, filters, histograms, clustering
-    headless API    23529  window.webSMLM.analyze()/analyzeBatch()
+    spt             18468  single-particle tracking and diffusion coefficients
+    pipeline        19518  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   20558  Micro-Manager/pycromanager bridge (experimental)
+    table           22970  localizations table, filters, histograms, clustering
+    headless API    23655  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29a</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3229,6 +3229,13 @@ const PARAMS = {
   // Zernike radius stays ns/NA either way, so every preset keeps its meaning (psfBMax()).
   simulation_psfSaf: { type:'bool', id:'simulation_psfSaf', label:'Supercritical angle (SAF)', default:false },
   simulation_psfApodization: { type:'bool', id:'simulation_psfApodization', label:'Fresnel apodisation', default:false },
+  // What a structure's z MEANS. 'objective' (default, every movie before 2026-10-29): z is
+  // objective travel relative to the kernel's focus — the depth-induced axial scale is implicitly
+  // 1, and one Sample depth applies to the whole movie. 'physical': z is height in nm relative to
+  // Sample depth, each emitter is imaged at its OWN depth with the objective fixed at the measured
+  // focus of Sample depth (psfFocusMap()) — so the depth-dependent axial squeezing Li et al. (2019)
+  // measure is in the movie, not defined away. No control: the Sample presets set it.
+  simulation_depthMode: { type:'enum', id:null, label:'Depth model', options:['objective','physical'], default:'objective' },
   // simulation_psfZRange/ZStep define the z-plane grid the kernel is built over: nz =
   // 2*round(zRange/zStep)+1 planes, centred on focus at index (nz-1)/2 — see buildPsfKernelStack().
   simulation_psfZRange: { type:'number', id:'simulation_psfZRange', label:'PSF z range (± nm)', min:50, max:2000, step:10, default:2000, int:false },
@@ -5587,7 +5594,8 @@ function readPsfConfigFromUI(){
                 zernikeCoeffs, zernikeSource,
                 maskType:paramValue('simulation_psfMaskType'), maskModes:paramValue('simulation_psfMaskModes'),
                 maskWaist:paramValue('simulation_psfMaskWaist'),
-                saf:!!paramValue('simulation_psfSaf'), apod:!!paramValue('simulation_psfApodization') };
+                saf:!!paramValue('simulation_psfSaf'), apod:!!paramValue('simulation_psfApodization'),
+                depthMode:paramValue('simulation_depthMode') };
   cfg.fftDk=psfFftDkForCfg(cfg);   // Cartesian grid's own k-space spacing — see psfFftDkForCfg()
   return cfg;
 }
@@ -5656,7 +5664,21 @@ async function buildPsfKernelStack(cfg){
   // default oversample=4, 64x at the max oversample=8) — the actual cause of a slow build, not a
   // fundamental performance limit of the algorithm itself.
   const nx=2*cfg.halfWidthPx+1, ny=nx;
-  const focusIndex=Math.floor((cfg.nz-1)/2);
+  let focusIndex=Math.floor((cfg.nz-1)/2);
+  // The sweep is centred on the PARAXIAL focus d*ni/ns. With the interface physics on (or the
+  // physical depth mode, which depends on it), use the MEASURED focus instead (psfFocusMap()):
+  // at depth the two differ by hundreds of nm, and everything downstream — structure z=0, the
+  // calibration stack's calRef, psfUsableZRange()'s walk — anchors on focusIndex. Off (the
+  // default), nothing changes: a seeded movie stays byte-identical.
+  let measuredFocus=null;
+  const dNm=cfg.particleAxialPosition*1e9;
+  if((cfg.saf || cfg.apod || cfg.depthMode==='physical') && dNm>0 && cfg.sweepCenterM===undefined){
+    const fm=await psfFocusMap(cfg, dNm, dNm);
+    const f0=fm.f0(dNm), fc=dNm*cfg.ni/cfg.ns, zs=cfg.zStep*1e9, c=(cfg.nz-1)/2;
+    const k=Math.round(c+(fc-f0)/zs);
+    focusIndex=Math.max(0, Math.min(cfg.nz-1, k));
+    measuredFocus={f0Nm:f0, paraxialNm:fc, rimf:dNm/f0, clamped:k!==focusIndex};
+  }
   const pool=await getPsfWorkerPool();
   // Use GPU acceleration → the device builds the planes, same rule as the simulator's frame stage
   // (simGpuWanted(): no size threshold). The workers still do the width fits afterwards.
@@ -5668,6 +5690,8 @@ async function buildPsfKernelStack(cfg){
       `${cfg.nz} z-planes × ${cfg.zStep*1e9}nm (focus @ plane ${focusIndex}), `+
       `Zernike[${cfg.zernikeSource}]=[${cfg.zernikeCoeffs.map(v=>v.toFixed(3)).join(',')}], `+
       `chirp-Z on a ${psfFftM(cfg)}×${psfFftM(cfg)} Cartesian pupil (dk=${cfg.fftDk.toExponential(3)})`+
+      (measuredFocus ? `, focus measured at ${measuredFocus.f0Nm.toFixed(0)} nm of objective travel (paraxial ${measuredFocus.paraxialNm.toFixed(0)}, model RIMF ${measuredFocus.rimf.toFixed(3)})`+
+        (measuredFocus.clamped ? ' — OUTSIDE this z range, clamped to its edge: widen PSF z range' : '') : '')+
       (cfg.saf?', supercritical annulus on':'')+(cfg.apod?', Fresnel apodisation on':'')+
       (engine?', on the GPU':pool?`, using ${pool.length} PSF worker(s)`:', running single-threaded (no worker pool available)'));
   const t0=performance.now();
@@ -5722,7 +5746,7 @@ async function buildPsfKernelStack(cfg){
           `. No fitter can do better than this — it is the yardstick, not a measurement of any fit.`);
     }
   }
-  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm, focusIndex, globalMax, zUsableNm, zCrlb };
+  return { slices, nx, ny, nz:cfg.nz, resLateralM:cfg.resLateralM, zStepNm, focusIndex, globalMax, zUsableNm, zCrlb, measuredFocus };
 }
 
 // How far either side of focus this PSF actually encodes z UNIQUELY, in nm.
@@ -5749,8 +5773,30 @@ async function buildPsfKernelStack(cfg){
 // `pool` (the PSF worker pool, optional) spreads the per-plane fits over the workers — on a
 // default 401-plane build they took ~2 s on the main thread, longer than the planes themselves.
 async function psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, oversample, pool){
+  const lr=await psfWidthRatios(slices, nx, ny, oversample, pool);
+  if(!lr) return 0;                                 // too few camera pixels to fit anything
+  // Walk outwards in both directions; the usable half-range is the smaller of the two, so the
+  // reported figure holds on both sides of focus.
+  let up=0;
+  for(let k=focusIndex+1;k<slices.length;k++){ if(Math.abs(lr[k])<=Math.abs(lr[k-1])) break; up=k-focusIndex; }
+  let dn=0;
+  for(let k=focusIndex-1;k>=0;k--){ if(Math.abs(lr[k])<=Math.abs(lr[k+1])) break; dn=focusIndex-k; }
+  const n=Math.min(up,dn);
+  if(n===0) return 0;
+  // A radially symmetric PSF has no width-based z information at all, but its fitted σy/σx still
+  // wobbles at the 1e-3 level on pure numerics, which would otherwise "grow monotonically" for a
+  // plane or two and report a spurious tens-of-nm range. Require a real separation (2% in σ) at
+  // the outermost plane before calling any of it usable.
+  const MIN_LN_RATIO=0.02;
+  if(Math.abs(lr[focusIndex+n])<MIN_LN_RATIO || Math.abs(lr[focusIndex-n])<MIN_LN_RATIO) return 0;
+  return n*zStepNm;
+}
+// ln(σy/σx) of every plane, each binned to camera pixels and fitted with gaussianFitElliptical()
+// — the fitter 3D calibration uses — on the PSF pool when there is one. null if the binned plane
+// is too small to fit. Shared by psfUsableZRange() and the focus map (psfFocusForDepth()).
+async function psfWidthRatios(slices, nx, ny, oversample, pool){
   const bw=Math.floor(nx/oversample), bh=Math.floor(ny/oversample);
-  if(bw<5||bh<5) return 0;                          // too few camera pixels to fit anything
+  if(bw<5||bh<5) return null;
   const cx=(bw-1)>>1, cy=(bh-1)>>1;
   const rad=Math.min(cx,cy), win=2*rad+1;
   const lr=new Float64Array(slices.length);         // ln(σy/σx) per plane
@@ -5778,21 +5824,100 @@ async function psfUsableZRange(slices, nx, ny, focusIndex, zStepNm, oversample, 
       lr[k] = (L && L.sx>0 && L.sy>0) ? Math.log(L.sy/L.sx) : 0;
     }
   }
-  // Walk outwards in both directions; the usable half-range is the smaller of the two, so the
-  // reported figure holds on both sides of focus.
-  let up=0;
-  for(let k=focusIndex+1;k<slices.length;k++){ if(Math.abs(lr[k])<=Math.abs(lr[k-1])) break; up=k-focusIndex; }
-  let dn=0;
-  for(let k=focusIndex-1;k>=0;k--){ if(Math.abs(lr[k])<=Math.abs(lr[k+1])) break; dn=focusIndex-k; }
-  const n=Math.min(up,dn);
-  if(n===0) return 0;
-  // A radially symmetric PSF has no width-based z information at all, but its fitted σy/σx still
-  // wobbles at the 1e-3 level on pure numerics, which would otherwise "grow monotonically" for a
-  // plane or two and report a spurious tens-of-nm range. Require a real separation (2% in σ) at
-  // the outermost plane before calling any of it usable.
-  const MIN_LN_RATIO=0.02;
-  if(Math.abs(lr[focusIndex+n])<MIN_LN_RATIO || Math.abs(lr[focusIndex-n])<MIN_LN_RATIO) return 0;
-  return n*zStepNm;
+  return lr;
+}
+
+/* ---- Focus map: where the objective must sit for an emitter at depth d to be in focus ----
+   Objective position f (nm) is measured as travel towards the sample from the coverslip focus:
+   f = ti0 - ti, with ti the immersion thickness the Gibson-Lanni pupil uses. Plane k of a stack
+   built around sweep centre ti_c sits at f(k) = (ti0 - ti_c) - zStep*(k - (nz-1)/2), so a HIGHER
+   plane index is the objective further from the sample, i.e. the emitter above focus — the same
+   sense in which a structure's z picks its plane.
+   f0(d) is MEASURED from the model, the way Li et al. define a bead's nominal position: the
+   objective position where the camera-binned PSF fits sigma_x = sigma_y (the zero of
+   ln(sigma_y/sigma_x)), which spherical aberration does not move because it is radially
+   symmetric. A PSF with no astigmatism has no such zero; its focus is the plane of highest
+   peak intensity instead. The paraxial guess d*ni/ns is NOT used as the focus: the true focus
+   lies between d/0.879 (paraxial) and d/0.7255 (whole subcritical pupil) and at 5 um the
+   difference is over a micrometre. Anchors are measured at a few depths and interpolated
+   linearly — f0 is close to linear in d — and cached per optical configuration. */
+const _psfFocusCache=new Map();
+function psfFocusKey(cfg){
+  return JSON.stringify([cfg.NA,cfg.lambda,cfg.ns,cfg.ni,cfg.ti0,cfg.zernikeCoeffs,cfg.maskType,cfg.maskModes,cfg.maskWaist,
+                         !!cfg.saf,!!cfg.apod,cfg.oversample,cfg.cameraPxNm,simGpuWanted()]);
+}
+// Planes for an arbitrary cfg through the same three paths buildPsfKernelStack() uses (GPU,
+// PSF worker pool, main thread), without its logging or diagnostics.
+async function buildPsfPlanesQuiet(cfg, nx, ny){
+  const pool=await getPsfWorkerPool();
+  if(simGpuWanted()){ const e=await getGpuEngine();
+    if(e && e.available){ try{ return {...await gpuPsfPlanes(e, cfg, nx, ny), pool}; }catch(_){ /* fall back to the CPU */ } } }
+  return {...(pool ? await buildPsfPlanesParallel(cfg, nx, ny, pool) : await buildPsfPlanesSerial(cfg, nx, ny)), pool};
+}
+// One measured anchor: f0 (nm) for an emitter dNm above the coverslip. guessNm centres the sweep.
+async function psfFocusForDepth(cfg, dNm, guessNm){
+  const key=psfFocusKey(cfg)+'|'+dNm;
+  if(_psfFocusCache.has(key)) return _psfFocusCache.get(key);
+  const resNm=cfg.cameraPxNm/cfg.oversample;
+  const halfWidthPx=Math.ceil(1500/resNm);            // 3 um is plenty to fit the core's widths
+  const stepNm=25, half=Math.round((400+0.15*dNm)/stepNm), nz=2*half+1;
+  const g=guessNm!==undefined ? guessNm : dNm/0.80;
+  const c={...cfg, particleAxialPosition:dNm*1e-9, zStep:stepNm*1e-9, nz, halfWidthPx,
+           sweepCenterM:cfg.ti0-g*1e-9};
+  c.fftDk=psfFftDkForCfg(c);
+  const nx=2*halfWidthPx+1;
+  const {slices, pool}=await buildPsfPlanesQuiet(c, nx, nx);
+  const fAt=k=>g-stepNm*(k-half);
+  const lr=await psfWidthRatios(slices, nx, nx, cfg.oversample, pool);
+  let best=null, maxAbs=0;
+  if(lr){
+    for(const v of lr) maxAbs=Math.max(maxAbs, Math.abs(v));
+    for(let k=0;k+1<lr.length;k++){
+      if(lr[k]===0 || lr[k+1]===0 || Math.sign(lr[k])===Math.sign(lr[k+1])) continue;
+      const slope=Math.abs(lr[k+1]-lr[k]), kc=k+lr[k]/(lr[k]-lr[k+1]);
+      if(!best || slope>best.slope) best={kc, slope};
+    }
+  }
+  let f0, how;
+  if(best && maxAbs>0.05){ f0=fAt(best.kc); how='width'; }
+  else {                                                // no astigmatism: the brightest plane
+    const bw=Math.floor(nx/cfg.oversample), pk=slices.map(s=>{ const img=new Float64Array(bw*bw); let sum=0, mx=0;
+      for(let y=0;y<bw*cfg.oversample;y++) for(let x=0;x<bw*cfg.oversample;x++){ const v=s[y*nx+x]; img[((y/cfg.oversample)|0)*bw+((x/cfg.oversample)|0)]+=v; sum+=v; }
+      for(const v of img) mx=Math.max(mx,v); return sum>0?mx/sum:0; });
+    let k=0; for(let i=1;i<pk.length;i++) if(pk[i]>pk[k]) k=i;
+    let kc=k; if(k>0 && k<pk.length-1){ const d=pk[k-1]-2*pk[k]+pk[k+1]; if(d<0) kc=k+0.5*(pk[k-1]-pk[k+1])/d; }
+    f0=fAt(kc); how='peak';
+  }
+  const atEdge = how==='width' ? (best.kc<1 || best.kc>nz-2) : false;
+  const r={dNm, f0Nm:f0, how, atEdge};
+  _psfFocusCache.set(key, r);
+  return r;
+}
+// The focus map over [dLoNm, dHiNm]: anchors at a fixed ladder of depths (dense near the glass,
+// where the supercritical light changes fastest), each measured once and cached.
+// Returns {anchors, f0(d), f0prime(d), rimf(d)} — f0prime is d f0/d d (nm of objective travel
+// per nm of depth, ~1/RIMF), rimf(d) = d/f0(d).
+async function psfFocusMap(cfg, dLoNm, dHiNm){
+  const LADDER=[0,100,200,350,500,750,1000,1500,2000,2500,3000,3500,4000,5000,6000];
+  const lo=Math.max(0,dLoNm), hi=Math.max(lo,dHiNm);
+  let ds=LADDER.filter(d=>d>=lo && d<=hi);
+  const below=LADDER.filter(d=>d<lo).pop(), above=LADDER.find(d=>d>hi);
+  if(below!==undefined) ds.unshift(below); else if(!ds.length || ds[0]>lo) ds.unshift(lo);
+  if(above!==undefined) ds.push(above); else if(ds[ds.length-1]<hi) ds.push(hi);
+  ds=[...new Set(ds)].sort((a,b)=>a-b);
+  const anchors=[];
+  let prev=null;
+  for(const d of ds){
+    const guess = prev ? prev.f0Nm+(d-prev.dNm)*(prev.dNm>0 ? prev.f0Nm/prev.dNm : 1.2) : d/0.80;
+    const a=await psfFocusForDepth(cfg, d, guess);
+    anchors.push(a); prev=a;
+  }
+  const seg=d=>{ let i=0; while(i<anchors.length-2 && d>anchors[i+1].dNm) i++; return i; };
+  const f0=d=>{ if(anchors.length===1) return anchors[0].f0Nm;
+    const i=seg(d), a=anchors[i], b=anchors[i+1]; return a.f0Nm+(d-a.dNm)*(b.f0Nm-a.f0Nm)/(b.dNm-a.dNm); };
+  const f0prime=d=>{ if(anchors.length===1) return 1;
+    const i=seg(d), a=anchors[i], b=anchors[i+1]; return (b.f0Nm-a.f0Nm)/(b.dNm-a.dNm); };
+  return {anchors, f0, f0prime, rimf:d=>d>0 ? d/f0(d) : 1/f0prime(0)};
 }
 // What this PSF can tell you about depth, for ANY PSF shape — the Cramer-Rao lower bound on x, y
 // and z, computed from the kernel stack itself under an assumed photon count and background.
@@ -22747,7 +22872,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29a — Simulation: Supercritical angle (SAF) and Fresnel apodisation switches (Advanced → PSF, both off); "Emitter depth into sample" is now "Sample depth".
+log(`webSMLM v0.13.0-dev · build 2026-10-29b — Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.
+— from build 2026-10-29a: Simulation: Supercritical angle (SAF) and Fresnel apodisation switches (Advanced → PSF, both off); "Emitter depth into sample" is now "Sample depth".
 — from build 2026-09-28u: Defaults: Compare to GT min photons/frame 300; cell field seed 0 (random each movie).
 — from build 2026-09-28t: Compare to GT: axial error histogram; every score plot now names what each mark is and how to read it; error ÷ CRLB view removed.
 — from build 2026-09-28s: Compare to GT: Jaccard vs depth is back.

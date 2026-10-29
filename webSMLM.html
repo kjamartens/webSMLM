@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2645   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3630   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3858   synthetic stack generator ("Simulate movie")
-    validation      7131   ground-truth scoring for simulated data ("Compare to GT")
-    detect          7990   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8246   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          8856   super-resolution accumulation, view, colour maps, plots
-    workers         10380  frame-parallel detect/fit worker pool
-    gpu             11026  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13355  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  13646  astigmatic width-vs-z bead calibration
-    drift           14045  AIM and cross-correlation drift correction
-    locprecision    14703  NeNA and FRC
-    sSMLM           15842  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2648   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3647   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3875   synthetic stack generator ("Simulate movie")
+    validation      7291   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8241   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8497   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9107   super-resolution accumulation, view, colour maps, plots
+    workers         10631  frame-parallel detect/fit worker pool
+    gpu             11277  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13606  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  13897  astigmatic width-vs-z bead calibration
+    drift           14296  AIM and cross-correlation drift correction
+    locprecision    14954  NeNA and FRC
+    sSMLM           16093  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             18555  single-particle tracking and diffusion coefficients
-    pipeline        19605  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   20645  Micro-Manager/pycromanager bridge (experimental)
-    table           23058  localizations table, filters, histograms, clustering
-    headless API    23743  window.webSMLM.analyze()/analyzeBatch()
+    spt             18806  single-particle tracking and diffusion coefficients
+    pipeline        19856  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   20896  Micro-Manager/pycromanager bridge (experimental)
+    table           23320  localizations table, filters, histograms, clustering
+    headless API    24005  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29c</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29d</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -2193,6 +2193,9 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="psfDepthRow" style="display:none" title="Height above the coverslip that the sample sits at and the objective is focused on. Depth-induced spherical aberration and focal shift follow from the refractive-index mismatch. With a Sample preset, each structure sits at this depth plus its own z.">Sample depth (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
           <label class="row" id="psfSafRow" style="display:none" title="Let light past the critical angle (the supercritical annulus between NA = ns and the objective's NA) through. That light is evanescent in the sample, so it fades within ~100 nm of the glass: emitters at the coverslip get brighter and sharper than deeper ones. Off = the classic subcritical pupil.">Supercritical angle (SAF) <input type="checkbox" id="simulation_psfSaf"></label>
           <label class="row" id="psfApodRow" style="display:none" title="Weight the pupil with the interface's Fresnel transmission. Changes the in-focus PSF as well as its depth dependence; off by default because published SAF fractions assume a uniform pupil.">Fresnel apodisation <input type="checkbox" id="simulation_psfApodization"></label>
+          <label class="row" id="calibDepthMaxRow" style="display:none" title="Calib. stack only. 0 = beads at Sample depth, focus on the centre frame (the usual calibration). Above 0 = beads in a gel at random heights up to this, the objective scanned through all of them; the stack then has ground truth, so Localize it (with a calibration from coverslip beads) and use Compare to GT → Show bead z.">Bead depth range (nm) <input type="number" id="simulation_calibDepthMax" min="0" max="6000" step="50" value="0" class="num"></label>
+          <label class="row" id="beadDiameterRow" style="display:none" title="Calib. stack only. Diameter of the fluorescent beads; 0 = point sources. A 100 nm bead is about 2% wider than a point.">Bead diameter (nm) <input type="number" id="simulation_beadDiameter" min="0" max="500" step="10" value="0" class="num"></label>
+          <label class="row" id="calibSeedRow" style="display:none" title="Calib. stack only. 0 = a new stack every click. Any other value reproduces bead positions, depths and camera noise exactly.">Calib. stack seed (0 = random) <input type="number" id="simulation_calibSeed" min="0" max="2147483647" step="1" value="0" class="num"></label>
           <label class="row" id="psfTi0Row" style="display:none" title="Nominal coverslip-to-objective working distance used by the Gibson-Lanni model.">Working distance (µm) <input type="number" id="simulation_psfTi0" min="100" max="250" step="1" value="150" class="num"></label>
           <label class="row" id="psfZernikeCustomRow" style="display:none" title="15 or 28 comma-separated values, one per OSA Zernike index (n ≤ 4 or n ≤ 6), in milliwaves (1000 = one full wave). Overrides the aberration preset; leave blank to use the preset.">Custom Zernike (mWave) <input type="text" id="simulation_psfZernikeCustom" placeholder="blank = preset" class="txt"></label>
           <div class="simsec">Background</div>
@@ -3236,6 +3239,20 @@ const PARAMS = {
   // focus of Sample depth (psfFocusMap()) — so the depth-dependent axial squeezing Li et al. (2019)
   // measure is in the movie, not defined away. No control: the Sample presets set it.
   simulation_depthMode: { type:'enum', id:null, label:'Depth model', options:['objective','physical'], default:'objective' },
+  // Calib. stack in a gel (Li et al. 2019, Fig. 2): >0 puts the beads at random heights up to this
+  // many nm above the coverslip (18% stay on the glass, the reference the paper finds the coverslip
+  // with) and scans the objective from 1 um below the glass to 1 um past the deepest bead's
+  // measured focus, each bead imaged at its own depth. 0 = the classic stack of beads at Sample
+  // depth, focus on the centre frame. Unlike the classic stack, the gel stack carries ground truth
+  // (one always-on emitter per bead), so Localize + Compare to GT → Show bead z scores it.
+  simulation_calibDepthMax: { type:'number', id:'simulation_calibDepthMax', label:'Bead depth range (nm)', min:0, max:6000, step:50, default:0, int:false },
+  // Fluorescent bead diameter. 0 = point source. >0 averages the PSF over a uniform ball: slabs
+  // across its height (weight R^2 - dz^2), each convolved laterally with a disc of radius
+  // sqrt(R^2 - dz^2) — the lateral term is the larger of the two (+2% in sigma at 100 nm).
+  simulation_beadDiameter: { type:'number', id:'simulation_beadDiameter', label:'Bead diameter (nm)', min:0, max:500, step:10, default:0, int:false },
+  // Seed for Calib. stack (bead positions, depths, camera noise). 0 = a fresh stack every click,
+  // the original behaviour.
+  simulation_calibSeed: { type:'number', id:'simulation_calibSeed', label:'Calib. stack seed (0 = random)', min:0, max:2147483647, step:1, default:0, int:true },
   // simulation_psfZRange/ZStep define the z-plane grid the kernel is built over: nz =
   // 2*round(zRange/zStep)+1 planes, centred on focus at index (nz-1)/2 — see buildPsfKernelStack().
   simulation_psfZRange: { type:'number', id:'simulation_psfZRange', label:'PSF z range (± nm)', min:50, max:2000, step:10, default:2000, int:false },
@@ -5202,6 +5219,8 @@ async function generateCalibrationStack(){
   const px=paramValue('simulation_pxnm');
   const interpMode=paramValue('simulation_psfInterp');
 
+  if(paramValue('simulation_calibDepthMax')>0) return generateGelBeadStack();
+  const calibSeed=paramValue('simulation_calibSeed');
   const cfg=readPsfConfigFromUI();               // FULL nz-plane kernel (see comment above)
   const kstack=await getOrBuildPsfKernelStack(cfg);
   const {nz, focusIndex, zStepNm}=kstack;
@@ -5211,7 +5230,16 @@ async function generateCalibrationStack(){
   // frame stays exactly photPerFrame regardless of distance from focus — physically the PSF
   // just spreads out (dims at the peak) with defocus, it doesn't lose energy.
   const planes=new Array(nz);
-  for(let z=0;z<nz;z++) planes[z]=simKernelPlane(normalizePsfPlane(kstack.slices[z]).norm, kstack.nx, kstack.ny, cfg.oversample, interpMode);
+  // A bead of finite size (Bead diameter) is averaged over its own volume here too, so the beads
+  // a calibration is made from and the gel beads it is then applied to are the same objects.
+  const beadR=paramValue('simulation_beadDiameter')/2;
+  let beadF0p=0;
+  if(beadR>0){ const d=cfg.particleAxialPosition*1e9; beadF0p=(await psfFocusMap(cfg, d, d)).f0prime(d); }
+  for(let z=0;z<nz;z++){
+    const s = beadR>0 ? beadConvolvedPlane(kstack.slices, z, kstack.nx, beadR, cfg.resLateralM*1e9, beadF0p, zStepNm) : kstack.slices[z];
+    planes[z]=simKernelPlane(normalizePsfPlane(s).norm, kstack.nx, kstack.ny, cfg.oversample, interpMode);
+    if(beadR>0 && z%20===19){ setProg(100*z/nz); await tick(); }
+  }
   const camRad=Math.max(1, Math.ceil(cfg.halfWidthPx/cfg.oversample));
 
   // A small grid of ALWAYS-ON fixed beads (unlike generateSynthetic()'s own blinking Poisson
@@ -5229,7 +5257,9 @@ async function generateCalibrationStack(){
 
   // fixed per-pixel camera offset map — same convention as generateSynthetic()'s own
   const offsetMap=new Float32Array(w*h);
-  for(let i=0;i<offsetMap.length;i++) offsetMap[i]=simOffset+simOffsetStd*gauss();
+  const offRng = calibSeed>0 ? mulberry32((calibSeed^0x0ffe7)>>>0) : undefined;
+  if(offRng) _g=null;   // no cached Box-Muller value from another stream may leak into a seeded stack   // unseeded: gauss()'s own Math.random, as before
+  for(let i=0;i<offsetMap.length;i++) offsetMap[i]=simOffset+simOffsetStd*gauss(offRng);
 
   // Splat+noise every z-plane — frame-parallel across the SAME simulation worker pool
   // generateSynthetic() uses (simulateCalibFramesParallel(), MODULE: workers), each worker
@@ -5238,7 +5268,7 @@ async function generateCalibrationStack(){
   // no seed control (its noise seed is a fresh random u32 per stack).
   const calibCtx={w,h,nz,bg,beadXY,photPerFrame,camRad,interpMode,
                   kernelNx:kstack.nx,kernelNy:kstack.ny,oversample:cfg.oversample,planes,
-                  offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(0),onProgress:setProg};
+                  offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(calibSeed),onProgress:setProg};
   const calibPool=await getSimWorkerPool();
   const calStage=newStageTimings(), tCal=performance.now();
   const {frames} = await runStage('simFrames', {useGpu:simGpuWanted(), stageTimings:calStage, onLog:log},
@@ -5253,6 +5283,136 @@ async function generateCalibrationStack(){
   log(`Simulated calibration stack: ${nz} z-planes × ${zStepNm}nm (focus @ frame ${focusIndex+1}/${nz}), `+
       `${beadXY.length} bead(s) at fixed x,y.`);
   return { stack: makeStack(w,h,nz,px, fi=>frames[fi]), focusIndex, zStepNm };
+}
+
+// Unit-mass disc of radius r (kernel px), anti-aliased by 8x8 supersampling, as {r:int, w:Float64Array}.
+function beadDiscKernel(rPx){
+  const R=Math.max(0,rPx), n=Math.ceil(R-1e-9), sz=2*n+1, w=new Float64Array(sz*sz); let sum=0;
+  for(let y=-n;y<=n;y++) for(let x=-n;x<=n;x++){
+    let c=0; for(let sy=0;sy<8;sy++) for(let sx=0;sx<8;sx++){ const dx=x-0.5+(sx+0.5)/8, dy=y-0.5+(sy+0.5)/8; if(dx*dx+dy*dy<=R*R) c++; }
+    w[(y+n)*sz+(x+n)]=c; sum+=c;
+  }
+  if(!(sum>0)){ w.fill(0); w[0]=1; return {r:0, w:Float64Array.of(1)}; }
+  for(let i=0;i<w.length;i++) w[i]/=sum;
+  return {r:n, w};
+}
+// The image of a uniform fluorescent ball (radius rNm) centred on plane j of a stack whose planes
+// step zStepNm of objective travel: slabs across the ball (weight R^2 - dz^2), each the plane its
+// height maps to (objective offset f0prime*dz, the physical-depth convention) convolved with a
+// disc of its own radius. Intensity space, incoherent — the ball's fluorophores do not interfere.
+function beadConvolvedPlane(slices, j, nx, rNm, resNm, f0prime, zStepNm){
+  const out=new Float64Array(nx*nx);
+  const NS=5;
+  for(let s=0;s<NS;s++){
+    const dz=-rNm+2*rNm*(s+0.5)/NS, wt=rNm*rNm-dz*dz;
+    if(!(wt>0)) continue;
+    const jj=Math.max(0,Math.min(slices.length-1, j+Math.round(f0prime*dz/zStepNm)));
+    const src=slices[jj], k=beadDiscKernel(Math.sqrt(wt)/resNm), sz=2*k.r+1;
+    for(let y=0;y<nx;y++) for(let x=0;x<nx;x++){
+      let acc=0;
+      for(let ky=-k.r;ky<=k.r;ky++){ const yy=y+ky; if(yy<0||yy>=nx) continue;
+        for(let kx=-k.r;kx<=k.r;kx++){ const xx=x+kx; if(xx<0||xx>=nx) continue; acc+=k.w[(ky+k.r)*sz+(kx+k.r)]*src[yy*nx+xx]; } }
+      out[y*nx+x]+=wt*acc;
+    }
+  }
+  return out;
+}
+// Calib. stack in a gel (Li et al., Biomed. Opt. Express 10, 2708 (2019), Fig. 2): a 3x3 grid
+// of always-on beads, 18% on the coverslip, the rest at random heights up to Bead depth range,
+// the objective stepped from 1 um below the glass to 1 um past the deepest bead's MEASURED focus
+// (psfFocusMap() — never the paraxial ratio, which at 5 um misses by over a micrometre). Each
+// bead is imaged at its own depth from the frame's objective position (its own small stack on
+// the shared objective axis, as in the physical depth mode), and only within ±1 um of its own
+// focus — outside that it is skipped and counted, never clamped onto an edge plane. The frames
+// go through the movie's own machinery (per-emitter plane index), so the worker pool and the GPU
+// render it unchanged. Ground truth: one always-on emitter per bead with its depth, its model
+// focus f0 and the stack's objective positions, so the score can compute z_nominal per frame.
+async function generateGelBeadStack(){
+  const w=paramValue('simulation_fov'), h=paramValue('simulation_fov');
+  const photPerFrame=paramValue('phot'), bg=paramValue('simbg');
+  const simGain=paramValue('simulation_gain'), simOffset=paramValue('simulation_offset'), simOffsetStd=paramValue('simulation_offset_std');
+  const readNoiseE=paramValue('simulation_readnoise'), cam=readSimCameraModel();
+  const px=paramValue('simulation_pxnm'), interpMode=paramValue('simulation_psfInterp');
+  const depthMax=paramValue('simulation_calibDepthMax'), beadD=paramValue('simulation_beadDiameter'), Rb=beadD/2;
+  const calibSeed=paramValue('simulation_calibSeed');
+  const rng = calibSeed>0 ? mulberry32(calibSeed>>>0) : Math.random;
+  const cfg0=readPsfConfigFromUI();
+  // A bead at defocus up to 1 um fits in a 3 um kernel; the full 6 um one would cost 4x the memory
+  // for nine beads' worth of planes.
+  const resNm=cfg0.cameraPxNm/cfg0.oversample, halfWidthPx=Math.min(cfg0.halfWidthPx, Math.ceil(1500/resNm));
+  const cfg={...cfg0, halfWidthPx}, nx=2*halfWidthPx+1;
+  const S=Math.max(20, cfg0.zStep*1e9);                       // objective step (nm); the paper used 20
+  const camRad=Math.max(1, Math.ceil(halfWidthPx/cfg.oversample));
+  // positions: the classic 3x3 grid, spaced so neighbouring beads' kernels never overlap
+  const spacing=Math.min(Math.max(24, 2*camRad+8), Math.floor(Math.min(w,h)/2 - camRad - 4));
+  const beads=[];
+  for(const gy of [-spacing,0,spacing]) for(const gx of [-spacing,0,spacing]) beads.push({x:w/2+gx, y:h/2+gy});
+  const nGlass=Math.max(1, Math.round(0.18*beads.length));
+  const order=beads.map((_,i)=>i).sort(()=>rng()-0.5);
+  beads.forEach((b,i)=>{ b.depth = order.indexOf(i)<nGlass ? Math.max(Rb,0) : Math.max(Rb,0)+rng()*(depthMax-Math.max(Rb,0)); });
+  const fm=await psfFocusMap(cfg, 0, depthMax);
+  for(const b of beads){ b.f0=fm.f0(b.depth); b.f0p=fm.f0prime(b.depth); }
+  const fStart=-1000, fEnd=Math.max(...beads.map(b=>b.f0))+1000;
+  const n=Math.floor((fEnd-fStart)/S)+1;
+  const fObj=new Float64Array(n); for(let m=0;m<n;m++) fObj[m]=fStart+m*S;
+  const margin = Rb>0 ? Math.ceil(1.6*Rb/S) : 0, half=Math.round(1000/S), halfTot=half+margin;
+  const frameEvents=Array.from({length:n}, ()=>[]);
+  const planes=[]; let nSkipped=0;
+  const t0=performance.now();
+  for(let bi=0; bi<beads.length; bi++){
+    const b=beads[bi];
+    const fC=fStart+S*Math.round((b.f0-fStart)/S);
+    const cb={...cfg, particleAxialPosition:b.depth*1e-9, zStep:S*1e-9, nz:2*halfTot+1, sweepCenterM:cfg.ti0-fC*1e-9};
+    cb.fftDk=psfFftDkForCfg(cb);
+    const {slices}=await buildPsfPlanesQuiet(cb, nx, nx);
+    const base=planes.length, cf=psfCollectedFraction(cfg, b.depth*1e-9);
+    b.cf=cf; b.m0=null; b.m1=null;
+    for(let j=margin; j<slices.length-margin; j++){
+      const s = Rb>0 ? beadConvolvedPlane(slices, j, nx, Rb, resNm, b.f0p, S) : slices[j];
+      planes.push(simKernelPlane(normalizePsfPlane(s).norm, nx, nx, cfg.oversample, interpMode));
+    }
+    for(let m=0;m<n;m++){
+      const j=halfTot+Math.round((fC-fObj[m])/S);           // plane index in this bead's stack
+      if(Math.abs(fObj[m]-b.f0)>1000 || j<margin || j>=slices.length-margin){ nSkipped++; continue; }
+      frameEvents[m].push([b.x, b.y, (base+j-margin)*S, cf]);
+      if(b.m0===null) b.m0=m; b.m1=m;
+    }
+    setProg(100*(bi+1)/beads.length);
+  }
+  const tPlanes=performance.now()-t0;
+  const zKernelStack={planes, nx, ny:nx, oversample:cfg.oversample, camRad, interpMode, focusIndex:0, zStepNm:S, nz:planes.length, zUsableNm:0};
+  const offsetMap=new Float32Array(w*h);
+  const offRng = calibSeed>0 ? mulberry32((calibSeed^0x0ffe7)>>>0) : undefined;
+  if(offRng) _g=null;   // no cached Box-Muller value from another stream may leak into a seeded stack
+  for(let i=0;i<offsetMap.length;i++) offsetMap[i]=simOffset+simOffsetStd*gauss(offRng);
+  const simCtx={w,h,n,bg,bgMap:null,bgDecay:0,frameEvents,driftPx:0,ddx:0,ddy:0,photPerFrame,sigma:1.3,rad:4,zKernelStack,zKernel:null,
+                offsetMap,simGain,readNoiseE,cam,noiseSeed:simNoiseSeed(calibSeed),onProgress:setProg};
+  const simPool=await getSimWorkerPool();
+  const stg=newStageTimings(), tF=performance.now();
+  const {frames}=await runStage('simFrames', {useGpu:simGpuWanted(), stageTimings:stg, onLog:log},
+    () => simPool && simPool.length>1 ? simulateFramesParallel(simPool, simCtx) : simulateFramesSerial(simCtx),
+    interpMode!=='fft' ? async () => simulateFramesGpu(await getGpuEngine(), simCtx) : null,
+    interpMode!=='fft' ? simGpuEligibility : null);
+  setProg(null);
+  lastSimTimings={frames:performance.now()-tF, path:stg.simFrames.path, stage:stg.simFrames};
+  // Ground truth: one always-on emitter per bead over the frames it is drawn in. z at frame fi is
+  // the model's own nominal defocus f0 - fObj[fi] (webSMLM's sign: a higher frame-plane index is
+  // the emitter above focus); the score derives the paper's nominal z from the localizations
+  // themselves (where the fitted z crosses 0), so this model value is never what it scores against.
+  groundTruth=null; simTrueDrift=null;
+  groundTruthEvents=beads.filter(b=>b.m0!==null).map((b,i)=>({x:b.x, y:b.y, z:0, tStart:b.m0, tEnd:b.m1+1, rate:photPerFrame*b.cf,
+    moleculeId:i, objectId:i, depth:b.depth, haze:false, bead:true, f0Nm:b.f0, fObj, photonsTotal:photPerFrame*b.cf*(b.m1+1-b.m0)}));
+  const gtLp=1/px;
+  groundTruthLocs=groundTruthEvents.map(e=>({x:e.x, y:e.y, z:0, photons:e.photonsTotal, moleculeId:e.moleculeId, lpx:gtLp, lpy:gtLp}));
+  const glassF=fm.f0(Math.max(Rb,0));
+  const refFrame=Math.max(0, Math.min(n-1, Math.round((glassF-fStart)/S)));
+  log(`Gel bead stack: ${beads.length} beads (${nGlass} on the coverslip, the rest up to ${depthMax} nm deep`+
+      (Rb>0?`, ${beadD} nm diameter`:', point sources')+`); objective ${fStart} → ${fEnd.toFixed(0)} nm in ${S} nm steps, ${n} frames; `+
+      `each bead drawn within ±1 µm of its own measured focus (${nSkipped} bead-frames skipped). `+
+      `${planes.length} PSF planes in ${(tPlanes/1000).toFixed(1)} s; splat + noise ${lastSimTimings.frames.toFixed(0)} ms on the `+
+      (lastSimTimings.path==='gpu' ? 'GPU' : simPool && simPool.length>1 ? `CPU (${simPool.length} workers)` : 'CPU (single thread)')+'. '+
+      `Depths: ${beads.map(b=>b.depth.toFixed(0)).sort((a,b)=>a-b).join(', ')} nm.`);
+  return { stack: makeStack(w,h,n,px, fi=>frames[fi]), focusIndex:refFrame, zStepNm:S, gel:true, beads, fObj };
 }
 
 /* ---------------------------------------------------------------------------
@@ -7162,7 +7322,8 @@ function groundTruthByFrame(gtEvents, nFrames, first, last){
       // boundary would otherwise leave a zero-photon emitter-frame here, i.e. a guaranteed miss
       if(!(ov>0)) continue;
       let a=byFrame.get(fi); if(!a){ a=[]; byFrame.set(fi,a); }
-      a.push({x:e.x, y:e.y, z:e.z, haze:!!e.haze, mol:e.moleculeId, phot: e.rate===undefined ? Infinity : e.rate*ov});
+      a.push({x:e.x, y:e.y, z: e.bead ? e.f0Nm-e.fObj[fi] : e.z, haze:!!e.haze, mol:e.moleculeId, phot: e.rate===undefined ? Infinity : e.rate*ov,
+              obj: e.objectId, ring: e.ring, depth: e.depth});
     }
   }
   return byFrame;
@@ -7240,6 +7401,8 @@ function matchFrameCylinder(locs, gts, radiusPx, axialTolNm, pxNm){
 //  - z errors are only accumulated where both sides have a finite z. A 2D fit method, or a 2D
 //    simulation, therefore yields the same detection and lateral numbers through the same code
 //    path, just without the axial ones — no separate 2D branch.
+// Gel-bead score window (nm either side of a bead's nominal focus) — see the beadZ block below.
+const BEAD_Z_WINDOW_NM=500;
 async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLog,onProgress}={}){
   const radiusPx=(cfg.validation_matchRadius||250)/px;
   const nBins=Math.max(4, cfg.validation_zBins||20);
@@ -7334,6 +7497,10 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   let fpNoTruth=0;                                 // FPs in frames with no truth at all (radius-independent)
   const fpZ=[];                                    // fitted z of every false positive (Jaccard vs depth)
   const sweep=[];                                  // per-frame {Lf,Gf} kept for the match-radius sweep
+  // Counted matched pairs that belong to an OBJECT (a gel bead, an NPC, a pit): frame, fitted and
+  // true positions, the ring an NPC site sits on, the emitter's height. The per-object scores
+  // below (bead z, ring distance, pit height) are built from these after the frame loop.
+  const objPairs=[];
   const frames=[...new Set([...byFrameGT.keys(), ...byFrameLoc.keys()])].sort((a,b)=>a-b);
   let yld=performance.now();
   for(let i=0;i<frames.length;i++){
@@ -7344,7 +7511,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
     // Truth for THIS frame = structure position + the drift the simulator applied to it. Note
     // trueDrift's accessors are in nm (see simTrueDrift), so convert back to camera pixels here.
     const drx=trueDrift? trueDrift.dx(f)/px : 0, dry=trueDrift? trueDrift.dy(f)/px : 0;
-    let Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot, haze:g.haze, mol:g.mol}));
+    let Gf=G.map(g=>({x:g.x+drx, y:g.y+dry, z:g.z, phot:g.phot, haze:g.haze, mol:g.mol, obj:g.obj, ring:g.ring, depth:g.depth}));
     if(excludeBorder) Gf=Gf.filter(inField);     // cut from both sides, before matching
     for(const g of Gf) g.care=cares(g);
     // Crowded = another cared-for emitter is ON within validation_crowdRadius in this same frame,
@@ -7377,6 +7544,8 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       tp++; const k=p.b.crowded?sub.crowded:sub.isolated; k.tp++; k.lat.push(lat);
       dx.push(p.a.x-p.b.x); dy.push(p.a.y-p.b.y);
       { const m=molOf(p.b); if(m){ m.hits++; m.sdx+=p.a.x-p.b.x; m.sdy+=p.a.y-p.b.y; } }
+      if(p.b.obj!==undefined) objPairs.push({obj:p.b.obj, ring:p.b.ring, depth:p.b.depth, f,
+        xf:p.a.x, yf:p.a.y, zf:p.a.z, xt:p.b.x, yt:p.b.y, zt:p.b.z});
       pr.phT.push(p.b.phot); pr.phF.push(p.a.photons); pr.lpx.push(p.a.lpx); pr.lpy.push(p.a.lpy);
       pr.lpz.push(isFinite(p.a.z)&&isFinite(p.b.z)?p.a.lpz:NaN); pr.dz.push(isFinite(p.a.z)&&isFinite(p.b.z)?p.a.z-p.b.z:NaN);
       if(isFinite(p.a.z) && isFinite(p.b.z)){ dz.push(p.a.z-p.b.z); zTrue.push(p.b.z); nZ++;
@@ -7582,6 +7751,60 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       }
     }
   }
+  // ---- Gel bead stack (Li et al. 2019, Fig. 2): fitted z against each bead's NOMINAL z. ----
+  // The nominal position of a bead is where ITS OWN fitted z crosses 0 as the objective scans —
+  // the paper's definition, which needs no model of the optics and which depth-induced spherical
+  // aberration does not move. Found by a straight-line fit of fitted z against objective position
+  // over the frames within ±300 nm of the crossing. z_nominal(frame) = f_cross - f_obj(frame)
+  // (webSMLM's sign: a higher frame-plane index is the emitter above focus, so the fitted z falls
+  // as the objective goes deeper). A coverslip bead then follows the 1:1 line; a deep one, fitted
+  // with a coverslip calibration, does not — that departure is the paper's 171 nm.
+  let beadZ=null;
+  { const beadEv=gtEvents.filter(e=>e.bead);
+    if(beadEv.length){
+      const lsq=(X,Y)=>{ const n=X.length; let sx=0,sy=0,sxx=0,sxy=0; for(let i=0;i<n;i++){ sx+=X[i]; sy+=Y[i]; sxx+=X[i]*X[i]; sxy+=X[i]*Y[i]; }
+        const d=n*sxx-sx*sx; if(!(Math.abs(d)>0)) return null; const a=(n*sxy-sx*sy)/d; return {a, b:(sy-a*sx)/n}; };
+      const pearson=(X,Y)=>{ const n=X.length; if(n<3) return NaN; const mx=X.reduce((s,v)=>s+v,0)/n, my=Y.reduce((s,v)=>s+v,0)/n;
+        let sxy=0,sxx=0,syy=0; for(let i=0;i<n;i++){ const a=X[i]-mx, b=Y[i]-my; sxy+=a*b; sxx+=a*a; syy+=b*b; } return sxy/Math.sqrt(sxx*syy); };
+      const beads=[], allNom=[], allFit=[], pts=[];
+      for(const e of beadEv){
+        const P=objPairs.filter(q=>q.obj===e.objectId && isFinite(q.zf)).sort((p,q)=>e.fObj[p.f]-e.fObj[q.f]);
+        if(P.length<5) continue;
+        const F=P.map(q=>e.fObj[q.f]), Zf=P.map(q=>q.zf);
+        // The crossing must be the real focus, not a fold-back: far from focus a width-based z
+        // turns round and comes back through 0 (and clamps at the calibration edges), so a plain
+        // fit through every |z| < 300 nm point can land a micrometre off. Take the steepest
+        // FALLING zero of a running median (z falls as the objective goes deeper), then fit a line
+        // through the points within ±250 nm of objective travel around it.
+        const sm=Zf.map((_,i)=>{ const w=Zf.slice(Math.max(0,i-2), i+3).sort((a,b)=>a-b); return w[w.length>>1]; });
+        let cand=null;
+        for(let i=0;i+1<sm.length;i++){
+          if(!(sm[i]>0 && sm[i+1]<=0)) continue;
+          const fc=F[i]+(F[i+1]-F[i])*sm[i]/(sm[i]-sm[i+1]);
+          const idx=P.map((_,k)=>k).filter(k=>Math.abs(F[k]-fc)<=250 && Math.abs(Zf[k])<500);
+          const ft=idx.length>=4 ? lsq(idx.map(k=>F[k]), idx.map(k=>Zf[k])) : null;
+          if(ft && ft.a<0 && (!cand || ft.a*idx.length<cand.score)) cand={fc:-ft.b/ft.a, score:ft.a*idx.length};
+        }
+        if(!cand) continue;                             // no clean falling crossing: not scorable
+        const fCross=cand.fc, Zn0=F.map(f=>fCross-f);
+        // Scored where a width-based calibration is single-valued: within ±BEAD_Z_WINDOW_NM of the
+        // nominal focus. Beyond it z folds back for ANY bead, coverslip or deep, which says nothing
+        // about depth; the paper's ±1 um was scored with a cubic-spline PSF model.
+        const keep=Zn0.map((z,i)=>i).filter(i=>Math.abs(Zn0[i])<=BEAD_Z_WINDOW_NM);
+        if(keep.length<5) continue;
+        const Zn=keep.map(i=>Zn0[i]), Zk=keep.map(i=>Zf[i]);
+        const err=Zk.map((z,i)=>z-Zn[i]), sl=lsq(Zn,Zk);
+        beads.push({id:e.objectId, depth:e.depth, n:Zk.length, fCrossNm:fCross, f0ModelNm:e.f0Nm,
+                    rmsNm:Math.sqrt(err.reduce((s,v)=>s+v*v,0)/err.length), pearson:pearson(Zn,Zk), slope:sl?sl.a:NaN});
+        for(let i=0;i<Zk.length;i++){ allNom.push(Zn[i]); allFit.push(Zk[i]); pts.push([Zn[i],Zk[i],e.depth]); }
+      }
+      if(beads.length){
+        const err=allFit.map((z,i)=>z-allNom[i]), sl=lsq(allNom,allFit);
+        beadZ={ beads, n:allFit.length, rmsNm:Math.sqrt(err.reduce((s,v)=>s+v*v,0)/err.length),
+                pearson:pearson(allNom,allFit), slope:sl?sl.a:NaN, points:pts, windowNm:BEAD_Z_WINDOW_NM };
+      }
+    }
+  }
   // One summary number per ratio: the pair-weighted mean of the per-bin ratios, so it compares like
   // with like at every brightness instead of dividing a pooled spread by a pooled bound.
   const wRatio=(a,b)=>{ if(!crlbBins) return NaN; let s=0,n=0;
@@ -7642,6 +7865,14 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       onLog(`photometry: fitted/true photons median ${photometry.median.toFixed(3)} (16–84%: ${photometry.p16.toFixed(2)}–${photometry.p84.toFixed(2)}, `+
             `robust spread ${(100*photometry.rsdRel).toFixed(1)}%) over ${photometry.n.toLocaleString()} pairs. True = photons reaching the camera (before QE); `+
             `a Gaussian model also misses the PSF's tails, so a few % under 1 is expected.`);
+    if(beadZ){
+      onLog(`gel beads (Li et al. 2019, Fig. 2): fitted z against nominal z (each bead's own fitted-z = 0 crossing), within ±${beadZ.windowNm} nm of it — `+
+            `RMS ${beadZ.rmsNm.toFixed(0)} nm · Pearson c ${beadZ.pearson.toFixed(4)} · slope ${beadZ.slope.toFixed(3)} over ${beadZ.n.toLocaleString()} bead-frames `+
+            `(the paper: 171 nm / c 0.9847 before its correction, with a cubic-spline fitter).`);
+      for(const b of [...beadZ.beads].sort((p,q)=>p.depth-q.depth))
+        onLog(`  bead at ${b.depth.toFixed(0)} nm: slope ${b.slope.toFixed(3)} · RMS ${b.rmsNm.toFixed(0)} nm · c ${b.pearson.toFixed(4)} · `+
+              `crossing at ${b.fCrossNm.toFixed(0)} nm of objective travel (model focus ${b.f0ModelNm.toFixed(0)}) · ${b.n} frames`);
+    }
     if(precVsCrlb){
       const f=v=>isFinite(v)?v.toFixed(2)+'×':'–';
       onLog(`precision vs CRLB (photon-binned, bias removed): lateral measured/reported ${f(precVsCrlb.measOverReported)}`+
@@ -7652,7 +7883,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
            biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
            nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
            nIgnoredGT, nIgnoredPairs, nHazeDetected, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
-           molecules, effZ, radiusSweep, photometry, crlbBins, precVsCrlb,
+           molecules, effZ, radiusSweep, photometry, crlbBins, precVsCrlb, beadZ,
            photonPairs:{true:pr.phT, fitted:pr.phF},
            matchMode: cylinder?'cylinder3D':'lateral', axialTolNm: cylinder?axialTol:NaN,
            photonMode: cfg.validation_photonMode==='quantile'?'quantile':'absolute', photonQuantile:photQuantile,
@@ -7667,17 +7898,17 @@ let truthPlotMode='zbias';
 // The views a given result can actually show, in cycling order. The two z views need z; the photon
 // view needs photon-resolved ground truth. 'lateral' is always there, so there is always a plot.
 function truthPlotModes(res){
-  return [...(res.has3d?['zbias','scatter']:[]), ...(res.has3d&&res.bins?['jaccz']:[]), 'lateral', ...(res.has3d?['axial']:[]),
+  return [...(res.beadZ?['beadz']:[]), ...(res.has3d?['zbias','scatter']:[]), ...(res.has3d&&res.bins?['jaccz']:[]), 'lateral', ...(res.has3d?['axial']:[]),
           ...(res.photonBins?['photons']:[]), ...(res.radiusSweep&&res.radiusSweep.length?['radius']:[]),
           ...(res.photometry?['photometry']:[]), ...(res.crlbBins?['crlb']:[])];
 }
-const TRUTH_PLOT_TITLES={ zbias:'Score: axial error vs true depth', scatter:'Score: fitted z vs true z',
+const TRUTH_PLOT_TITLES={ beadz:'Score: gel beads — fitted z vs nominal z', zbias:'Score: axial error vs true depth', scatter:'Score: fitted z vs true z',
                           jaccz:'Score: detection vs true depth', lateral:'Score: lateral error histogram',
                           axial:'Score: axial error histogram',
                           photons:'Score: detection and lateral error vs photons', radius:'Score: detection vs match radius',
                           photometry:'Score: fitted vs true photons',
                           crlb:'Score: measured precision vs reported CRLB' };
-const TRUTH_PLOT_BTN={ zbias:'Show z error', scatter:'Show fitted vs true', jaccz:'Show Jaccard vs z', lateral:'Show lateral hist.',
+const TRUTH_PLOT_BTN={ beadz:'Show bead z', zbias:'Show z error', scatter:'Show fitted vs true', jaccz:'Show Jaccard vs z', lateral:'Show lateral hist.',
                        axial:'Show axial hist.', photons:'Show vs photons', radius:'Show vs radius', photometry:'Show photometry',
                        crlb:'Show vs CRLB' };
 
@@ -7734,7 +7965,27 @@ function drawTruthScorePlot(res){
   const decades=(l0,l1)=>{ const t=[]; for(let d=Math.ceil(l0); d<=Math.floor(l1); d++) t.push(d);
     if(t.length<2){ t.length=0; const st=(l1-l0)/4; for(let k=0;k<=4;k++) t.push(l0+k*st); } return t; };
   const pow10fmt=v=>{ const x=Math.pow(10,v); return x>=100?Math.round(x).toLocaleString():x.toPrecision(2); };
-  if(mode==='jaccz'){
+  if(mode==='beadz'){
+    // Li et al. (2019) Fig. 2c, left panel: every bead-frame's fitted z against its nominal z, each
+    // bead coloured by its depth; a coverslip calibration keeps the shallow beads on y = x and
+    // bends the deep ones away from it.
+    const P=res.beadZ.points; let lo=Infinity, hi=-Infinity, dlo=Infinity, dhi=-Infinity;
+    for(const [a,b,d] of P){ lo=Math.min(lo,a,b); hi=Math.max(hi,a,b); dlo=Math.min(dlo,d); dhi=Math.max(dhi,d); }
+    lo=Math.max(lo,-1200); hi=Math.min(hi,1200);
+    const X=v=>mL+pw*(v-lo)/Math.max(1e-9,hi-lo), Y=v=>mT+ph*(1-(v-lo)/Math.max(1e-9,hi-lo));
+    axis(X,Y,'nominal z (nm), from each bead\'s z = 0 crossing','fitted z (nm)',niceTicks(lo,hi,6),niceTicks(lo,hi,6),0,0);
+    const lut=getLUT('turbo'), step=Math.max(1,Math.ceil(P.length/8000));
+    for(let i=0;i<P.length;i+=step){ const [a,b,d]=P[i]; if(a<lo||a>hi||b<lo||b>hi) continue;
+      const t=Math.max(0,Math.min(255,Math.round(255*(d-dlo)/Math.max(1e-9,dhi-dlo))));
+      ctx.fillStyle=`rgb(${lut[3*t]},${lut[3*t+1]},${lut[3*t+2]})`; ctx.beginPath(); ctx.arc(X(a),Y(b),1.6,0,7); ctx.fill(); }
+    line([[X(lo),Y(lo)],[X(hi),Y(hi)]],C.text,1.4,[5,3]);
+    const cA=getLUT('turbo'), col=t=>`rgb(${cA[3*t]},${cA[3*t+1]},${cA[3*t+2]})`;
+    legend([[col(0),`● bead at ${dlo.toFixed(0)} nm`],[col(255),`● bead at ${dhi.toFixed(0)} nm`],[C.text,'┄ y = x']]);
+    note([`RMS ${res.beadZ.rmsNm.toFixed(0)} nm · c ${res.beadZ.pearson.toFixed(4)}`,
+          `slope ${res.beadZ.slope.toFixed(3)} · ${res.beadZ.beads.length} beads`,
+          'colour = bead depth','paper: 171 nm, c 0.9847'],'br');
+    hover={mL,mT,pw,ph,xA:lo,xB:hi,yTop:hi,yBot:lo,fmt:(vx,vy)=>`nominal ${vx.toFixed(0)} nm · fitted ${vy.toFixed(0)} nm`};
+  } else if(mode==='jaccz'){
     // Recall, precision and Jaccard per depth bin. TP/FN are binned by true z, false positives by
     // their fitted z (they have no true one) — see scoreTruthCore().
     const bins=res.bins.filter(b=>b.n+b.fn+b.fp>0);
@@ -21195,7 +21446,11 @@ async function runCalibrationSimulation(){
   $('genCalBtn').disabled=true; $('genBtn').disabled=true; $('loadBtn').disabled=true;
   clearAnalysisOutputs();
   try{
-    const {stack:s, focusIndex, zStepNm}=await generateCalibrationStack();
+    // generateCalibrationStack() leaves the gel stack's ground truth in the globals; keep a copy,
+    // since clearAnalysisOutputs()/presentStack() below may clear them again.
+    const gen=await generateCalibrationStack();
+    const {stack:s, focusIndex, zStepNm}=gen;
+    const gelTruth = gen.gel ? {events:groundTruthEvents, locs:groundTruthLocs} : null;
     if(staleEpoch(myEpoch)) return;   // superseded while generating — see newEpoch()
     // Not rotated: calStep/calRef below describe the stack as generated.
     stack=s; stackName='webSMLM_simulated_calib';
@@ -21206,6 +21461,12 @@ async function runCalibrationSimulation(){
     $('calStep').value = zStepNm;
     $('calRef').value = focusIndex+1;
     if(!await presentStack(myEpoch)) return;
+    if(gelTruth){
+      groundTruthEvents=gelTruth.events; groundTruthLocs=gelTruth.locs;
+      setViewGtBtn(!!(groundTruthLocs && groundTruthLocs.length));
+      log(`Gel bead stack ready: ${stack.n} frames · ${stack.w}×${stack.h} · objective step ${zStepNm}nm (frame ${focusIndex+1} is the coverslip beads' focus). `+
+          `Localize it with a 3D method and a calibration from coverslip beads, then Compare to GT → Show bead z.`);
+    } else
     log(`Calibration stack ready: ${stack.n} frames · ${stack.w}×${stack.h} · z-step ${zStepNm}nm · `+
         `z=0 ref frame ${focusIndex+1}. Click "Calibrate" in the 3D calibration section.`);
   }catch(err){
@@ -21688,7 +21949,7 @@ updateMethodUI();
 // (Several of these rows live under Simulation → Advanced; the toggle doesn't care where. The two
 // section headings are block elements; Preview PSF / Calib. stack are disabled, not hidden, so the
 // top-level button grid keeps its shape.)
-const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfSafRow','psfApodRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfInterpRow'];
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfSafRow','psfApodRow','calibDepthMaxRow','beadDiameterRow','calibSeedRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfInterpRow'];
 function psfModelIsZernike(){ return paramValue('simulation_psfModel')==='zernike'; }
 function updatePsfModelUI(){
   const on = psfModelIsZernike();
@@ -22959,7 +23220,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29c — Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.
+log(`webSMLM v0.13.0-dev · build 2026-10-29d — Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.
+— from build 2026-10-29c: Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.
 — from build 2026-10-29b: Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.
 — from build 2026-10-29a: Simulation: Supercritical angle (SAF) and Fresnel apodisation switches (Advanced → PSF, both off); "Emitter depth into sample" is now "Sample depth".
 — from build 2026-09-28u: Defaults: Compare to GT min photons/frame 300; cell field seed 0 (random each movie).

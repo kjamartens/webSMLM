@@ -286,6 +286,47 @@ try {
   check('(3) physical movie: every event carries depth = 2000 + z', phys.depthOk, `${phys.nEvents} events, depth ${phys.depthRange.map(v => v.toFixed(0)).join('…')} nm`);
   check('(3) physical movie: CPU workers = GPU', phys.paths === 'cpu/gpu' && phys.fracClose >= 0.999,
     `paths ${phys.paths}, ${(100 * phys.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${phys.maxAbs.toExponential(2)}`);
+
+  // ---- (4) Calib. stack: seed, then the gel (Li 2019 Fig. 2) end to end ---------------------------
+  // Calibrate on 100 nm beads on the coverslip (±500 nm: inside this astigmatism's single-valued
+  // range), simulate beads in a gel up to 3 um, Localize with MLE 3D, Compare to GT → bead z.
+  const gel = await page.evaluate(async () => {
+    const z = new Array(PSF_NZERNIKE).fill(0); z[5] = 183;
+    __set('simulation_psfNA', 1.43); __set('simulation_psfWavelength', 670); __set('simulation_psfNs', 1.3345); __set('simulation_psfNi', 1.518);
+    __set('simulation_psfSaf', true); __set('simulation_psfZernikeCustom', z.join(',')); __set('simulation_pxnm', 100);
+    __set('simulation_psfZRange', 500); __set('simulation_psfZStep', 20); __set('simulation_psfDepth', 50);
+    __set('phot', 5000); __set('simbg', 10); __set('simulation_beadDiameter', 100); __set('useGpu', true);
+    __set('simulation_calibDepthMax', 0);
+    // a seeded stack reproduces; seed 0 keeps the old fresh-every-click behaviour
+    __set('simulation_calibSeed', 7); await runCalibrationSimulation(); const h1 = await stackPixelHash(stack);
+    await runCalibrationSimulation(); const h2 = await stackPixelHash(stack);
+    __set('simulation_calibSeed', 0); await runCalibrationSimulation(); const h3 = await stackPixelHash(stack);
+    __set('simulation_calibSeed', 7); await runCalibrationSimulation();
+    await runCalibration();
+    __set('simulation_calibDepthMax', 3000); await runCalibrationSimulation();
+    const gelFrames = stack.n, gtN = groundTruthEvents ? groundTruthEvents.length : 0;
+    __set('method', 'mle3d'); __set('gain', 0.34); __set('camoffset', 100);
+    await run(); await computeTruthScore();
+    const B = lastTruthScore.beadZ;
+    __set('simulation_calibDepthMax', 0); __set('simulation_beadDiameter', 0); __set('simulation_calibSeed', 0);
+    return { h1, h2, h3, gelFrames, gtN,
+             beadZ: B ? { rms: B.rmsNm, pearson: B.pearson, slope: B.slope, n: B.n,
+                          beads: B.beads.map(b => ({ depth: b.depth, slope: b.slope, rms: b.rmsNm, cross: b.fCrossNm, model: b.f0ModelNm })) } : null };
+  });
+  results.gelStack = gel;
+  check('(4) a seeded Calib. stack reproduces, seed 0 does not', gel.h1 === gel.h2 && gel.h3 !== gel.h1, `${gel.h1} / ${gel.h2} / ${gel.h3}`);
+  check('(4) the gel stack carries one truth emitter per bead', gel.gtN === 9, `${gel.gtN} beads, ${gel.gelFrames} frames`);
+  check('(4) every bead scored', gel.beadZ && gel.beadZ.beads.length === 9, gel.beadZ ? `${gel.beadZ.beads.length} beads` : 'no bead score');
+  if (gel.beadZ) {
+    const bs = [...gel.beadZ.beads].sort((a, b) => a.depth - b.depth), glass = bs.filter(b => b.depth < 100), deep = bs.filter(b => b.depth > 1500);
+    check('(4) coverslip beads on the 1:1 line (slope 1 ± 0.05)', glass.every(b => Math.abs(b.slope - 1) < 0.05), glass.map(b => b.slope.toFixed(3)).join(', '));
+    check('(4) coverslip beads cross z = 0 within 20 nm of the model focus', glass.every(b => Math.abs(b.cross - b.model) < 20),
+      glass.map(b => `${b.cross.toFixed(0)}/${b.model.toFixed(0)}`).join(', '));
+    check('(4) deep beads squeezed (slope < 0.8) — Li et al. Fig. 2', deep.length > 0 && deep.every(b => b.slope < 0.8), deep.map(b => `${b.depth.toFixed(0)} nm: ${b.slope.toFixed(3)}`).join(', '));
+    let concordant = 0, pairs = 0;
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) if (bs[j].depth - bs[i].depth > 100) { pairs++; if (bs[j].slope < bs[i].slope) concordant++; }
+    check('(4) squeezing grows with depth (≥ 90% of bead pairs > 100 nm apart in order)', concordant / pairs >= 0.9, `${concordant}/${pairs}`);
+  }
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

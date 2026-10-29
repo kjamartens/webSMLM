@@ -25,25 +25,25 @@
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
     params          2651   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3686   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3914   synthetic stack generator ("Simulate movie")
-    validation      7426   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8376   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8632   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9242   super-resolution accumulation, view, colour maps, plots
-    workers         10766  frame-parallel detect/fit worker pool
-    gpu             11412  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13741  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  14032  astigmatic width-vs-z bead calibration
-    drift           14431  AIM and cross-correlation drift correction
-    locprecision    15089  NeNA and FRC
-    sSMLM           16228  spectral SMLM pairing (distance/angle fit, pairCore())
+    in/out          3691   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3919   synthetic stack generator ("Simulate movie")
+    validation      7457   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8532   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8788   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9398   super-resolution accumulation, view, colour maps, plots
+    workers         10922  frame-parallel detect/fit worker pool
+    gpu             11568  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13897  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14188  astigmatic width-vs-z bead calibration
+    drift           14587  AIM and cross-correlation drift correction
+    locprecision    15245  NeNA and FRC
+    sSMLM           16384  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             18941  single-particle tracking and diffusion coefficients
-    pipeline        19991  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   21031  Micro-Manager/pycromanager bridge (experimental)
-    table           23460  localizations table, filters, histograms, clustering
-    headless API    24145  window.webSMLM.analyze()/analyzeBatch()
+    spt             19097  single-particle tracking and diffusion coefficients
+    pipeline        20147  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21187  Micro-Manager/pycromanager bridge (experimental)
+    table           23617  localizations table, filters, histograms, clustering
+    headless API    24302  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29e</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29f</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -3673,6 +3673,11 @@ let groundTruthEvents=null;
 // objectId its sites and events carry. Built by the structure builder, shifted with the structure,
 // read by the per-object scores (scoreTruthCore()). null for every other structure.
 let groundTruthObjects=null;
+// Physical depth mode only (PARAMS.simulation_depthMode): {depthNm, fObjNm, rimf} of the last
+// movie — the model's own refractive-index-mismatch factor at the sample depth (1/f0'), which the
+// score uses to report the axial slope both raw (objective units, what a coverslip calibration
+// returns) and RIMF-corrected (physical nm).
+let simDepthInfo=null;
 // GT localizations viewer state ("View GT localizations" button, genBtn's own row) —
 // groundTruthLocs is a {x,y,z,photons} array built from groundTruthEvents right after a
 // successful Simulate movie (one entry per simulated blink, the fair thing to compare against a
@@ -4777,6 +4782,18 @@ function psfDepthBinCenters(dNm, zLoNm, zHiNm){
   for(let z=dNm; z>Math.max(0,zLoNm); ){ let s=psfDepthBinWidth(z); if(psfDepthBinWidth(z-s)<s) s=psfDepthBinWidth(z-s); z=Math.max(0,z-s); c.unshift(z); if(z===0) break; }
   return c;
 }
+// Half-energy radius (nm) of one kernel plane about its own centroid — the PSF footprint s50 the
+// overlap rule K = rho_on*pi*s50^2 is written in.
+function psfS50Nm(slice, nx, resNm){
+  let sum=0, mx=0, my=0;
+  for(let y=0;y<nx;y++) for(let x=0;x<nx;x++){ const v=slice[y*nx+x]; sum+=v; mx+=v*x; my+=v*y; }
+  if(!(sum>0)) return NaN;
+  mx/=sum; my/=sum;
+  const NB=Math.ceil(nx*0.75), hist=new Float64Array(NB+1);
+  for(let y=0;y<nx;y++) for(let x=0;x<nx;x++){ const r=Math.hypot(x-mx,y-my); hist[Math.min(NB,Math.floor(r))]+=slice[y*nx+x]; }
+  let acc=0; for(let r=0;r<=NB;r++){ acc+=hist[r]; if(acc>=sum/2) return (r+0.5)*resNm; }
+  return NB*resNm;
+}
 // Builds the virtual stack for a set of emitter depths zps (nm). fObjNm is the objective position.
 // Returns {slices, nz, planeOf(zp), bins:[{zb, n, offset}], fm (the focus map)}.
 async function buildPhysicalDepthStack(cfg, dNm, fObjNm, zps){
@@ -5201,6 +5218,7 @@ async function generateSynthetic(){
       const ds=await buildPhysicalDepthStack(psfCfgPhys, depthNm, fObj, zps);
       for(const ev of frameEvents) for(const e of ev) e[2]=ds.planeOf(zpOf(e[2]))*Z;
       srcSlices=ds.slices; zKernelStack.focusIndex=0; zKernelStack.nz=ds.nz;
+      simDepthInfo={depthNm, fObjNm:fObj, rimf:1/ds.fm.f0prime(depthNm)};
       const mb=ds.nz*ds.nx*ds.nx*8/1048576;
       log(`Physical depth: objective fixed at ${fObj.toFixed(0)} nm of travel (in focus for ${depthNm} nm, model RIMF ${ds.fm.rimf(depthNm).toFixed(3)}); `+
           `${ds.bins.length} depth bin(s) from ${ds.bins[0].zb.toFixed(0)} to ${ds.bins[ds.bins.length-1].zb.toFixed(0)} nm, ${ds.nz} planes (${mb.toFixed(0)} MB), `+
@@ -5223,6 +5241,7 @@ async function generateSynthetic(){
     return g;
   });
   groundTruthObjects = structObjects.length ? structObjects.map(o=>({...o, depthNm: physical ? depthNm+o.cz : undefined})) : null;
+  if(!physical) simDepthInfo=null;
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
   // per-pixel property, so it's drawn once per stack and reused for every frame, not resampled.
@@ -5301,6 +5320,18 @@ async function generateSynthetic(){
   if(is3d){
     log(`3D simulation: ${structureZDescription(structure,zRange,structureSize)}`+
         (zKernelStack ? ' — each emitter is splatted from the PSF kernel plane matching its own z.' : '.'));
+    // Overlap: K = (emitters ON per um^2) x pi x s50^2, s50 the PSF's half-energy radius — the
+    // expected number of OTHER emitters inside one PSF's core. Single-emitter fitting is reliable
+    // up to K ~ 0.1 (SMLMpipelinelessons §6); a defocused PSF is wider, so K is worst at the edge
+    // of the structure's depth range, not at focus.
+    if(kernelStack && zKernelStack){
+      const kz=kernelStack, ext=structureZExtent(structure,zRange,structureSize);
+      const at=zNm=>{ const k=Math.max(0,Math.min(kz.nz-1, kz.focusIndex+Math.round(zNm/kz.zStepNm))); return psfS50Nm(kz.slices[k], kz.nx, kz.resLateralM*1e9); };
+      const s0=at(0), s1=Math.max(at(-ext), at(ext)), K=s=>dens*Math.PI*(s/1000)**2;
+      log(`Overlap K = ON density × π × s50² (s50 = the PSF's half-energy radius): ${K(s0).toFixed(3)} at focus (s50 ${s0.toFixed(0)} nm), `+
+          `${K(s1).toFixed(3)} at ±${ext.toFixed(0)} nm (s50 ${s1.toFixed(0)} nm)`+
+          (K(s1)>0.1 ? ` — above 0.1, where single-emitter fitting starts to see overlapping PSFs; lower Emitter density for a clean test.` : ` — single-emitter fitting is fine below 0.1.`));
+    }
     if(zKernelStack && zClampedCount>0){
       const halfRangeNm=zKernelStack.zStepNm*(zKernelStack.nz-1)/2;
       log(`⚠ ${zClampedCount}/${zTotalCount} emitter(s) had z beyond the PSF kernel's own ±${halfRangeNm.toFixed(0)}nm `+
@@ -7940,6 +7971,76 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       }
     }
   }
+  // ---- Per OBJECT (Li et al. 2019 Fig. 3-5): what the reconstruction does to each pore or pit. ----
+  // NPC: the distance between its two rings, from the localizations' positions projected on the
+  // pore's TRUE axis (groundTruthObjects), ring membership from the ground truth. That is an
+  // upper bound on what a per-pore fit could recover — the paper fits two rings with tip/tilt —
+  // but it measures exactly the quantity whose depth dependence Fig. 5d shows: the distance
+  // against the pore's fitted centre z. With tilt a plain two-cluster split along z would merge
+  // the rings, which is why the truth is used for membership. CCP: the slope of fitted z on true z
+  // within each pit (each pit centred on itself, pooled over pits) — the flattening of Fig. 3b. A
+  // slope, not a height ratio: a 5-95% height spread is inflated by the localization precision
+  // itself (measured 1.6x at the coverslip), while regressing fitted on TRUE z carries the error
+  // in y only and is not diluted by it.
+  let objects=null;
+  if(cfg._objects && cfg._objects.length && objPairs.length){
+    const byObj=new Map(); for(const q of objPairs){ let a=byObj.get(q.obj); if(!a){ a=[]; byObj.set(q.obj,a); } a.push(q); }
+    const kind=cfg._objects[0].kind, per=[];
+    const medA=a=>{ const q=[...a].sort((x,y)=>x-y); return q.length ? q[(q.length-1)>>1] : NaN; };
+    const pctA=(a,p)=>{ const q=[...a].sort((x,y)=>x-y); return q[Math.min(q.length-1,Math.max(0,Math.round(p*(q.length-1))))]; };
+    for(const o of cfg._objects){
+      const P=(byObj.get(o.id)||[]).filter(q=>isFinite(q.zf));
+      if(kind==='nup'){
+        const proj=q=>((q.xf-o.cx)*px)*o.axis[0]+((q.yf-o.cy)*px)*o.axis[1]+(q.zf-o.cz)*o.axis[2];
+        const up=P.filter(q=>q.ring>0).map(proj), dn=P.filter(q=>q.ring<0).map(proj);
+        if(up.length<3 || dn.length<3) continue;
+        const mu=medA(up), md=medA(dn);
+        per.push({id:o.id, zTrue:o.cz, zFit:o.cz+(mu+md)/2, dist:mu-md, trueDist:o.params.sep, n:up.length+dn.length});
+      } else if(kind==='ccp'){
+        if(P.length<8) continue;
+        const zf=P.map(q=>q.zf), zt=P.map(q=>q.zt);
+        const mf=zf.reduce((s,v)=>s+v,0)/zf.length, mt=zt.reduce((s,v)=>s+v,0)/zt.length;
+        const hf=pctA(zf,0.95)-pctA(zf,0.05), ht=pctA(zt,0.95)-pctA(zt,0.05);
+        per.push({id:o.id, zTrue:o.cz, heightFit:hf, heightTrue:ht, n:P.length,
+                  dzf:zf.map(v=>v-mf), dzt:zt.map(v=>v-mt),
+                  pts:P.map(q=>[(q.xf-o.cx)*px, q.zf-medA(zf)+medA(zt), (q.xt-o.cx)*px, q.zt])});
+      }
+    }
+    if(per.length){
+      const pear=(X,Y)=>{ const n=X.length; if(n<3) return NaN; const mx=X.reduce((s,v)=>s+v,0)/n, my=Y.reduce((s,v)=>s+v,0)/n;
+        let sxy=0,sxx=0,syy=0; for(let i=0;i<n;i++){ const a=X[i]-mx, b=Y[i]-my; sxy+=a*b; sxx+=a*a; syy+=b*b; } return sxy/Math.sqrt(sxx*syy); };
+      const slope=(X,Y)=>{ const n=X.length; if(n<3) return NaN; const mx=X.reduce((s,v)=>s+v,0)/n, my=Y.reduce((s,v)=>s+v,0)/n;
+        let sxy=0,sxx=0; for(let i=0;i<n;i++){ sxy+=(X[i]-mx)*(Y[i]-my); sxx+=(X[i]-mx)**2; } return sxx>0?sxy/sxx:NaN; };
+      if(kind==='nup'){
+        const X=per.map(p=>p.zFit), Y=per.map(p=>p.dist);
+        objects={kind, perObject:per, n:per.length, medianDist:medA(Y), trueDist:per[0].trueDist,
+                 pearson:pear(X,Y), slopeNmPerUm:1000*slope(X,Y), zFitRange:[Math.min(...X),Math.max(...X)]};
+      } else {
+        const X=[], Y=[]; for(const p of per){ X.push(...p.dzt); Y.push(...p.dzf); delete p.dzt; delete p.dzf; }
+        objects={kind, perObject:per, n:per.length, axialScale:slope(X,Y), nLocs:X.length,
+                 medianHeightTrue:medA(per.map(p=>p.heightTrue)), medianHeightFit:medA(per.map(p=>p.heightFit))};
+      }
+    }
+  }
+  // Failure rule of SMLMpipelinelessons §5: an axial error beyond max(5 x the fit's own CRLB, d/4),
+  // d the depth range the PSF encodes single-valued — beyond that the localization has fallen off
+  // the right branch, not merely scattered. Reported next to the spread, globally and per z bin.
+  let failRule=null;
+  if(has3d){
+    const lpz=pr.lpz.filter(v=>isFinite(v)&&v>0), crlbZ=lpz.length?med(lpz):NaN;
+    const d=cfg._zUsableNm>0 ? 2*cfg._zUsableNm : NaN;
+    const thr=Math.max(isFinite(crlbZ)?5*crlbZ:0, isFinite(d)?d/4:0) || grossZnm;
+    const nF=dz.filter(v=>Math.abs(v)>thr).length;
+    failRule={thresholdNm:thr, crlbZ, dNm:d, nFail:nF, frac:nF/dz.length};
+    if(bins) for(const b of bins) b.nFail=b.dz.filter(v=>Math.abs(v)>thr).length;
+  }
+  // Axial scale: fitted z against true z over all matched pairs. In the physical depth mode the
+  // fit returns OBJECTIVE travel (a coverslip calibration's unit) and the truth is height in the
+  // sample, so the raw slope carries the model's RIMF; times RIMF it is the squeezing alone.
+  let axialSlope=NaN;
+  if(has3d && dz.length>=10){ const zf=zTrue.map((z,i)=>z+dz[i]); const n=zf.length, mx=zTrue.reduce((s,v)=>s+v,0)/n, my=zf.reduce((s,v)=>s+v,0)/n;
+    let sxy=0,sxx=0; for(let i=0;i<n;i++){ sxy+=(zTrue[i]-mx)*(zf[i]-my); sxx+=(zTrue[i]-mx)**2; } axialSlope=sxx>0?sxy/sxx:NaN; }
+  const rimf=cfg._rimf;
   // One summary number per ratio: the pair-weighted mean of the per-bin ratios, so it compares like
   // with like at every brightness instead of dividing a pooled spread by a pooled bound.
   const wRatio=(a,b)=>{ if(!crlbBins) return NaN; let s=0,n=0;
@@ -8000,6 +8101,26 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
       onLog(`photometry: fitted/true photons median ${photometry.median.toFixed(3)} (16–84%: ${photometry.p16.toFixed(2)}–${photometry.p84.toFixed(2)}, `+
             `robust spread ${(100*photometry.rsdRel).toFixed(1)}%) over ${photometry.n.toLocaleString()} pairs. True = photons reaching the camera (before QE); `+
             `a Gaussian model also misses the PSF's tails, so a few % under 1 is expected.`);
+    if(failRule)
+      onLog(`axial failures (|error| > max(5 × CRLB, d/4) = ${failRule.thresholdNm.toFixed(0)} nm`+
+            (isFinite(failRule.crlbZ)?`, CRLB median ${failRule.crlbZ.toFixed(0)} nm`:'')+(isFinite(failRule.dNm)?`, d = ${failRule.dNm.toFixed(0)} nm`:'')+
+            `): ${failRule.nFail.toLocaleString()} of ${nZ.toLocaleString()} (${(100*failRule.frac).toFixed(1)}%).`);
+    if(isFinite(axialSlope))
+      onLog(`axial scale: fitted z / true z = ${axialSlope.toFixed(3)}`+
+            (isFinite(rimf) ? ` in objective units; × the model's RIMF ${rimf.toFixed(3)} = ${(axialSlope*rimf).toFixed(3)} — the squeezing left once the refractive-index scale is taken out (1 = none).` : '.'));
+    // Fitted z is objective travel (a coverslip calibration's unit); the paper multiplies by its
+    // RIMF before comparing with the sample, and so does the "× RIMF" figure here (the model's own).
+    const rf=isFinite(rimf)?rimf:NaN;
+    if(objects && objects.kind==='nup')
+      onLog(`NPC rings (Li et al. 2019, Fig. 5): distance between the rings ${objects.medianDist.toFixed(1)} nm median over ${objects.n} pores in objective units`+
+            (isFinite(rf)?`, ${(objects.medianDist*rf).toFixed(1)} nm × RIMF ${rf.toFixed(3)}`:'')+` (true ${objects.trueDist} nm); `+
+            `against each pore's fitted centre z: Pearson c ${objects.pearson.toFixed(2)}, slope ${objects.slopeNmPerUm.toFixed(1)} nm per µm `+
+            `(paper, uncorrected: c 0.55). Ring membership and pore axis from the ground truth — an upper bound on a per-pore fit.`);
+    if(objects && objects.kind==='ccp')
+      onLog(`clathrin-coated pits (Li et al. 2019, Fig. 3): within-pit axial scale (fitted z on true z, each pit centred on itself) `+
+            `${objects.axialScale.toFixed(3)} over ${objects.n} pits / ${objects.nLocs.toLocaleString()} localizations in objective units`+
+            (isFinite(rf)?`, ${(objects.axialScale*rf).toFixed(3)} × RIMF ${rf.toFixed(3)}`:'')+
+            ` — below 1 (× RIMF) = the dome is flattened. Heights (5–95%): true ${objects.medianHeightTrue.toFixed(0)} nm, fitted ${objects.medianHeightFit.toFixed(0)} nm, the latter widened by the precision.`);
     if(beadZ){
       onLog(`gel beads (Li et al. 2019, Fig. 2): fitted z against nominal z (each bead's own fitted-z = 0 crossing), within ±${beadZ.windowNm} nm of it — `+
             `RMS ${beadZ.rmsNm.toFixed(0)} nm · Pearson c ${beadZ.pearson.toFixed(4)} · slope ${beadZ.slope.toFixed(3)} over ${beadZ.n.toLocaleString()} bead-frames `+
@@ -8018,7 +8139,7 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
            biasX, biasY, rmseLat, medLat, p90Lat, biasZ, rmseZ, medZ, p90Z, p95Z,
            nGrossZ, grossZnm, nZ, zClampedMatched, has3d, bins,
            nIgnoredGT, nIgnoredPairs, nHazeDetected, minPhotons:minPhot, borderPx, isolated, crowded, photonBins, phot50, efficiency:eff,
-           molecules, effZ, radiusSweep, photometry, crlbBins, precVsCrlb, beadZ,
+           molecules, effZ, radiusSweep, photometry, crlbBins, precVsCrlb, beadZ, objects, failRule, axialSlope, rimf,
            photonPairs:{true:pr.phT, fitted:pr.phF},
            matchMode: cylinder?'cylinder3D':'lateral', axialTolNm: cylinder?axialTol:NaN,
            photonMode: cfg.validation_photonMode==='quantile'?'quantile':'absolute', photonQuantile:photQuantile,
@@ -8033,17 +8154,17 @@ let truthPlotMode='zbias';
 // The views a given result can actually show, in cycling order. The two z views need z; the photon
 // view needs photon-resolved ground truth. 'lateral' is always there, so there is always a plot.
 function truthPlotModes(res){
-  return [...(res.beadZ?['beadz']:[]), ...(res.has3d?['zbias','scatter']:[]), ...(res.has3d&&res.bins?['jaccz']:[]), 'lateral', ...(res.has3d?['axial']:[]),
+  return [...(res.beadZ?['beadz']:[]), ...(res.objects?['objects']:[]), ...(res.has3d?['zbias','scatter']:[]), ...(res.has3d&&res.bins?['jaccz']:[]), 'lateral', ...(res.has3d?['axial']:[]),
           ...(res.photonBins?['photons']:[]), ...(res.radiusSweep&&res.radiusSweep.length?['radius']:[]),
           ...(res.photometry?['photometry']:[]), ...(res.crlbBins?['crlb']:[])];
 }
-const TRUTH_PLOT_TITLES={ beadz:'Score: gel beads — fitted z vs nominal z', zbias:'Score: axial error vs true depth', scatter:'Score: fitted z vs true z',
+const TRUTH_PLOT_TITLES={ beadz:'Score: gel beads — fitted z vs nominal z', objects:'Score: per object', zbias:'Score: axial error vs true depth', scatter:'Score: fitted z vs true z',
                           jaccz:'Score: detection vs true depth', lateral:'Score: lateral error histogram',
                           axial:'Score: axial error histogram',
                           photons:'Score: detection and lateral error vs photons', radius:'Score: detection vs match radius',
                           photometry:'Score: fitted vs true photons',
                           crlb:'Score: measured precision vs reported CRLB' };
-const TRUTH_PLOT_BTN={ beadz:'Show bead z', zbias:'Show z error', scatter:'Show fitted vs true', jaccz:'Show Jaccard vs z', lateral:'Show lateral hist.',
+const TRUTH_PLOT_BTN={ beadz:'Show bead z', objects:'Show objects', zbias:'Show z error', scatter:'Show fitted vs true', jaccz:'Show Jaccard vs z', lateral:'Show lateral hist.',
                        axial:'Show axial hist.', photons:'Show vs photons', radius:'Show vs radius', photometry:'Show photometry',
                        crlb:'Show vs CRLB' };
 
@@ -8100,7 +8221,40 @@ function drawTruthScorePlot(res){
   const decades=(l0,l1)=>{ const t=[]; for(let d=Math.ceil(l0); d<=Math.floor(l1); d++) t.push(d);
     if(t.length<2){ t.length=0; const st=(l1-l0)/4; for(let k=0;k<=4;k++) t.push(l0+k*st); } return t; };
   const pow10fmt=v=>{ const x=Math.pow(10,v); return x>=100?Math.round(x).toLocaleString():x.toPrecision(2); };
-  if(mode==='beadz'){
+  if(mode==='objects' && res.objects.kind==='nup'){
+    // Li et al. Fig. 5d: each pore's ring distance against its fitted centre z, the true distance
+    // dashed. A depth-dependent distance is the PSF-model mismatch the paper corrects.
+    $('rawTitle').textContent='Score: NPC ring distance vs fitted z';
+    const O=res.objects, P=O.perObject;
+    const x0=Math.min(...P.map(p=>p.zFit)), x1=Math.max(...P.map(p=>p.zFit));
+    const y0=Math.min(O.trueDist, ...P.map(p=>p.dist))-10, y1=Math.max(O.trueDist, ...P.map(p=>p.dist))+10;
+    const X=v=>mL+pw*(v-x0)/Math.max(1e-9,x1-x0), Y=v=>mT+ph*(1-(v-y0)/Math.max(1e-9,y1-y0));
+    axis(X,Y,'pore centre, fitted z (nm)','ring distance (nm)',niceTicks(x0,x1,6),niceTicks(y0,y1,6),0,0);
+    line([[X(x0),Y(O.trueDist)],[X(x1),Y(O.trueDist)]],GREEN,1.4,[5,3]);
+    ctx.fillStyle=BLUE; for(const p of P){ ctx.beginPath(); ctx.arc(X(p.zFit),Y(p.dist),2.6,0,7); ctx.fill(); }
+    if(isFinite(O.slopeNmPerUm)){ const m=O.slopeNmPerUm/1000, xm=P.reduce((s,p)=>s+p.zFit,0)/P.length, ym=P.reduce((s,p)=>s+p.dist,0)/P.length;
+      line([[X(x0),Y(ym+m*(x0-xm))],[X(x1),Y(ym+m*(x1-xm))]],MAG,1.6); }
+    legend([[BLUE,'● one pore'],[GREEN,`┄ true distance ${O.trueDist} nm`],[MAG,'— linear fit']]);
+    note([`median ${O.medianDist.toFixed(1)} nm over ${O.n} pores`,`Pearson c ${O.pearson.toFixed(2)} (paper: 0.55)`,
+          `slope ${O.slopeNmPerUm.toFixed(1)} nm/µm`,'rings from ground truth'],'br');
+    hover={mL,mT,pw,ph,xA:x0,xB:x1,yTop:y1,yBot:y0,fmt:(vx,vy)=>`z ${vx.toFixed(0)} nm · ${vy.toFixed(1)} nm`};
+  } else if(mode==='objects'){
+    // Li et al. Fig. 3 side view: every pit's localizations about its own centre, true (grey)
+    // and fitted (blue) — a coverslip calibration flattens the deep pits' domes.
+    $('rawTitle').textContent='Score: clathrin-coated pits, side view';
+    const O=res.objects, T=[], F=[];
+    for(const p of O.perObject) for(const q of p.pts){ F.push([q[0],q[1]-p.zTrue]); T.push([q[2],q[3]-p.zTrue]); }
+    const all=[...T,...F]; const xr=Math.max(...all.map(a=>Math.abs(a[0])))*1.05;
+    const y0=Math.min(...all.map(a=>a[1]))-10, y1=Math.max(...all.map(a=>a[1]))+10;
+    const X=v=>mL+pw*(v+xr)/(2*xr), Y=v=>mT+ph*(1-(v-y0)/Math.max(1e-9,y1-y0));
+    axis(X,Y,'x from pit centre (nm)','z from pit centre (nm)',niceTicks(-xr,xr,6),niceTicks(y0,y1,6),0,0);
+    const step=Math.max(1,Math.ceil(T.length/6000));
+    ctx.fillStyle=C.grid; for(let i=0;i<T.length;i+=step){ ctx.beginPath(); ctx.arc(X(T[i][0]),Y(T[i][1]),1.4,0,7); ctx.fill(); }
+    ctx.fillStyle=BLUE; ctx.globalAlpha=0.6; for(let i=0;i<F.length;i+=step){ ctx.beginPath(); ctx.arc(X(F[i][0]),Y(F[i][1]),1.4,0,7); ctx.fill(); } ctx.globalAlpha=1;
+    legend([[C.text,'● true position'],[BLUE,'● fitted (z shifted to the pit\'s true median)']]);
+    note([`axial scale ${O.axialScale.toFixed(3)}`+(isFinite(res.rimf)?` (× RIMF ${(O.axialScale*res.rimf).toFixed(3)})`:''),`${O.n} pits`,'below 1 = flattened'],'br');
+    hover={mL,mT,pw,ph,xA:-xr,xB:xr,yTop:y1,yBot:y0,fmt:(vx,vy)=>`x ${vx.toFixed(0)} · z ${vy.toFixed(0)} nm`};
+  } else if(mode==='beadz'){
     // Li et al. (2019) Fig. 2c, left panel: every bead-frame's fitted z against its nominal z, each
     // bead coloured by its depth; a coverslip calibration keeps the shallow beads on y = x and
     // bends the deep ones away from it.
@@ -8337,7 +8491,9 @@ function drawTruthScorePlot(res){
 // result headlessly — whose firstIdx/lastIdx (half-open, 0-based) and `stopped` set the frames
 // that are scored at all.
 function truthScoreConfig(cfg, det, run){
-  const c={...cfg, _frameW:stack?stack.w:0, _frameH:stack?stack.h:0, _detBorder:det&&det.border?det.border:0};
+  const c={...cfg, _frameW:stack?stack.w:0, _frameH:stack?stack.h:0, _detBorder:det&&det.border?det.border:0,
+           _objects:groundTruthObjects, _zUsableNm:(_psfKernelCache&&_psfKernelCache.zUsableNm)||0,
+           _rimf:simDepthInfo?simDepthInfo.rimf:NaN};
   if(run && Number.isFinite(run.firstIdx) && Number.isFinite(run.lastIdx)){
     c._runFirst=run.firstIdx; c._runLast=run.lastIdx-1; c._runStopped=!!run.stopped; }
   return c;
@@ -21749,7 +21905,7 @@ function clearAnalysisOutputs(){
 // Drops the simulator's ground truth (it describes a stack that is gone, or
 // one rotated or cropped away from it) and the controls that read it.
 function clearSimGroundTruth(){
-  groundTruthObjects=null;
+  groundTruthObjects=null; simDepthInfo=null;
   groundTruth=null; groundTruthEvents=null; groundTruthLocs=null; simTrueDrift=null; gtShowing=false; srFullBeforeGT=null;
   $('truthBtn').disabled=true; setViewGtBtn(false);
 }
@@ -23359,7 +23515,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29e — Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.
+log(`webSMLM v0.13.0-dev · build 2026-10-29f — Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.
+— from build 2026-10-29e: Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.
 — from build 2026-10-29d: Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.
 — from build 2026-10-29c: Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.
 — from build 2026-10-29b: Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.

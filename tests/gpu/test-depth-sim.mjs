@@ -372,6 +372,58 @@ try {
   check('(5) CCP: every dye on the coat shell and within the closing angle (no linker error)', st.ccp.rFrac === 1 && st.ccp.angFrac === 1,
     `${st.ccp.n} dyes on ${st.ccp.nObj} pits`);
   check('(5) CCP movie: every in-focus event tagged with its pit', st.ccp.tagged === 1, `${st.ccp.movieEvents} events`);
+
+  // ---- (6) the biological samples, scored per object -------------------------------------------
+  // Calibrate on 100 nm coverslip beads (±500 nm), then simulate each sample in the physical depth
+  // mode, Localize with MLE 3D and score. Fitted z comes back in OBJECTIVE units (a coverslip
+  // calibration's unit); "× RIMF" is the model's own factor at the sample depth.
+  const bio = await page.evaluate(async () => {
+    const li = () => { const z = new Array(PSF_NZERNIKE).fill(0); z[5] = 183;
+      __set('simulation_psfNA', 1.43); __set('simulation_psfWavelength', 670); __set('simulation_psfNs', 1.3345); __set('simulation_psfNi', 1.518);
+      __set('simulation_psfSaf', true); __set('simulation_psfZernikeCustom', z.join(',')); __set('simulation_pxnm', 100);
+      __set('simulation_psfZRange', 500); __set('simulation_psfZStep', 20); __set('useGpu', true); __set('simulation_seed', 11);
+      __set('simulation_illumProfile', 'flat'); paramOverrides.simulation_3d = true; };
+    li(); __set('simulation_psfDepth', 50); __set('phot', 5000); __set('simbg', 10); __set('simulation_beadDiameter', 100);
+    __set('simulation_calibSeed', 7); __set('simulation_calibDepthMax', 0);
+    await runCalibrationSimulation(); await runCalibration();
+    __set('simulation_beadDiameter', 0);
+    const score = async () => { __set('method', 'mle3d'); __set('gain', 0.34); __set('camoffset', 100); await run(); await computeTruthScore();
+      const r = lastTruthScore; return { jaccard: r.jaccard, axialSlope: r.axialSlope, rimf: r.rimf, failFrac: r.failRule ? r.failRule.frac : NaN, objects: r.objects }; };
+    paramOverrides.simulation_depthMode = 'physical';
+    const out = {};
+    for (const [name, depth, orient] of [['ccp100', 100, 'up'], ['ccp2000', 2000, 'down']]) {
+      li(); paramOverrides.simulation_ccp_orientation = orient;
+      __set('simulation_psfDepth', depth); __set('simulation_structureType', 'ccp'); __set('simulation_ccp_count', 60);
+      __set('phot', 7000); __set('simbg', 30); __set('frames', 1000); __set('dens', 0.1); __set('simulation_labelEfficiency', 70);
+      await runSimulation(); const r = await score();
+      out[name] = { scale: r.objects.axialScale, rimf: r.rimf, scaleRimf: r.objects.axialScale * r.rimf, n: r.objects.n, failFrac: r.failFrac };
+    }
+    for (const [name, depth, membrane, curv] of [['npc340', 340, 'flat', 600], ['npc5um', 4850, 'dome', 0]]) {
+      li(); paramOverrides.simulation_nup_tiltDeg = 10; paramOverrides.simulation_nup_membrane = membrane; paramOverrides.simulation_nup_curvature = curv;
+      __set('simulation_psfDepth', depth); __set('simulation_structureType', 'nup'); __set('simulation_nup_variant', 'nup107'); __set('simulation_nup_count', 120);
+      __set('phot', 2000); __set('simbg', 15); __set('frames', 1000); __set('dens', 0.15); __set('simulation_labelEfficiency', 60);
+      await runSimulation(); const r = await score(), O = r.objects, P = O.perObject;
+      const pct = (a, p) => { const q = [...a].sort((x, y) => x - y); return q[Math.round(p * (q.length - 1))]; };
+      const zt = P.map(p => p.zTrue), zf = P.map(p => p.zFit);
+      out[name] = { n: O.n, medianDist: O.medianDist, distRimf: O.medianDist * r.rimf, pearson: O.pearson, slopeNmPerUm: O.slopeNmPerUm, rimf: r.rimf,
+                    spreadTrue: pct(zt, 0.95) - pct(zt, 0.05), spreadFitRimf: (pct(zf, 0.95) - pct(zf, 0.05)) * r.rimf, failFrac: r.failFrac };
+    }
+    out.kLogged = document.getElementById('logText').textContent.includes('Overlap K');
+    paramOverrides.simulation_depthMode = 'objective'; delete paramOverrides.simulation_nup_tiltDeg; delete paramOverrides.simulation_nup_membrane;
+    delete paramOverrides.simulation_nup_curvature; delete paramOverrides.simulation_ccp_orientation;
+    __set('simulation_nup_variant', 'nup96'); __set('simulation_psfSaf', false); __set('simulation_psfZernikeCustom', '');
+    return out;
+  });
+  results.biological = bio;
+  check('(6) pits flatten with depth: within-pit axial scale × RIMF lower at 2 µm than at 100 nm, and below 0.8',
+    bio.ccp2000.scaleRimf < bio.ccp100.scaleRimf && bio.ccp2000.scaleRimf < 0.8,
+    `100 nm ${bio.ccp100.scaleRimf.toFixed(3)} (raw ${bio.ccp100.scale.toFixed(3)}), 2 µm ${bio.ccp2000.scaleRimf.toFixed(3)} (raw ${bio.ccp2000.scale.toFixed(3)})`);
+  check('(6) Nup107 at 340 nm: ring distance × RIMF within 15% of 56.5 nm', Math.abs(bio.npc340.distRimf - 56.5) / 56.5 < 0.15,
+    `${bio.npc340.distRimf.toFixed(1)} nm (${bio.npc340.medianDist.toFixed(1)} raw) over ${bio.npc340.n} pores; vs fitted centre z c ${bio.npc340.pearson.toFixed(2)}, ${bio.npc340.slopeNmPerUm.toFixed(1)} nm/µm (paper +0.55; see the docs)`);
+  check('(6) Nup107 dome at ~5 µm reconstructs flattened (fitted spread × RIMF < 0.8 × true)', bio.npc5um.spreadFitRimf < 0.8 * bio.npc5um.spreadTrue,
+    `true pore-centre spread ${bio.npc5um.spreadTrue.toFixed(0)} nm, fitted × RIMF ${bio.npc5um.spreadFitRimf.toFixed(0)} nm`);
+  check('(6) failure rule and overlap K reported', isFinite(bio.npc340.failFrac) && bio.kLogged,
+    `failures ${(100 * bio.npc340.failFrac).toFixed(1)}% (NPC 340), K logged ${bio.kLogged}`);
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

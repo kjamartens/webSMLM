@@ -27,23 +27,23 @@
     params          2645   PARAMS registry, param controls, log/terminal helpers, memory defaults
     in/out          3630   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
     simulation      3858   synthetic stack generator ("Simulate movie")
-    validation      7044   ground-truth scoring for simulated data ("Compare to GT")
-    detect          7903   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8159   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          8769   super-resolution accumulation, view, colour maps, plots
-    workers         10293  frame-parallel detect/fit worker pool
-    gpu             10939  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13268  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  13559  astigmatic width-vs-z bead calibration
-    drift           13958  AIM and cross-correlation drift correction
-    locprecision    14616  NeNA and FRC
-    sSMLM           15755  spectral SMLM pairing (distance/angle fit, pairCore())
+    validation      7131   ground-truth scoring for simulated data ("Compare to GT")
+    detect          7990   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8246   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          8856   super-resolution accumulation, view, colour maps, plots
+    workers         10380  frame-parallel detect/fit worker pool
+    gpu             11026  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13355  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  13646  astigmatic width-vs-z bead calibration
+    drift           14045  AIM and cross-correlation drift correction
+    locprecision    14703  NeNA and FRC
+    sSMLM           15842  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             18468  single-particle tracking and diffusion coefficients
-    pipeline        19518  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   20558  Micro-Manager/pycromanager bridge (experimental)
-    table           22970  localizations table, filters, histograms, clustering
-    headless API    23655  window.webSMLM.analyze()/analyzeBatch()
+    spt             18555  single-particle tracking and diffusion coefficients
+    pipeline        19605  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   20645  Micro-Manager/pycromanager bridge (experimental)
+    table           23058  localizations table, filters, histograms, clustering
+    headless API    23743  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29b</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29c</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -4608,6 +4608,58 @@ function prepareSimKernelPlanes(zks, slices, frameEvents){
   zks.planes=planes;
   return used.size;
 }
+/* ---- Physical depth mode (PARAMS.simulation_depthMode='physical') ----
+   The objective is fixed for the whole movie at f_obj (nm of travel from the coverslip focus);
+   an emitter at height z_p above the coverslip is imaged with the PSF of an emitter at z_p seen
+   from f_obj. That is a different pupil for every depth, so emitters are grouped into depth BINS
+   (psfDepthBinCenters()) and each bin gets one small stack of planes on the shared objective
+   axis, built for the bin's centre depth z_b. An emitter at z_b + delta is drawn from the bin's
+   plane at objective offset f0'(z_b)*delta: moving an emitter delta deeper moves its own focus
+   f0'*delta deeper, which at a fixed objective is the same as the objective sitting f0'*delta
+   too shallow. Without that residual mapping a 250 nm bin would put ±156 nm of defocus error
+   on its emitters (the focus moves ~1.25 nm per nm of depth).
+   All bins' planes are concatenated into ONE virtual stack (focusIndex 0) and each per-frame
+   emitter entry gets its global plane index through the z slot splatSimFrame() already reads
+   (z = index*zStep) — so the serial path, the worker pool and the GPU need no change at all,
+   and the ground truth keeps the physical z. */
+// Bin centres from the sample depth outwards. Width 25 nm below 200 nm, 50 nm below 500 nm,
+// 250 nm beyond: the supercritical light e-folds over ~100 nm near the glass, the spherical
+// aberration changes ~11 milliwaves per 250 nm deeper in. The sample depth is always a centre,
+// so an emitter at exactly that depth is drawn with no residual mapping.
+function psfDepthBinWidth(zNm){ return zNm<200 ? 25 : zNm<500 ? 50 : 250; }
+function psfDepthBinCenters(dNm, zLoNm, zHiNm){
+  const c=[dNm];
+  for(let z=dNm; z<zHiNm; ){ z+=psfDepthBinWidth(z); c.push(z); }
+  for(let z=dNm; z>Math.max(0,zLoNm); ){ let s=psfDepthBinWidth(z); if(psfDepthBinWidth(z-s)<s) s=psfDepthBinWidth(z-s); z=Math.max(0,z-s); c.unshift(z); if(z===0) break; }
+  return c;
+}
+// Builds the virtual stack for a set of emitter depths zps (nm). fObjNm is the objective position.
+// Returns {slices, nz, planeOf(zp), bins:[{zb, n, offset}], fm (the focus map)}.
+async function buildPhysicalDepthStack(cfg, dNm, fObjNm, zps){
+  let zLo=Infinity, zHi=-Infinity;
+  for(const z of zps){ if(z<zLo) zLo=z; if(z>zHi) zHi=z; }
+  if(!isFinite(zLo)){ zLo=dNm; zHi=dNm; }
+  const fm=await psfFocusMap(cfg, Math.min(zLo,dNm), Math.max(zHi,dNm));
+  const centers=psfDepthBinCenters(dNm, zLo, zHi), Z=cfg.zStep*1e9;
+  const binOf=z=>{ let b=0; for(let i=1;i<centers.length;i++) if(Math.abs(z-centers[i])<Math.abs(z-centers[b])) b=i; return b; };
+  const offOf=(z,b)=>Math.round(fm.f0prime(centers[b])*(z-centers[b])/Z);   // objective-plane offset within the bin
+  const ext=new Map();
+  for(const z of zps){ const b=binOf(z), k=offOf(z,b), e=ext.get(b)||{lo:0,hi:0}; e.lo=Math.min(e.lo,k); e.hi=Math.max(e.hi,k); ext.set(b,e); }
+  if(!ext.size) ext.set(binOf(dNm),{lo:0,hi:0});
+  const nx=2*cfg.halfWidthPx+1, slices=[], bins=new Map();
+  for(const b of [...ext.keys()].sort((a,c)=>a-c)){
+    const {lo,hi}=ext.get(b), half=Math.max(-lo,hi), nzB=2*half+1;
+    const cb={...cfg, particleAxialPosition:centers[b]*1e-9, nz:nzB, sweepCenterM:cfg.ti0-fObjNm*1e-9};
+    cb.fftDk=psfFftDkForCfg(cb);
+    const built=await buildPsfPlanesQuiet(cb, nx, nx);
+    bins.set(b, {zb:centers[b], n:nzB, half, offset:slices.length});
+    for(const s of built.slices) slices.push(s);
+  }
+  // A higher plane index is the objective further from the sample (psfFocusMap()'s convention):
+  // an emitter deeper than its bin centre sits ABOVE the bin's focus, so it takes +offset.
+  const planeOf=z=>{ const b=binOf(z), B=bins.get(b), k=offOf(z,b); return B.offset+B.half+Math.max(-B.half,Math.min(B.half,k)); };
+  return {slices, nz:slices.length, planeOf, bins:[...bins.values()], fm, nx};
+}
 // The simulated sensor's own model as one bundle, so the three frame-producing paths (serial,
 // worker pool, calibration stack) each carry one object instead of five more positional
 // parameters. type 'scmos' (the default) leaves applySimCameraNoise() on its original
@@ -4858,6 +4910,18 @@ async function generateSynthetic(){
         `z-dependent defocus.`);
   }
 
+  // Physical depth mode: each emitter at its own height (sample depth + its z), objective fixed.
+  // The supercritical light it loses with height comes off its brightness here, in `bright`, so
+  // the movie and the ground truth agree on it (psfCollectedFraction(): exactly 1 with the
+  // interface physics off).
+  const depthNm=paramValue('simulation_psfDepth');
+  const physical = paramValue('simulation_depthMode')==='physical' && psfModel==='zernike' && is3d && !!zKernelStack;
+  const psfCfgPhys = physical ? readPsfConfigFromUI() : null;
+  const cfCache=new Map();
+  let nNegDepth=0;
+  const zpOf=ez=>{ const z=depthNm+ez; if(z<0){ nNegDepth++; return 0; } return z; };
+  const cfOf=ez=>{ if(!physical) return 1; const z=Math.round(zpOf(ez)/2)*2;
+    let v=cfCache.get(z); if(v===undefined){ v=psfCollectedFraction(psfCfgPhys, z*1e-9); cfCache.set(z,v); } return v; };
   // `dens` is a physical areal density (emitters/µm²/frame) of the STRUCTURE/sample, independent
   // of how densely buildStructure() happens to sample candidate points and independent of the
   // camera FOV — the arrival-rate area below is the structure's own footprint (structFov), not
@@ -4889,7 +4953,9 @@ async function generateSynthetic(){
   let nMolecules=0;
   const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol,haze)=>{
     if(tEnd<=0 || tStart>=n) return;                // never overlaps the movie — nothing to record
-    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze});
+    if(physical) bright*=cfOf(ez);
+    events.push(physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze, depth:zpOf(ez)}
+                         : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
@@ -4936,8 +5002,9 @@ async function generateSynthetic(){
     const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
     const tStart=-lead+rng()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-rng());   // exponential duration, mean=lifetime
-    const ill=illumOf(ex,ey);   // exactly 1 on the default flat profile
-    events.push({x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e});
+    const ill=illumOf(ex,ey)*cfOf(ez);   // exactly 1 on the default flat profile (and outside physical depth mode)
+    events.push(physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e, depth:zpOf(ez)}
+                         : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*ill, moleculeId:e});
     const f0=Math.max(0,Math.floor(tStart)), f1=Math.min(n-1,Math.floor(tEnd));
     for(let fi=f0; fi<=f1; fi++){
       const ov=Math.min(fi+1,tEnd)-Math.max(fi,tStart);
@@ -4973,7 +5040,25 @@ async function generateSynthetic(){
     log(`Out-of-focus emitters need the Zernike-aberrated PSF model — a fixed-σ Gaussian looks the same at every depth, `+
         `so they would just be extra in-focus emitters. Skipped; the static haze still applies.`);
   if(zKernelStack){
-    const nUsed=prepareSimKernelPlanes(zKernelStack, kernelStack.slices, frameEvents);
+    let srcSlices=kernelStack.slices;
+    if(physical){
+      // Objective at the kernel plane nearest the measured focus of the sample depth (exactly the
+      // plane objective mode would use for z = 0), so the two modes agree for an emitter there.
+      const Z=zKernelStack.zStepNm, fc=depthNm*psfCfgPhys.ni/psfCfgPhys.ns, c=(kernelStack.nz-1)/2;
+      const fObj=fc-Z*(kernelStack.focusIndex-c);
+      const zps=[]; for(const ev of frameEvents) for(const e of ev) zps.push(zpOf(e[2]));
+      const t0=performance.now();
+      const ds=await buildPhysicalDepthStack(psfCfgPhys, depthNm, fObj, zps);
+      for(const ev of frameEvents) for(const e of ev) e[2]=ds.planeOf(zpOf(e[2]))*Z;
+      srcSlices=ds.slices; zKernelStack.focusIndex=0; zKernelStack.nz=ds.nz;
+      const mb=ds.nz*ds.nx*ds.nx*8/1048576;
+      log(`Physical depth: objective fixed at ${fObj.toFixed(0)} nm of travel (in focus for ${depthNm} nm, model RIMF ${ds.fm.rimf(depthNm).toFixed(3)}); `+
+          `${ds.bins.length} depth bin(s) from ${ds.bins[0].zb.toFixed(0)} to ${ds.bins[ds.bins.length-1].zb.toFixed(0)} nm, ${ds.nz} planes (${mb.toFixed(0)} MB), `+
+          `built in ${Math.round(performance.now()-t0)} ms. Each emitter is imaged at its own height; its z in the ground truth is that height minus ${depthNm} nm.`+
+          (psfCfgPhys.saf||psfCfgPhys.apod ? ` Light collected relative to the coverslip: ${cfOf(0).toFixed(3)} at the sample depth.` : '')+
+          (nNegDepth ? ` ⚠ ${nNegDepth} emitter position(s) fell below the coverslip and were placed on it.` : ''));
+    }
+    const nUsed=prepareSimKernelPlanes(zKernelStack, srcSlices, frameEvents);
     log(`Simulate movie: ${nUsed} of ${zKernelStack.nz} PSF z-planes are used by an emitter — only those are prepared and sent to the workers/GPU.`);
   }
   groundTruthEvents = events.map(e=>{
@@ -4982,7 +5067,9 @@ async function generateSynthetic(){
     // rate x overlap. scoreTruthCore() (MODULE: validation) needs it to decide whether an
     // emitter-frame was bright enough to be fairly expected to be detected at all.
     const rate = e.rate===undefined ? photPerFrame : e.rate;   // per-blink once brightness varies
-    return {x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, haze:!!e.haze, photonsTotal:rate*Math.max(0,t-s)};
+    const g={x:e.x, y:e.y, z:e.z, tStart:e.tStart, tEnd:e.tEnd, rate, moleculeId:e.moleculeId, haze:!!e.haze, photonsTotal:rate*Math.max(0,t-s)};
+    if(e.depth!==undefined) g.depth=e.depth;   // physical depth mode: the emitter's height above the coverslip
+    return g;
   });
 
   // fixed per-pixel camera offset map — real sensor fixed-pattern offset noise is a static
@@ -22872,7 +22959,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29b — Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.
+log(`webSMLM v0.13.0-dev · build 2026-10-29c — Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.
+— from build 2026-10-29b: Simulation: with Supercritical angle or Fresnel apodisation on, a PSF at depth is centred on its MEASURED focus (σx = σy), not the paraxial one.
 — from build 2026-10-29a: Simulation: Supercritical angle (SAF) and Fresnel apodisation switches (Advanced → PSF, both off); "Emitter depth into sample" is now "Sample depth".
 — from build 2026-09-28u: Defaults: Compare to GT min photons/frame 300; cell field seed 0 (random each movie).
 — from build 2026-09-28t: Compare to GT: axial error histogram; every score plot now names what each mark is and how to read it; error ÷ CRLB view removed.

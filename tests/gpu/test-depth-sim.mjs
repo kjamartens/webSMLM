@@ -208,6 +208,84 @@ try {
   check('(2) model RIMF at 340/2000/3500 nm near report 0.70/0.76/0.79',
     [[340, 0.70], [2000, 0.76], [3500, 0.79]].every(([d, t]) => Math.abs(at(d).rimf - t) < 0.02),
     [340, 2000, 3500].map(d => at(d).rimf.toFixed(3)).join(' / '));
+
+  // ---- (3) physical depth mode -----------------------------------------------------------------
+  // (a) the default movies are untouched by the new code paths
+  const base3 = await page.evaluate(async () => {
+    __set('simulation_psfSaf', false); __set('simulation_psfZernikeCustom', ''); __set('simulation_psfNA', 1.4);
+    __set('simulation_psfWavelength', 660); __set('simulation_psfNs', 1.33); __set('simulation_psfNi', 1.518);
+    paramOverrides.simulation_depthMode = 'objective';
+    return { uniform3D: await __simHash({ simulation_structureType: 'uniform3D' }), nup: await __simHash({ simulation_structureType: 'nup' }) };
+  });
+  for (const k of Object.keys(BASELINE))
+    check(`(3) seeded ${k} movie still byte-identical after the depth code`, base3[k].hash === BASELINE[k], `hash ${base3[k].hash}`);
+  // (b) at the coverslip, a flat sample in physical mode is the objective-mode movie, bit for bit
+  const same = await page.evaluate(async () => {
+    const cfg = { simulation_structureType: 'tiltedPlane', simulation_zRange: 0, simulation_psfSaf: true, simulation_psfDepth: 0 };
+    paramOverrides.simulation_depthMode = 'objective'; const a = await __simHash(cfg);
+    paramOverrides.simulation_depthMode = 'physical'; const b = await __simHash(cfg);
+    paramOverrides.simulation_depthMode = 'objective';
+    return { a, b };
+  });
+  results.physicalAtCoverslip = same;
+  check('(3) physical = objective for a flat sample at the coverslip', same.a.hash === same.b.hash, `${same.a.hash} / ${same.b.hash}`);
+  // (c) residual mapping: the plane an emitter at depth D+delta is drawn from against the PSF built
+  // directly at that depth and the same objective position — and against the opposite sign.
+  const resid = await page.evaluate(async () => {
+    const z = new Array(PSF_NZERNIKE).fill(0); z[5] = 183;
+    __set('simulation_psfNA', 1.43); __set('simulation_psfWavelength', 670); __set('simulation_psfNs', 1.3345);
+    __set('simulation_psfNi', 1.518); __set('simulation_psfSaf', true); __set('simulation_psfZernikeCustom', z.join(','));
+    __set('simulation_psfZRange', 400); __set('simulation_psfZStep', 10);
+    paramOverrides.simulation_depthMode = 'physical';
+    const cfg = readPsfConfigFromUI(), D = 2000;
+    const fObj = (await psfFocusMap(cfg, D, D)).f0(D);
+    const deltas = [-120, -60, 60, 120], zps = deltas.map(d => D + d);
+    const ds = await buildPhysicalDepthStack(cfg, D, fObj, zps);
+    const corr = (a, b) => { let sa = 0, sb = 0, sab = 0, saa = 0, sbb = 0, n = a.length;
+      for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; } const ma = sa / n, mb = sb / n;
+      for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; sab += x * y; saa += x * x; sbb += y * y; } return sab / Math.sqrt(saa * sbb); };
+    const out = [];
+    for (const zp of zps) {
+      const direct = await buildPsfPlanesQuiet({ ...cfg, particleAxialPosition: zp * 1e-9, nz: 1, sweepCenterM: cfg.ti0 - fObj * 1e-9, fftDk: psfFftDkForCfg(cfg) }, ds.nx, ds.nx);
+      const used = ds.slices[ds.planeOf(zp)];
+      // the opposite sign: mirror the plane index about the bin's own centre plane
+      const B = ds.bins.find(b => ds.planeOf(zp) >= b.offset && ds.planeOf(zp) < b.offset + b.n);
+      const mirror = ds.slices[B.offset + B.half - (ds.planeOf(zp) - B.offset - B.half)];
+      const centre = ds.slices[B.offset + B.half];
+      out.push({ zp, corrUsed: corr(direct.slices[0], used), corrMirror: corr(direct.slices[0], mirror), corrNoResidual: corr(direct.slices[0], centre) });
+    }
+    paramOverrides.simulation_depthMode = 'objective';
+    return { bins: ds.bins.map(b => ({ zb: b.zb, n: b.n })), out };
+  });
+  results.residualMapping = resid;
+  for (const r of resid.out)
+    check(`(3) residual mapping at ${r.zp} nm reproduces the direct PSF, and beats the opposite sign`,
+      r.corrUsed > 0.995 && r.corrUsed > r.corrMirror && r.corrUsed >= r.corrNoResidual,
+      `corr used ${r.corrUsed.toFixed(4)}, opposite sign ${r.corrMirror.toFixed(4)}, no residual ${r.corrNoResidual.toFixed(4)}`);
+  // (d) a real physical-mode movie, 2 um deep, ±500 nm of structure, on the CPU workers and the GPU
+  const phys = await page.evaluate(async () => {
+    const cfg = { simulation_structureType: 'uniform3D', simulation_zRange: 500, simulation_psfDepth: 2000, simulation_psfZRange: 1000 };
+    paramOverrides.simulation_depthMode = 'physical';
+    const movies = [];
+    for (const g of [false, true]) {
+      __simBase(); for (const [k, v] of Object.entries(cfg)) __set(k, v); __set('useGpu', g);
+      const st = await generateSynthetic();
+      movies.push({ path: lastSimTimings.path, frames: await st.getFrames(0, st.n),
+        depths: groundTruthEvents.map(e => e.depth), zs: groundTruthEvents.map(e => e.z), rates: groundTruthEvents.map(e => e.rate) });
+    }
+    paramOverrides.simulation_depthMode = 'objective'; __set('useGpu', false);
+    let close = 0, tot = 0, maxAbs = 0;
+    for (let fi = 0; fi < movies[0].frames.length; fi++) for (let i = 0; i < movies[0].frames[fi].length; i++) {
+      const d = Math.abs(movies[0].frames[fi][i] - movies[1].frames[fi][i]); tot++; if (d <= 1e-3) close++; if (d > maxAbs) maxAbs = d; }
+    const m = movies[0];
+    const depthOk = m.depths.every((d, i) => Math.abs(d - Math.max(0, 2000 + m.zs[i])) < 1e-9);
+    return { paths: movies.map(x => x.path).join('/'), fracClose: close / tot, maxAbs, depthOk, nEvents: m.zs.length,
+             depthRange: [Math.min(...m.depths), Math.max(...m.depths)] };
+  });
+  results.physicalMovie = phys;
+  check('(3) physical movie: every event carries depth = 2000 + z', phys.depthOk, `${phys.nEvents} events, depth ${phys.depthRange.map(v => v.toFixed(0)).join('…')} nm`);
+  check('(3) physical movie: CPU workers = GPU', phys.paths === 'cpu/gpu' && phys.fracClose >= 0.999,
+    `paths ${phys.paths}, ${(100 * phys.fracClose).toFixed(3)}% of pixels within 1e-3 ADU, max|Δ| ${phys.maxAbs.toExponential(2)}`);
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

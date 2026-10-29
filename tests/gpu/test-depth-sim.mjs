@@ -424,6 +424,51 @@ try {
     `true pore-centre spread ${bio.npc5um.spreadTrue.toFixed(0)} nm, fitted × RIMF ${bio.npc5um.spreadFitRimf.toFixed(0)} nm`);
   check('(6) failure rule and overlap K reported', isFinite(bio.npc340.failFrac) && bio.kLogged,
     `failures ${(100 * bio.npc340.failFrac).toFixed(1)}% (NPC 340), K logged ${bio.kLogged}`);
+
+  // ---- (7) the Sample presets ------------------------------------------------------------------
+  const pre = await page.evaluate(async () => {
+    const sel = document.getElementById('simulation_samplePreset'), out = {};
+    const opts = [...sel.options].map(o => o.value).filter(v => v !== 'custom');
+    __set('useGpu', true);
+    for (const p of opts) {
+      const r = { name: p };
+      sel.value = p; sel.dispatchEvent(new Event('change'));
+      r.optics = paramValue('simulation_psfNA') === 1.43 && paramValue('simulation_psfWavelength') === 670 && paramValue('simulation_depthMode') === 'physical'
+        && paramValue('simulation_psfSaf') === true && paramValue('simulation_cameraType') === 'emccd';
+      r.depth = paramValue('simulation_psfDepth');
+      r.structure = paramValue('simulation_structureType');
+      r.variant = paramValue('simulation_nup_variant'); r.membrane = paramValue('simulation_nup_membrane');
+      r.physicsCustom = document.getElementById('simulation_realism').value === 'custom' || !p.match(/ccp|npc/);
+      // settings round trip: save, scramble, load
+      const json = JSON.stringify(buildSettingsJson(buildConfigFromParams()));
+      sel.value = 'custom'; sel.dispatchEvent(new Event('change'));
+      __set('simulation_psfDepth', 0); __set('simulation_structureType', 'uniform3D'); paramOverrides.simulation_depthMode = 'objective';
+      await loadSettingsJson(new File([json], 'roundtrip.json', { type: 'application/json' }));
+      r.roundTrip = sel.value === p && paramValue('simulation_psfDepth') === r.depth && paramValue('simulation_depthMode') === 'physical'
+        && (!p.match(/ccp|npc/) || paramValue('simulation_structureType') === r.structure);
+      // an edit to a field it wrote flips it to Custom
+      __set('phot', 1234); r.flips = sel.value === 'custom';
+      // and it simulates: beads through Calib. stack, the rest through Simulate movie (short)
+      const logBefore = document.getElementById('logText').textContent.length;
+      if (p.includes('beads')) { await runCalibrationSimulation(); r.frames = stack.n; r.truth = groundTruthEvents ? groundTruthEvents.length : 0; }
+      else { __set('frames', 200); await runSimulation(); r.frames = stack.n; r.truth = groundTruthEvents ? groundTruthEvents.length : 0;
+             r.objects = groundTruthObjects ? groundTruthObjects.length : 0; }
+      const newLog = document.getElementById('logText').textContent.slice(logBefore);
+      r.failed = /⚠ Simulat(e|ion)[^\n]*failed/.test(newLog);
+      out[p] = r;
+    }
+    sel.value = 'custom'; sel.dispatchEvent(new Event('change'));
+    return out;
+  });
+  results.presets = pre;
+  for (const r of Object.values(pre)) {
+    check(`(7) preset ${r.name}: Li optics, physical depth, depth ${r.depth} nm${r.structure ? ', ' + r.structure : ''}`, r.optics, '');
+    check(`(7) preset ${r.name}: survives a settings round trip`, r.roundTrip, '');
+    check(`(7) preset ${r.name}: Physics detail says Custom when the preset overrode its fields`, r.physicsCustom, '');
+    check(`(7) preset ${r.name}: an edit flips it to Custom`, r.flips, '');
+    check(`(7) preset ${r.name}: simulates`, !r.failed && r.frames > 0 && (r.name === 'li2019_beadsGlass' || r.truth > 0),
+      `${r.frames} frames, ${r.truth} truth events${r.objects ? ', ' + r.objects + ' objects' : ''}`);
+  }
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

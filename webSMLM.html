@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2651   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3691   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3919   synthetic stack generator ("Simulate movie")
-    validation      7457   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8532   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8788   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9398   super-resolution accumulation, view, colour maps, plots
-    workers         10922  frame-parallel detect/fit worker pool
-    gpu             11568  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13897  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  14188  astigmatic width-vs-z bead calibration
-    drift           14587  AIM and cross-correlation drift correction
-    locprecision    15245  NeNA and FRC
-    sSMLM           16384  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2652   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3703   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3931   synthetic stack generator ("Simulate movie")
+    validation      7469   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8544   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8800   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9410   super-resolution accumulation, view, colour maps, plots
+    workers         10934  frame-parallel detect/fit worker pool
+    gpu             11580  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13909  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14200  astigmatic width-vs-z bead calibration
+    drift           14599  AIM and cross-correlation drift correction
+    locprecision    15257  NeNA and FRC
+    sSMLM           16396  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             19097  single-particle tracking and diffusion coefficients
-    pipeline        20147  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   21187  Micro-Manager/pycromanager bridge (experimental)
-    table           23617  localizations table, filters, histograms, clustering
-    headless API    24302  window.webSMLM.analyze()/analyzeBatch()
+    spt             19109  single-particle tracking and diffusion coefficients
+    pipeline        20159  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21199  Micro-Manager/pycromanager bridge (experimental)
+    table           23693  localizations table, filters, histograms, clustering
+    headless API    24378  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29f</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29g</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1925,6 +1925,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" title="Length of the simulated movie, in frames.">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="2000" class="num"></label>
         <label class="row" title="How many emitters are ON per µm² in an average frame: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Sets Emitter density under Sample; editing that by hand switches this to Custom.">Emitter density <select id="simulation_densityPreset" class="sel"><option value="low">Low (0.05)</option><option value="med">Medium (0.2)</option><option value="high" selected>High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
         <label class="row" title="How much physics — and compute — a simulation spends. Basic: every molecule blinks once at constant brightness on a flat, dark background (fastest). Realistic: molecules blink repeatedly and bleach, brightness varies, and the background fades and carries out-of-focus haze — nearly free per frame. Full: also adds blinking out-of-focus emitters rendered with the real defocused PSF — roughly doubles the simulation time. It only writes fields under Fluorophore and Background; edit any of them and this switches to Custom.">Physics detail <select id="simulation_realism" class="sel"><option value="min">Basic (fastest)</option><option value="med" selected>Realistic</option><option value="max">Full (slowest)</option><option value="custom">Custom</option></select></label>
+        <label class="row" title="Ready-made samples from Li et al., Biomed. Opt. Express 10, 2708 (2019): the Li microscope (NA 1.43, 670 nm, 100 nm pixels, astigmatism, EMCCD) with each sample at its own depth, every emitter imaged at its own height. Beads: click Calib. stack (coverslip beads to Calibrate on; gel beads to score). Pits and pores: Simulate movie. It only writes ordinary settings — choosing one also sets Physics detail and Emitter density to Custom, and editing any field it wrote sets this back to Custom.">Sample preset <select id="simulation_samplePreset" class="sel"><option value="custom" selected>Custom</option><option value="li2019_beadsGlass">Li 2019 — beads on coverslip</option><option value="li2019_beadsGel">Li 2019 — beads in gel</option><option value="li2019_ccpGlass">Li 2019 — pits at coverslip</option><option value="li2019_ccp2um">Li 2019 — pits at 2 µm</option><option value="li2019_npc340">Li 2019 — NPC at 340 nm</option><option value="li2019_npc5um">Li 2019 — NPC at 5 µm</option></select></label>
         <div class="btnrow" id="simToolsRow">
           <button type="button" id="psfPreviewBtn" title="Build the PSF kernel from the PSF settings and show it in the raw panel as a z-scrollable stack. Zernike PSF model only.">Preview PSF</button>
           <button type="button" id="genCalBtn" title="Simulate a bead z-stack from the same PSF kernel as Preview PSF (PSF z range/step), focus exactly on the centre frame, and write z-step/z=0 ref frame into the 3D calibration section — Calibrate then needs no other setting changed. Zernike PSF model only.">Calib. stack</button>
@@ -3018,6 +3019,14 @@ const PARAMS = {
   // simulation_hazeDepth = how far from focus (nm) that population reaches; capped at the PSF z range.
   simulation_hazeDepth: { type:'number', id:'simulation_hazeDepth', label:'Out-of-focus depth (± nm)', min:300, max:2000, step:50, default:1500, int:false },
   simulation_realism: { type:'enum', id:'simulation_realism', label:'Physics detail', options:['min','med','max','custom'], default:'med' },
+  // Sample preset: the calibration and test samples of Li et al., Biomed. Opt. Express 10, 2708
+  // (2019) — beads on the coverslip, beads in a gel, clathrin-coated pits at the coverslip and
+  // 2 um deep, Nup107 pores at 340 nm and ~5 um. Like every preset it only WRITES ordinary
+  // parameters (wirePreset(); control-less ones through paramOverrides) and carries no physics of
+  // its own; 'custom' writes nothing. Values and their sources: docs/DOCUMENTATION.md, Simulation
+  // guide, "Li et al. 2019".
+  simulation_samplePreset: { type:'enum', id:'simulation_samplePreset', label:'Sample preset',
+    options:['custom','li2019_beadsGlass','li2019_beadsGel','li2019_ccpGlass','li2019_ccp2um','li2019_npc340','li2019_npc5um'], default:'custom' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
   simbg: { type:'number', id:'simbg', label:'Background (photons/px)', min:0, max:500, step:1, default:10, int:false },
@@ -3581,7 +3590,10 @@ function overrideWithFields(config, call){
   const stmts=[];
   for(const [k,v] of Object.entries(config)){
     if(v===null||v===undefined||v==='') continue;
-    const el=$(k); if(!el||el.type==='file') continue;
+    const el=$(k);
+    // a control-less PARAMS field is set the way paramValue() reads it
+    if(!el){ if(PARAMS[k] && PARAMS[k].id===null) stmts.push(`paramOverrides.${k}=${JSON.stringify(v)};`); continue; }
+    if(el.type==='file') continue;
     stmts.push(el.type==='checkbox' ? `$('${k}').checked=${JSON.stringify(!!v)};` : `$('${k}').value=${JSON.stringify(v)};`);
   }
   // Assignments on one line, the call on the next.
@@ -21681,7 +21693,9 @@ async function runSimulation(){
               'simulation_offset_std','simulation_readnoise','simulation_pxnm','driftpx'];
   const cmdCfg={};
   for(const k of Object.keys(PARAMS)){
-    if(!PARAMS[k].id || ['simulation_realism','simulation_densityPreset'].includes(k)) continue;
+    if(['simulation_realism','simulation_densityPreset','simulation_samplePreset'].includes(k)) continue;
+    // a control-less field counts only when a preset or settings file actually set it
+    if(!PARAMS[k].id && !(k in paramOverrides)) continue;
     if(core.includes(k) || (k.startsWith('simulation_') && paramValue(k)!==PARAMS[k].default)) cmdCfg[k]=paramValue(k);
   }
   logCmd(cmdCfg, overrideWithFields(cmdCfg, 'runSimulation()'));
@@ -22293,12 +22307,27 @@ updateSimulationStructureUI();
 // numbers and need to know nothing about presets. `_presetWriting` stops a preset's own writes
 // from being read back as a manual edit. Same idea as the Zernike preset + custom-coefficient pair.
 let _presetWriting=false;
+// Every preset's table, by preset id, so one preset can tell whether another still holds after it
+// wrote fields both govern (presetHolds()).
+const _presetTables={};
+function presetHolds(presetId){
+  const sel=$(presetId), want=_presetTables[presetId] && _presetTables[presetId][sel.value];
+  if(!want) return true;
+  for(const id in want){ const el=$(id), w=want[id];
+    const have = !el ? paramValue(id) : el.type==='checkbox' ? el.checked : (el.tagName==='SELECT'||el.type==='text') ? el.value : parseFloat(el.value);
+    const same = typeof w==='number' && typeof have==='number' ? Math.abs(have-w)<1e-9 : have===w;
+    if(!same) return false; }
+  return true;
+}
 function wirePreset(presetId, table){
+  _presetTables[presetId]=table;
   const ids=[...new Set(Object.values(table).flatMap(o=>Object.keys(o)))];
   $(presetId).addEventListener('change',()=>{
     const vals=table[$(presetId).value]; if(!vals) return;          // 'custom' writes nothing
     _presetWriting=true;
-    try{ for(const id in vals){ const el=$(id); if(!el) continue;
+    // A field with no control (PARAMS id:null) goes through paramOverrides, where paramValue()
+    // reads it — so a preset can set geometry that has no place in the sidebar.
+    try{ for(const id in vals){ const el=$(id); if(!el){ if(PARAMS[id]) paramOverrides[id]=vals[id]; continue; }
            if(el.type==='checkbox') el.checked=!!vals[id]; else el.value=vals[id];
            el.dispatchEvent(new Event('change')); } }
     finally{ _presetWriting=false; }
@@ -22346,6 +22375,52 @@ wirePreset('validation_preset', {
   for(const el of [pre,m,p]) el.addEventListener('change', sync);
   sync();
 })();
+// Li et al. (2019). Optics and camera from the paper's §3.1 and the depth-calibration report:
+// NA 1.43 oil, 670 nm emission, 100 nm pixels (16 um / 160x), vertical astigmatism 1.15 rad =
+// 183 milliwaves at OSA j=5 (psfIndexToNM(5) = (2,2)), agarose/buffer n = 1.3345, oil 1.518,
+// Evolve 512 EMCCD (EM gain 350, QE 0.9), flat-top illumination (speckle reducer + multimode
+// fibre). Supercritical angle on (the paper's coverslip-bead PSF has it, its sample PSF loses it);
+// apodisation off (the published SAF fractions are uniform-pupil). Photons per FRAME: 2000 for
+// the NPC samples (fit3Dcspline's example_3D_fit.m) and 7000 with COT for the pits (x3.5, Olivier
+// et al. 2013) — the report's 3823 is per switching CYCLE. Duty cycle 1/(1+2000) = 0.0005 and
+// 4.4 blinks per dye (bleach 0.23 per blink) for AF647 in GLOX/MEA. Density chosen so overlap
+// K stays below 0.1 at the edge of each sample's depth range. Calibration ±500 nm at 20 nm, the
+// range this astigmatism encodes single-valued (±400 nm).
+{ const optics={ simulation_psfModel:'zernike', simulation_psfNA:1.43, simulation_psfWavelength:670, simulation_psfNs:1.3345,
+    simulation_psfNi:1.518, simulation_pxnm:100, simulation_psfZernikeCustom:'0,0,0,0,0,183,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0',
+    simulation_psfSaf:true, simulation_psfApodization:false, simulation_depthMode:'physical', simulation_3d:true,
+    simulation_psfZRange:500, simulation_psfZStep:20,
+    simulation_cameraType:'emccd', simulation_emGain:350, simulation_qe:0.9, simulation_illumProfile:'flat' };
+  const beads={ ...optics, phot:5000, simbg:10, simulation_beadDiameter:100 };
+  const dstorm={ ...optics, frames:2000, simlifetime:1, simulation_offLifetime:2000, simulation_blinkBleachProb:0.23,
+    simulation_photCV:0.5, simulation_calibDepthMax:0, simulation_beadDiameter:0 };
+  const ccp={ ...dstorm, simulation_structureType:'ccp', phot:7000, simbg:30, dens:0.1, simulation_labelEfficiency:70,
+    simulation_ccp_count:60, simulation_ccp_radius:72, simulation_ccp_closingAngleDeg:120, simulation_ccp_shellThickness:15,
+    simulation_ccp_linkerSigma:5, simulation_ccp_dol:1.5 };
+  const npc={ ...dstorm, simulation_structureType:'nup', simulation_nup_variant:'nup107', phot:2000, simbg:15, dens:0.1,
+    simulation_labelEfficiency:60, simulation_nup_count:120, simulation_nup_tiltDeg:10 };
+  wirePreset('simulation_samplePreset', {
+    li2019_beadsGlass:{ ...beads, simulation_psfDepth:50, simulation_calibDepthMax:0 },
+    li2019_beadsGel:  { ...beads, simulation_psfDepth:50, simulation_calibDepthMax:5000 },
+    li2019_ccpGlass:  { ...ccp, simulation_psfDepth:100,  simulation_ccp_orientation:'up' },
+    li2019_ccp2um:    { ...ccp, simulation_psfDepth:2000, simulation_ccp_orientation:'down' },
+    li2019_npc340:    { ...npc, simulation_psfDepth:340,  simulation_nup_membrane:'flat', simulation_nup_curvature:600 },
+    li2019_npc5um:    { ...npc, simulation_psfDepth:4850, simulation_nup_membrane:'dome', simulation_nup_curvature:0, simulation_nup_domeHeight:900 },
+  });
+  // What to click next, and the analysis-side settings a preset deliberately does NOT write
+  // (a Simulation preset never touches Localisation).
+  $('simulation_samplePreset').addEventListener('change',()=>{
+    const v=$('simulation_samplePreset').value; if(v==='custom') return;
+    // A preset's own writes never flip another preset (they run under _presetWriting); this one
+    // writes fields Physics detail and Emitter density govern, so say so where they no longer hold.
+    for(const id of ['simulation_realism','simulation_densityPreset']) if(!presetHolds(id)) $(id).value='custom';
+    log(`Sample preset ${$('simulation_samplePreset').selectedOptions[0].textContent}: `+
+        (v==='li2019_beadsGlass' ? 'click Calib. stack, then Calibrate (3D calibration).'
+         : v==='li2019_beadsGel' ? 'calibrate on "beads on coverslip" first, then click Calib. stack here, Localize with a 3D method and Compare to GT → Show bead z.'
+         : 'calibrate on "beads on coverslip" first, then Simulate movie, Localize with a 3D method and Compare to GT → Show objects.')+
+        ` For Localisation set Gain 0.34 photons/ADU, Camera offset 100 ADU and Excess noise F² 2 (EMCCD).`);
+  });
+}
 wirePreset('simulation_realism', {
   min:{ simulation_blinkBleachProb:1,   simulation_photCV:0,   simbg:0,  simulation_bgCellContrast:1,
         simulation_bgHazeWeight:0, simulation_bgDecayFrames:0,   simulation_hazeRatio:0 },
@@ -23515,7 +23590,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29f — Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.
+log(`webSMLM v0.13.0-dev · build 2026-10-29g — Simulation: Sample preset — the calibration and test samples of Li et al. (2019) in one choice (beads on coverslip / in gel, pits, Nup107 pores).
+— from build 2026-10-29f: Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.
 — from build 2026-10-29e: Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.
 — from build 2026-10-29d: Simulation: Calib. stack in a gel (Bead depth range > 0) with ground truth, Bead diameter, Calib. stack seed; Compare to GT → Show bead z.
 — from build 2026-10-29c: Simulation: physical depth mode (settings/presets only): each emitter imaged at its own height, objective fixed.

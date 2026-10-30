@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2677   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3728   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3956   synthetic stack generator ("Simulate movie")
-    validation      7498   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8573   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8829   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9439   super-resolution accumulation, view, colour maps, plots
-    workers         10963  frame-parallel detect/fit worker pool
-    gpu             11609  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13938  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  14229  astigmatic width-vs-z bead calibration
-    drift           14628  AIM and cross-correlation drift correction
-    locprecision    15286  NeNA and FRC
-    sSMLM           16425  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2685   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3750   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3978   synthetic stack generator ("Simulate movie")
+    validation      7549   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8626   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8882   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9499   super-resolution accumulation, view, colour maps, plots
+    workers         11023  frame-parallel detect/fit worker pool
+    gpu             11664  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          13993  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14284  astigmatic width-vs-z bead calibration
+    drift           14683  AIM and cross-correlation drift correction
+    locprecision    15341  NeNA and FRC
+    sSMLM           16480  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             19138  single-particle tracking and diffusion coefficients
-    pipeline        20188  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   21228  Micro-Manager/pycromanager bridge (experimental)
-    table           23723  localizations table, filters, histograms, clustering
-    headless API    24408  window.webSMLM.analyze()/analyzeBatch()
+    spt             19193  single-particle tracking and diffusion coefficients
+    pipeline        20243  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21287  Micro-Manager/pycromanager bridge (experimental)
+    table           23811  localizations table, filters, histograms, clustering
+    headless API    24496  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-29h</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-30a</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -1780,6 +1780,12 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <input type="file" id="calFile" accept=".json" hidden>
           <div id="cal3dStatus" class="hint" style="margin-top:4px">No calibration loaded.</div>
         </div>
+        <div id="zScaleRow" style="display:none">
+          <label class="row" title="Multiplies every fitted z (and its precision). A calibration on coverslip beads measures objective travel; in a sample of lower refractive index (water, gel, cells) an emitter's focus moves ~1/RIMF nm per nm of height, so z × RIMF is height in the sample. 1 = objective travel. Typical oil objective into water: 0.7–0.8.">Axial scale (RIMF) <input type="number" id="zScale" value="1" min="0.3" max="1.5" step="0.001" class="num"></label>
+          <div class="btnrow" style="margin-top:2px">
+            <button id="zScaleFromSimBtn" disabled style="grid-column:2" title="Fill in the RIMF of the simulated sample: the local value at its Sample depth from the PSF model (physical depth model only)">From simulation</button>
+          </div>
+        </div>
         <label class="row" id="ftmEnabledRow" style="margin-top:8px" title="Subtract a per-pixel temporal median background (FTM) before detection and fitting">Temporal median filtering <input type="checkbox" id="ftmEnabled"></label>
         <label class="row" id="ftmWindowRow" style="display:none;padding-left:40px" title="Frames in the temporal median; a blinking emitter should be on for less than half of it">Window size <input type="number" id="ftmWindow" value="50" min="3" step="1" class="num"></label>
         <label class="row" style="margin-top:8px">First frame <input type="number" id="fitFirstFrame" min="1" step="1" value="1" class="num" title="First frame (1-based, inclusive) Localize processes"></label>
@@ -1812,6 +1818,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <li><b>Gauss MLE elliptical</b> / <b>Gauss MLE rotated elliptical</b> — independent σx/σy (axis-aligned, or at a rotation angle) instead of one symmetric σ; see <b>3D localisation</b> below.</li>
           </ul>
           <p><b>3D localisation</b> (only shown for the two elliptical methods above) — <b>checked</b> (default): a free rotation angle recovered per emitter, plus z from a loaded calibration, same as <b>Gauss MLE elliptical</b>. <b>Unchecked</b>: a calibration-free fit with no z — for <b>Gauss MLE elliptical</b> this is a plain 2D elliptical fit; for the rotated method the angle is instead fixed to the sSMLM pairing step's own dispersion bearing (Pairing for sSMLM or FRET → Primary angle).</p>
+          <p><b>Axial scale (RIMF)</b> (shown with any 3D fit) multiplies every fitted z and its precision. A 3D calibration on beads on the coverslip measures <i>objective travel</i>; in a sample of lower refractive index than the immersion oil (water, gel, cells) an emitter's focus moves about 1/RIMF nm per nm of height, so z × RIMF is height in the sample relative to the focal plane. 1 keeps objective travel. For an oil objective imaging into water the RIMF is about 0.7–0.8 and changes slowly with depth; one constant is the usual correction, not the depth-dependent one of Li <i>et al.</i> (2019). <b>From simulation</b> fills in the PSF model's own value at a simulated sample's depth (physical depth model only).</p>
           <p><b>Fit radius 2D</b>/<b>Fit radius 3D</b> set the fit window half-width used for a 2D vs. a genuinely 3D fit respectively — whichever one is relevant switches in automatically as you change method/<b>3D localisation</b>, so there's no separate "current Fit radius" field to keep in sync by hand.</p>
           <p><b>Detection filter</b> — Wavelet and DoG both band-pass the frame (suppress smooth background, enhance PSF-sized spots); candidates are strict local maxima above <b>k·σ_noise</b>. The three filters respond very differently, so <b>re-tune the threshold</b> when switching between them.</p>
           <ul>
@@ -1925,7 +1932,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
         <label class="row" title="Length of the simulated movie, in frames.">Frames <input type="number" id="frames" min="50" max="5000" step="50" value="2000" class="num"></label>
         <label class="row" title="How many emitters are ON per µm² in an average frame: low 0.05 (PSFs essentially never overlap), medium 0.2, high 0.5 (typical SMLM), very high 2 (dense enough that single-emitter fitting visibly breaks down). Sets Emitter density under Sample; editing that by hand switches this to Custom.">Emitter density <select id="simulation_densityPreset" class="sel"><option value="low">Low (0.05)</option><option value="med">Medium (0.2)</option><option value="high" selected>High (0.5)</option><option value="veryhigh">Very high (2)</option><option value="custom">Custom</option></select></label>
         <label class="row" title="How much physics — and compute — a simulation spends. Basic: every molecule blinks once at constant brightness on a flat, dark background (fastest). Realistic: molecules blink repeatedly and bleach, brightness varies, and the background fades and carries out-of-focus haze — nearly free per frame. Full: also adds blinking out-of-focus emitters rendered with the real defocused PSF — roughly doubles the simulation time. It only writes fields under Fluorophore and Background; edit any of them and this switches to Custom.">Physics detail <select id="simulation_realism" class="sel"><option value="min">Basic (fastest)</option><option value="med" selected>Realistic</option><option value="max">Full (slowest)</option><option value="custom">Custom</option></select></label>
-        <label class="row" title="Ready-made samples from Li et al., Biomed. Opt. Express 10, 2708 (2019): the Li microscope (NA 1.43, 670 nm, 100 nm pixels, astigmatism, EMCCD) with each sample at its own depth, every emitter imaged at its own height. Beads: click Calib. stack (coverslip beads to Calibrate on; gel beads to score). Pits and pores: Simulate movie. It only writes ordinary settings — choosing one also sets Physics detail and Emitter density to Custom, and editing any field it wrote sets this back to Custom.">Sample preset <select id="simulation_samplePreset" class="sel"><option value="custom" selected>Custom</option><option value="li2019_beadsGlass">Li 2019 — beads on coverslip</option><option value="li2019_beadsGel">Li 2019 — beads in gel</option><option value="li2019_ccpGlass">Li 2019 — pits at coverslip</option><option value="li2019_ccp2um">Li 2019 — pits at 2 µm</option><option value="li2019_npc340">Li 2019 — NPC at 340 nm</option><option value="li2019_npc5um">Li 2019 — NPC at 5 µm</option></select></label>
+        <label class="row" title="Ready-made samples from Li et al., Biomed. Opt. Express 10, 2708 (2019): the Li microscope (NA 1.43, 670 nm, 100 nm pixels, astigmatism, EMCCD) with each sample at its own depth, every emitter imaged at its own height. Beads: click Calib. stack (coverslip beads to Calibrate on; gel beads to score). Pits and pores: Simulate movie. It only writes ordinary settings — choosing one also sets Physics detail and Emitter density to Custom, and editing any field it wrote sets this back to Custom.">Sample preset <select id="simulation_samplePreset" class="sel"><option value="custom" selected>Custom</option><option value="li2019_beadsGlass">Li 2019 — beads on coverslip</option><option value="li2019_beadsGel">Li 2019 — beads in gel</option><option value="li2019_ccpGlass">Li 2019 — pits at coverslip</option><option value="li2019_ccp2um">Li 2019 — pits at 2 µm</option><option value="li2019_npc340">Li 2019 — NPC at 340 nm</option><option value="li2019_npc5um">Li 2019 — NPC at 5 µm</option><option value="cellMicrotubules">Cell — microtubules</option></select></label>
         <div class="btnrow" id="simToolsRow">
           <button type="button" id="psfPreviewBtn" title="Build the PSF kernel from the PSF settings and show it in the raw panel as a z-scrollable stack. Zernike PSF model only.">Preview PSF</button>
           <button type="button" id="genCalBtn" title="Simulate a bead z-stack from the same PSF kernel as Preview PSF (PSF z range/step), focus exactly on the centre frame, and write z-step/z=0 ref frame into the 3D calibration section — Calibrate then needs no other setting changed. With Bead depth range above 0 (Advanced → PSF): beads in a gel at random heights, the objective scanned through all of them, with ground truth — Localize it and Compare to GT. Zernike PSF model only.">Calib. stack</button>
@@ -1941,7 +1948,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <b>Physics detail</b> and <b>Sample preset</b>. <b>Sample preset</b> loads the calibration and test samples of Li <i>et al.</i>,
           <i>Biomed. Opt. Express</i> 10, 2708 (2019) — beads on the coverslip and in a gel, clathrin-coated pits at the
           coverslip and 2 µm deep, Nup107 pores at 340 nm and ~5 µm — on that paper's microscope, every emitter
-          imaged at its own height; like every preset it only writes ordinary fields.</p>
+          imaged at its own height; <b>Cell — microtubules</b> puts a cell on the same microscope. Like every
+          preset it only writes ordinary fields.</p>
           <p><b>Physics detail</b> Physics detail is a preset for how much physics — and compute — the simulation
           spends: <b>Basic</b> blinks every molecule once at constant brightness on a flat, dark background;
           <b>Realistic</b> adds repeated blinking with bleaching, brightness spread, a fading background and
@@ -2062,7 +2070,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" title="Mean background over the whole field of view, in photons per pixel per frame (Poisson, like the signal). The fields below only reshape it in space and time.">Background (photons/px) <input type="number" id="simbg" min="0" max="500" step="1" value="10" class="num"></label>
           <label class="row" id="bgCellContrastRow" title="How many times brighter the background is inside the simulated cell outline than outside it. 1 = flat. Not applied to the Microtubules structure (its cells will drive this in a later update).">Cell contrast (×) <input type="number" id="simulation_bgCellContrast" min="1" max="20" step="0.5" value="3" class="num"></label>
           <label class="row" title="A second, blinking population on the same structure, 0.3–2 µm out of focus, rendered with the real defocused PSF. Per in-focus emitter; 0 = none. Needs the Zernike-aberrated PSF model. These emitters are in the movie but never in the score.">Out-of-focus emitters (×) <input type="number" id="simulation_hazeRatio" min="0" max="10" step="0.1" value="0" class="num"></label>
-          <label class="row" title="How far from focus the out-of-focus emitters reach. Capped at the PSF z range.">Out-of-focus depth (± nm) <input type="number" id="simulation_hazeDepth" min="300" max="2000" step="50" value="1500" class="num"></label>
+          <label class="row" title="How far from focus the out-of-focus emitters reach. Capped at the PSF z range, except in the physical depth model, where each emitter gets a PSF for its own height and only the coverslip limits them.">Out-of-focus depth (± nm) <input type="number" id="simulation_hazeDepth" min="300" max="2000" step="50" value="1500" class="num"></label>
           <label class="row" title="Time constant of the background fading to a 30% floor over the movie. 0 = constant.">Fade time constant (frames) <input type="number" id="simulation_bgDecayFrames" min="0" max="100000" step="10" value="150" class="num"></label>
           <button type="button" class="infobtn">more info…</button>
           <div class="hint" hidden id="hint-simulation-background"><span class="pill">module: simulation</span>
@@ -2075,7 +2083,8 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <b>Fade time constant</b> lets the
           background bleach down to a 30% floor over the movie, which is what a temporal-median (FTM) correction
           exists for. <b>Out-of-focus emitters</b> goes further: a second, blinking population on the same
-          structure, 0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so
+          structure, 0.3–2 µm out of focus (<b>Out-of-focus depth</b>; capped at the PSF z range, except in the
+          physical depth model, where only the coverslip limits it), rendered with the real defocused PSF — so
           it needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
           tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the score.
           A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
@@ -2135,6 +2144,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
               <option value="extendedRangeStrong">Extended depth (±1.3 µm)</option>
             </select>
           </label>
+          <label class="row" id="psfOpticsPresetRow" style="display:none" title="Standard astigmatic 3D: the usual astigmatic 3D SMLM microscope (as in Li et al. 2019) — NA 1.43 oil objective imaging into water, 670 nm emission, 100 nm pixels, 183 milliwaves of astigmatism, supercritical-angle light and each emitter imaged at its own depth. Optics only: camera, structure and density stay as they are. Editing any field it wrote sets this back to Custom.">Optics preset <select id="simulation_opticsPreset" class="sel"><option value="custom" selected>Custom</option><option value="astig3d">Standard astigmatic 3D</option></select></label>
           <label class="row" id="psfNARow" style="display:none" title="Numerical aperture of the objective.">Numerical aperture (NA) <input type="number" id="simulation_psfNA" min="0.5" max="1.7" step="0.01" value="1.4" class="num"></label>
           <label class="row" id="psfWavelengthRow" style="display:none" title="Emission wavelength.">Wavelength (nm) <input type="number" id="simulation_psfWavelength" min="300" max="900" step="1" value="660" class="num"></label>
           <!-- PSF phase mask rows: hidden for now (SHOW_PSF_PHASE_MASK=false, see updatePsfModelUI()); revisit. -->
@@ -2151,6 +2161,11 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <p><b>PSF model</b> — <code>Zernike-aberrated</code> (default) is a Gibson-Lanni + Zernike-pupil
           optical model; every emitter is rendered from its kernel at the emitter's own depth.
           <code>Gaussian</code> is a fixed σ = 1.3 px spot: fast, but it carries no depth information.</p>
+          <p><b>Optics preset</b> — <b>Standard astigmatic 3D</b> is the usual astigmatic 3D SMLM microscope (the
+          optics of Li <i>et al.</i> 2019): NA 1.43 oil objective imaging into water, 670 nm, 100 nm pixels, 183
+          milliwaves of astigmatism, supercritical-angle light, and every emitter imaged at its own height (the
+          physical depth model, Advanced → PSF). It sets optics only — camera, structure and density stay as they
+          are — so it puts that microscope under any structure. Editing a field it wrote sets it back to Custom.</p>
           <p><b>Aberration preset</b> sets the objective's aberrations: astigmatism (the standard way to encode
           depth), coma, spherical, trefoil or a realistic mix, at a few strengths — order-of-magnitude values,
           not calibrated ones. <b>Saddle point</b> and <b>Extended depth</b> stack astigmatism at higher orders
@@ -2214,6 +2229,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           <label class="row" id="psfNsRow" style="display:none" title="Refractive index of the sample medium (1.33 = water).">Sample refractive index (ns) <input type="number" id="simulation_psfNs" min="1.0" max="1.7" step="0.0001" value="1.33" class="num"></label>
           <label class="row" id="psfNiRow" style="display:none" title="Refractive index of the immersion medium (1.518 = standard oil).">Immersion refractive index (ni) <input type="number" id="simulation_psfNi" min="1.0" max="1.7" step="0.001" value="1.518" class="num"></label>
           <label class="row" id="psfDepthRow" style="display:none" title="Height above the coverslip that the sample sits at and the objective is focused on. Depth-induced spherical aberration and focal shift follow from the refractive-index mismatch. With a Sample preset, each structure sits at this depth plus its own z.">Sample depth (nm) <input type="number" id="simulation_psfDepth" min="0" max="5000" step="10" value="0" class="num"></label>
+          <label class="row" id="depthModeRow" style="display:none" title="What a structure's z means. Objective travel: z is a defocus, one Sample depth for the whole movie (the classic simulation). Height in sample: each emitter is imaged at its own height above the coverslip (Sample depth + its z, or Focus height + its z for microtubules) with the objective fixed, so the refractive-index mismatch squeezes z as in a real sample.">Depth model <select id="simulation_depthMode" class="sel"><option value="objective" selected>Objective travel</option><option value="physical">Height in sample</option></select></label>
           <label class="row" id="psfSafRow" style="display:none" title="Let light past the critical angle (the supercritical annulus between NA = ns and the objective's NA) through. That light is evanescent in the sample, so it fades within ~100 nm of the glass: emitters at the coverslip get brighter and sharper than deeper ones. Off = the classic subcritical pupil.">Supercritical angle (SAF) <input type="checkbox" id="simulation_psfSaf"></label>
           <label class="row" id="psfApodRow" style="display:none" title="Weight the pupil with the interface's Fresnel transmission. Changes the in-focus PSF as well as its depth dependence; off by default because published SAF fractions assume a uniform pupil.">Fresnel apodisation <input type="checkbox" id="simulation_psfApodization"></label>
           <label class="row" id="calibDepthMaxRow" style="display:none" title="Calib. stack only. 0 = beads at Sample depth, focus on the centre frame (the usual calibration). Above 0 = beads in a gel at random heights up to this, the objective scanned through all of them; the stack then has ground truth, so Localize it (with a calibration from coverslip beads) and use Compare to GT → Show bead z.">Bead depth range (nm) <input type="number" id="simulation_calibDepthMax" min="0" max="6000" step="50" value="0" class="num"></label>
@@ -2254,7 +2270,11 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
           emitter's actual focus. <b>Supercritical angle (SAF)</b> lets the light past the critical angle through —
           it is evanescent in the sample, so an emitter at the glass is brighter and sharper than one a few
           hundred nm up; <b>Fresnel apodisation</b> weights the pupil with the interface's transmission (off by
-          default: published SAF fractions assume a uniform pupil). <b>Bead depth range</b> (above 0) makes Calib.
+          default: published SAF fractions assume a uniform pupil). <b>Depth model</b>: <i>Objective travel</i>
+          (default) treats a structure's z as a defocus, one Sample depth for the whole movie; <i>Height in
+          sample</i> images each emitter at its own height above the coverslip with the objective fixed, so the
+          refractive-index mismatch squeezes z the way it does in a real sample (for Microtubules the height is
+          Focus height + z; nothing goes below the coverslip). <b>Bead depth range</b> (above 0) makes Calib.
           stack a gel of beads at random heights, with ground truth; <b>Bead diameter</b> averages each bead over
           its volume; <b>Calib. stack seed</b> makes the stack reproducible. <b>Working distance</b> is the
           Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b> overrides the
@@ -2746,6 +2766,12 @@ const PARAMS = {
   // (unticked: 2D elliptical fit, no calibration). gaussmleEll: ticked = free
   // angle (+ z if calibrated); unticked = angle fixed at sSmlmAngleCenter, no z.
   localize3D: { type:'bool', id:'localize3D', label:'3D localisation', default:true },
+  // zScale = the axial scale (RIMF) applied to every 3D z: a calibration made on coverslip beads
+  // measures objective travel, and an emitter in a sample of lower refractive index moves its own
+  // focus by ~1/RIMF nm per nm of height, so z × RIMF is height in the sample. Rides on the z models
+  // themselves (zFromWidths(), phasorZ()), so every fit path — worker, serial, GPU, live preview —
+  // gets it without a copy of its own. 1 = objective travel, as before.
+  zScale: { type:'number', id:'zScale', label:'Axial scale (RIMF)', min:0.3, max:1.5, step:0.001, default:1, int:false },
   // mleEps: Newton convergence tolerance (px), Picasso's default (1e-4 was
   // needlessly tight: 19% slower for ~0.008 px difference).
   mleEps: { type:'number', id:null, label:'MLE convergence tolerance (px)', min:1e-6, max:0.1, step:0.0001, default:0.001, int:false },
@@ -3041,7 +3067,8 @@ const PARAMS = {
   // it is what separates the 'max' preset from 'med'. `dens` stays the IN-FOCUS density. Needs the
   // Zernike PSF model (a fixed-σ Gaussian has no defocus to show). Never scored: see cares().
   simulation_hazeRatio: { type:'number', id:'simulation_hazeRatio', label:'Out-of-focus emitters (×)', min:0, max:10, step:0.1, default:0, int:false },
-  // simulation_hazeDepth = how far from focus (nm) that population reaches; capped at the PSF z range.
+  // simulation_hazeDepth = how far from focus (nm) that population reaches; capped at the PSF z range
+  // (not in the physical depth model, where only the coverslip bounds it).
   simulation_hazeDepth: { type:'number', id:'simulation_hazeDepth', label:'Out-of-focus depth (± nm)', min:300, max:2000, step:50, default:1500, int:false },
   simulation_realism: { type:'enum', id:'simulation_realism', label:'Physics detail', options:['min','med','max','custom'], default:'med' },
   // Sample preset: the calibration and test samples of Li et al., Biomed. Opt. Express 10, 2708
@@ -3050,8 +3077,14 @@ const PARAMS = {
   // parameters (wirePreset(); control-less ones through paramOverrides) and carries no physics of
   // its own; 'custom' writes nothing. Values and their sources: docs/DOCUMENTATION.md, Simulation
   // guide, "Li et al. 2019".
+  // 'cellMicrotubules' is a CellField cell with the same optics and dSTORM photophysics.
   simulation_samplePreset: { type:'enum', id:'simulation_samplePreset', label:'Sample preset',
-    options:['custom','li2019_beadsGlass','li2019_beadsGel','li2019_ccpGlass','li2019_ccp2um','li2019_npc340','li2019_npc5um'], default:'custom' },
+    options:['custom','li2019_beadsGlass','li2019_beadsGel','li2019_ccpGlass','li2019_ccp2um','li2019_npc340','li2019_npc5um','cellMicrotubules'], default:'custom' },
+  // Optics preset: 'astig3d' = the standard astigmatic 3D microscope (the optics of Li et al. 2019:
+  // NA 1.43 oil into water, 670 nm, 100 nm pixels, 183 milliwaves of astigmatism, supercritical
+  // angle, physical depth model). Optics only — camera and sample stay where they are, so it puts
+  // that microscope under any structure. Writes parameters like every preset.
+  simulation_opticsPreset: { type:'enum', id:'simulation_opticsPreset', label:'Optics preset', options:['custom','astig3d'], default:'custom' },
   // simbg = mean background photon rate PER PIXEL, every frame — every pixel independently gets
   // this many background photons (mean), folded into the same Poisson shot-noise draw as signal
   simbg: { type:'number', id:'simbg', label:'Background (photons/px)', min:0, max:500, step:1, default:10, int:false },
@@ -3305,8 +3338,9 @@ const PARAMS = {
   // 1, and one Sample depth applies to the whole movie. 'physical': z is height in nm relative to
   // Sample depth, each emitter is imaged at its OWN depth with the objective fixed at the measured
   // focus of Sample depth (psfFocusMap()) — so the depth-dependent axial squeezing Li et al. (2019)
-  // measure is in the movie, not defined away. No control: the Sample presets set it.
-  simulation_depthMode: { type:'enum', id:null, label:'Depth model', options:['objective','physical'], default:'objective' },
+  // measure is in the movie, not defined away. Set by the Optics and Sample presets, or by hand
+  // (Advanced → PSF).
+  simulation_depthMode: { type:'enum', id:'simulation_depthMode', label:'Depth model', options:['objective','physical'], default:'objective' },
   // Calib. stack in a gel (Li et al. 2019, Fig. 2): >0 puts the beads at random heights up to this
   // many nm above the coverslip (18% stay on the glass, the reference the paper finds the coverslip
   // with) and scans the objective from 1 um below the glass to 1 um past the deepest bead's
@@ -5080,7 +5114,7 @@ async function generateSynthetic(){
   // kernel stack too; the in-focus emitters then simply all use its focal plane (their z is 0).
   const hazeRatio=paramValue('simulation_hazeRatio'), hazeDepth=paramValue('simulation_hazeDepth');
   if(psfModel==='zernike' && (is3d || hazeRatio>0)){
-    const cfg=readPsfConfigFromUI();
+    const cfg=readPsfConfigForMovie();
     kernelStack=await getOrBuildPsfKernelStack(cfg);
     const kstack=kernelStack;
     // `planes` is filled by prepareSimKernelPlanes() once the events are known (only the planes
@@ -5114,12 +5148,18 @@ async function generateSynthetic(){
   // The supercritical light it loses with height comes off its brightness here, in `bright`, so
   // the movie and the ground truth agree on it (psfCollectedFraction(): exactly 1 with the
   // interface physics off).
-  const depthNm=paramValue('simulation_psfDepth');
+  const depthNm=simMovieDepthNm();
   const physical = paramValue('simulation_depthMode')==='physical' && psfModel==='zernike' && is3d && !!zKernelStack;
-  const psfCfgPhys = physical ? readPsfConfigFromUI() : null;
+  const psfCfgPhys = physical ? readPsfConfigForMovie() : null;
+  if(physical && paramValue('simulation_structureType')==='microtubules' && paramValue('simulation_psfDepth')!==depthNm)
+    log(`Physical depth: microtubules take their sample depth from Focus height (${depthNm} nm) — Sample depth (${paramValue('simulation_psfDepth')} nm) is not used for this movie.`);
   const cfCache=new Map();
+  // Nothing sits below the coverslip: a site under it (CellField's dye shell reaches a few tens of
+  // nm under microtubules lying on the glass) is put ON it, in the movie AND in the ground truth —
+  // the blink's z is clamped before either is written, so the two never disagree.
   let nNegDepth=0;
-  const zpOf=ez=>{ const z=depthNm+ez; if(z<0){ nNegDepth++; return 0; } return z; };
+  const zOnGlass=ez=>{ if(physical && depthNm+ez<0){ nNegDepth++; return -depthNm; } return ez; };
+  const zpOf=ez=>Math.max(0, depthNm+ez);
   const cfOf=ez=>{ if(!physical) return 1; const z=Math.round(zpOf(ez)/2)*2;
     let v=cfCache.get(z); if(v===undefined){ v=psfCollectedFraction(psfCfgPhys, z*1e-9); cfCache.set(z,v); } return v; };
   // `dens` is a physical areal density (emitters/µm²/frame) of the STRUCTURE/sample, independent
@@ -5153,6 +5193,7 @@ async function generateSynthetic(){
   let nMolecules=0;
   const addBlink=(ex,ey,ez,tStart,tEnd,bright,mol,haze,obj,ring)=>{
     if(tEnd<=0 || tStart>=n) return;                // never overlaps the movie — nothing to record
+    ez=zOnGlass(ez);
     if(physical) bright*=cfOf(ez);
     const ev = physical ? {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze, depth:zpOf(ez)}
                         : {x:ex, y:ey, z:ez, tStart, tEnd, rate:photPerFrame*bright, moleculeId:mol, haze:!!haze};
@@ -5201,7 +5242,7 @@ async function generateSynthetic(){
   } else {
   const nEvents=poisson(arrivalRate*rangeLen, rng);
   for(let e=0;e<nEvents;e++){
-    const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=gt[gi][2];
+    const gi=Math.floor(rng()*gt.length), ex=gt[gi][0], ey=gt[gi][1], ez=zOnGlass(gt[gi][2]);
     const tStart=-lead+rng()*rangeLen;
     const tEnd=tStart-lifetime*Math.log(1-rng());   // exponential duration, mean=lifetime
     const ill=illumOf(ex,ey)*cfOf(ez);   // exactly 1 on the default flat profile (and outside physical depth mode)
@@ -5232,14 +5273,22 @@ async function generateSynthetic(){
   if(hazeRatio>0 && zKernelStack){
     const hzRng = simSeed>0 ? mulberry32((simSeed^0x27d4eb2f)>>>0) : Math.random;
     const halfKernel=zKernelStack.zStepNm*(zKernelStack.nz-1)/2;
-    const zLo=Math.min(Math.max(zKernelStack.zUsableNm||0, 300), halfKernel), zHi=Math.min(Math.max(hazeDepth,zLo), halfKernel);
+    // In the physical depth model every emitter gets a PSF built for its own height, so the kernel's
+    // z range does not bound the haze — the coverslip does: nothing below height 0.
+    const cap = physical ? Infinity : halfKernel;
+    const zLo=Math.min(Math.max(zKernelStack.zUsableNm||0, 300), cap), zHi=Math.min(Math.max(hazeDepth,zLo), cap);
+    const zBelow = physical ? Math.min(zHi, depthNm) : zHi;
     const before=events.length;
-    spawnMolecules(hzRng, dens*hazeRatio, r=>(r()<0.5?-1:1)*(zLo+r()*(zHi-zLo)), true, 1e9);
+    spawnMolecules(hzRng, dens*hazeRatio, physical
+      ? r=>{ const below = r()<0.5 && zBelow>zLo; return below ? -(zLo+r()*(zBelow-zLo)) : zLo+r()*(zHi-zLo); }
+      : r=>(r()<0.5?-1:1)*(zLo+r()*(zHi-zLo)), true, 1e9);
     nHazeBlinks=events.length-before;
-    log(`Out-of-focus emitters: ${nHazeBlinks.toLocaleString()} blinks at ${zLo.toFixed(0)}–${zHi.toFixed(0)} nm either side of focus `+
-        `(${hazeRatio}× the in-focus density), rendered with the real defocused PSF. They are in the movie but `+
+    log(`Out-of-focus emitters: ${nHazeBlinks.toLocaleString()} blinks at ${zLo.toFixed(0)}–${zHi.toFixed(0)} nm `+
+        (physical ? `above focus`+(zBelow>zLo ? ` and ${zLo.toFixed(0)}–${zBelow.toFixed(0)} nm below it (down to the coverslip)` : ' only — the coverslip is too close for any below it —')
+                  : 'either side of focus')+
+        ` (${hazeRatio}× the in-focus density), rendered with the real defocused PSF. They are in the movie but `+
         `not in the score: detecting one is neither a hit nor a false positive.`+
-        (hazeDepth>halfKernel?` Depth capped at the PSF z range (±${halfKernel.toFixed(0)} nm) — widen it to go deeper.`:''));
+        (!physical && hazeDepth>halfKernel?` Depth capped at the PSF z range (±${halfKernel.toFixed(0)} nm) — widen it to go deeper.`:''));
   } else if(hazeRatio>0)
     log(`Out-of-focus emitters need the Zernike-aberrated PSF model — a fixed-σ Gaussian looks the same at every depth, `+
         `so they would just be extra in-focus emitters. Skipped; the static haze still applies.`);
@@ -5261,7 +5310,7 @@ async function generateSynthetic(){
           `${ds.bins.length} depth bin(s) from ${ds.bins[0].zb.toFixed(0)} to ${ds.bins[ds.bins.length-1].zb.toFixed(0)} nm, ${ds.nz} planes (${mb.toFixed(0)} MB), `+
           `built in ${Math.round(performance.now()-t0)} ms. Each emitter is imaged at its own height; its z in the ground truth is that height minus ${depthNm} nm.`+
           (psfCfgPhys.saf||psfCfgPhys.apod ? ` Light collected relative to the coverslip: ${cfOf(0).toFixed(3)} at the sample depth.` : '')+
-          (nNegDepth ? ` ⚠ ${nNegDepth} emitter position(s) fell below the coverslip and were placed on it.` : ''));
+          (nNegDepth ? ` ${nNegDepth.toLocaleString()} blink(s) at a site below the coverslip were placed on it, in the movie and the ground truth alike.` : ''));
     }
     const nUsed=prepareSimKernelPlanes(zKernelStack, srcSlices, frameEvents);
     log(`Simulate movie: ${nUsed} of ${zKernelStack.nz} PSF z-planes are used by an emitter — only those are prepared and sent to the workers/GPU.`);
@@ -6449,6 +6498,20 @@ async function getOrBuildPsfKernelStack(cfg){
 // depth (simulation_psfDepth) to every emitter, so there is nothing to sweep — this is the 2D
 // scope boundary. A future per-emitter-z (3D) version stops overriding nz here and instead selects/
 // blends slices per emitter — see docs/design/VECTORIAL_ZERNIKE_PSF_IMPLEMENTATION.md §10.
+// The depth a MOVIE is imaged at. Microtubules in the physical depth model take it from Focus
+// height: CellField measures every site's z from that height above the coverslip, so it already
+// is the sample depth, and a second number for the same plane would put the cells off the glass.
+function simMovieDepthNm(){
+  return paramValue('simulation_depthMode')==='physical' && paramValue('simulation_structureType')==='microtubules'
+    ? paramValue('simulation_mt_focusZ') : paramValue('simulation_psfDepth');
+}
+// readPsfConfigFromUI() at simMovieDepthNm() — the movie's kernel (Preview PSF and Calib. stack keep
+// Sample depth).
+function readPsfConfigForMovie(){
+  const cfg=readPsfConfigFromUI();
+  cfg.particleAxialPosition=simMovieDepthNm()*1e-9;
+  return cfg;
+}
 function readPsfConfigForSimulation(){
   const cfg=readPsfConfigFromUI();
   cfg.nz=1;
@@ -8081,7 +8144,8 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
   let axialSlope=NaN;
   if(has3d && dz.length>=10){ const zf=zTrue.map((z,i)=>z+dz[i]); const n=zf.length, mx=zTrue.reduce((s,v)=>s+v,0)/n, my=zf.reduce((s,v)=>s+v,0)/n;
     let sxy=0,sxx=0; for(let i=0;i<n;i++){ sxy+=(zTrue[i]-mx)*(zf[i]-my); sxx+=(zTrue[i]-mx)**2; } axialSlope=sxx>0?sxy/sxx:NaN; }
-  const rimf=cfg._rimf;
+  // _rimf is what is LEFT to apply: the model's RIMF divided by any Axial scale the Run already used.
+  const rimf=cfg._rimf, zScaleRun=cfg._zScale||1;
   // One summary number per ratio: the pair-weighted mean of the per-bin ratios, so it compares like
   // with like at every brightness instead of dividing a pooled spread by a pooled bound.
   const wRatio=(a,b)=>{ if(!crlbBins) return NaN; let s=0,n=0;
@@ -8148,7 +8212,8 @@ async function scoreTruthCore(locs, gtEvents, nFrames, px, trueDrift, cfg, {onLo
             `): ${failRule.nFail.toLocaleString()} of ${nZ.toLocaleString()} (${(100*failRule.frac).toFixed(1)}%).`);
     if(isFinite(axialSlope))
       onLog(`axial scale: fitted z / true z = ${axialSlope.toFixed(3)}`+
-            (isFinite(rimf) ? ` in objective units; × the model's RIMF ${rimf.toFixed(3)} = ${(axialSlope*rimf).toFixed(3)} — the squeezing left once the refractive-index scale is taken out (1 = none).` : '.'));
+            (zScaleRun!==1 ? ` (fitted z already × Axial scale ${zScaleRun})` : ' in objective units')+
+            (isFinite(rimf) ? `; × ${zScaleRun!==1?'the remaining model RIMF factor':"the model's RIMF"} ${rimf.toFixed(3)} = ${(axialSlope*rimf).toFixed(3)} — the squeezing left once the refractive-index scale is taken out (1 = none).` : '.'));
     // Fitted z is objective travel (a coverslip calibration's unit); the paper multiplies by its
     // RIMF before comparing with the sample, and so does the "× RIMF" figure here (the model's own).
     const rf=isFinite(rimf)?rimf:NaN;
@@ -8534,7 +8599,7 @@ function drawTruthScorePlot(res){
 function truthScoreConfig(cfg, det, run){
   const c={...cfg, _frameW:stack?stack.w:0, _frameH:stack?stack.h:0, _detBorder:det&&det.border?det.border:0,
            _objects:groundTruthObjects, _zUsableNm:(_psfKernelCache&&_psfKernelCache.zUsableNm)||0,
-           _rimf:simDepthInfo?simDepthInfo.rimf:NaN};
+           _rimf:simDepthInfo?simDepthInfo.rimf/((run&&run.zScale)||1):NaN, _zScale:(run&&run.zScale)||1};
   if(run && Number.isFinite(run.firstIdx) && Number.isFinite(run.lastIdx)){
     c._runFirst=run.firstIdx; c._runLast=run.lastIdx-1; c._runStopped=!!run.stopped; }
   return c;
@@ -9212,6 +9277,7 @@ function gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma0,gain=1,camoffset=0,e
 // local calibration slopes, inverse-variance combined (an estimate, not a
 // joint CRLB). Self-contained for the worker.
 function zFromWidths(sx,sy,wcal,lpsx,lpsy){
+  const zs=wcal.zScale||1;   // PARAMS.zScale (RIMF); the clamp test below stays in calibration units
   const sxn=sx*wcal.px, syn=sy*wcal.px;
   const sig=(q,z)=>q.a*(z-q.c)*(z-q.c)+q.b;
   const cost=z=>{ const ax=sxn-sig(wcal.qx,z), ay=syn-sig(wcal.qy,z); return ax*ax+ay*ay; };
@@ -9229,7 +9295,13 @@ function zFromWidths(sx,sy,wcal,lpsx,lpsy){
     if(Math.abs(dSigY)>1e-6) invVarZ += (dSigY*dSigY)/(lpsyNm*lpsyNm);
     if(invVarZ>0) lpz=1/Math.sqrt(invVarZ);
   }
-  return { z:zref, clamped:(zref<=z0+dz*0.5)||(zref>=z1-dz*0.5), lpz };
+  return { z:zref*zs, clamped:(zref<=z0+dz*0.5)||(zref>=z1-dz*0.5), lpz:lpz*zs };
+}
+// z from the phasor magnitude ratio (Phasor 3D): the calibration polynomial over the clamped ratio,
+// times the axial scale (PARAMS.zScale). Self-contained for the worker.
+function phasorZ(zcal, raw){
+  const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
+  return { z:polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc)*(zcal.zScale||1), clamped:raw<zcal.rmin||raw>zcal.rmax };
 }
 // -- elliptical 2D Gaussian (independent σx, σy) for astigmatic 3D calibration.
 // 6 params [A, x0, y0, sx, sy, b]; Gauss-Newton + line search, like gaussianFit.
@@ -11008,7 +11080,7 @@ function workerSource(){
     // self-test in onmessage below). phasorApertureIntensity() is the piece
     // phasorFit() itself now calls (MODULE: fit) AND what buildFitSeedRowPhasor()
     // above calls directly for the GPU-fit path.
-    zFromWidths.toString(), apertureGeometry.toString(), percentile.toString(), phasorApertureIntensity.toString(), phasorFit.toString(), polyEval.toString(), applyExcessNoise.toString(),
+    zFromWidths.toString(), apertureGeometry.toString(), percentile.toString(), phasorApertureIntensity.toString(), phasorFit.toString(), polyEval.toString(), phasorZ.toString(), applyExcessNoise.toString(),
     ftmSeriesGlobal.toString(),
     `onmessage=function(e){
       const d=e.data;
@@ -11121,9 +11193,7 @@ function workerSource(){
                          : gaussianFit(img,w,h,mm[0],mm[1],win,sigma,gain,camoffset), excessF2);
           if(L){
             let z=NaN, cl=0, lpz=NaN;
-            if(method==='phasor3d'&&zcal){ const raw=L.pratio; cl=(raw<zcal.rmin||raw>zcal.rmax)?1:0;
-              const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
-              z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
+            if(method==='phasor3d'&&zcal){ const zr=phasorZ(zcal, L.pratio); z=zr.z; cl=zr.clamped?1:0; }
             else if((method==='mle3d'||method==='gaussmleEll')&&wcal){ const zr=zFromWidths(L.sx,L.sy,wcal,L.lpsx,L.lpsy); z=zr.z; cl=zr.clamped?1:0; lpz=zr.lpz; }
             out.push(L.x,L.y,L.photons,L.bg,L.bgstd,L.sigma,z,cl,start+i,      // cl: z clamped out-of-range
                      L.lpx==null?NaN:L.lpx, L.lpy==null?NaN:L.lpy, lpz,        // CRLB precision (MLE only; NaN otherwise)
@@ -11149,6 +11219,23 @@ function workerSource(){
 let _pool=undefined;                                // undefined = not probed yet
 // Creates the worker pool once; null if workers aren't usable (callers then
 // run single-threaded).
+// Worker self-test shared by the four pools: ping, wait for the pong. A worker that throws answers
+// through onerror at once, so a failure is still caught immediately. A SLOW one is not broken: a
+// page the browser throttles (window in the background, Windows efficiency mode) can take well over
+// 3 s to start a worker, and declaring the pool dead then would push every later job onto the main
+// thread for the rest of the session — slower still, and blocking the page. So it waits, says so
+// after WORKER_PROBE_SLOW_MS, and gives up only after WORKER_PROBE_GIVE_UP_MS.
+const WORKER_PROBE_SLOW_MS=3000, WORKER_PROBE_GIVE_UP_MS=60000;
+function probeWorker(probe, what){
+  return new Promise(res=>{
+    const slow=setTimeout(()=>log(`(${what} slow to start — still waiting. The browser is probably throttling this page, e.g. because its window is in the background; keep it in front for full speed.)`), WORKER_PROBE_SLOW_MS);
+    const done=v=>{ clearTimeout(slow); clearTimeout(t); res(v); };
+    const t=setTimeout(()=>done({pong:0,err:'no answer in '+WORKER_PROBE_GIVE_UP_MS/1000+' s'}), WORKER_PROBE_GIVE_UP_MS);
+    probe.onmessage=ev=>done(ev.data||{pong:0});
+    probe.onerror  =ev=>done({pong:0,err:ev.message||'worker error'});
+    probe.postMessage({ping:1});
+  });
+}
 async function getPool(){
   if(_pool!==undefined) return _pool;
   try{
@@ -11156,12 +11243,7 @@ async function getPool(){
     // Probe first: on file:// some browsers refuse blob-URL workers, and the
     // failure is asynchronous, so a try/catch around the constructor isn't enough.
     const probe=new Worker(url);
-    const ok=await new Promise(res=>{
-      const t=setTimeout(()=>res({pong:0,err:'timeout'}),3000);
-      probe.onmessage=ev=>{clearTimeout(t);res(ev.data||{pong:0});};
-      probe.onerror  =ev=>{clearTimeout(t);res({pong:0,err:ev.message||'worker error'});};
-      probe.postMessage({ping:1});
-    });
+    const ok=await probeWorker(probe, 'detect/fit workers');
     probe.terminate();
     if(!ok.pong){
       log(`(workers unavailable${ok.err?' — '+ok.err:''}; running single-threaded)`);
@@ -11311,12 +11393,7 @@ async function getRenderWorker(){
   try{
     const url=URL.createObjectURL(new Blob([renderWorkerSource()],{type:'text/javascript'}));
     const probe=new Worker(url);
-    const ok=await new Promise(res=>{
-      const t=setTimeout(()=>res({pong:0,err:'timeout'}),3000);
-      probe.onmessage=ev=>{clearTimeout(t);res(ev.data||{pong:0});};
-      probe.onerror  =ev=>{clearTimeout(t);res({pong:0,err:ev.message||'worker error'});};
-      probe.postMessage({ping:1});
-    });
+    const ok=await probeWorker(probe, 'render worker');
     if(!ok.pong){
       probe.terminate();
       log(`  (render worker unavailable${ok.err?' — '+ok.err:''}; SR reconstruction will run on the main thread)`);
@@ -11439,12 +11516,7 @@ async function getPsfWorkerPool(){
   try{
     const url=URL.createObjectURL(new Blob([psfWorkerSource()],{type:'text/javascript'}));
     const probe=new Worker(url);
-    const ok=await new Promise(res=>{
-      const t=setTimeout(()=>res({pong:0,err:'timeout'}),3000);
-      probe.onmessage=ev=>{clearTimeout(t);res(ev.data||{pong:0});};
-      probe.onerror  =ev=>{clearTimeout(t);res({pong:0,err:ev.message||'worker error'});};
-      probe.postMessage({ping:1});
-    });
+    const ok=await probeWorker(probe, 'PSF workers');
     probe.terminate();
     if(!ok.pong){
       log(`(PSF workers unavailable${ok.err?' — '+ok.err:''}; building the PSF kernel on the main thread)`);
@@ -11549,12 +11621,7 @@ async function getSimWorkerPool(){
   try{
     const url=URL.createObjectURL(new Blob([simWorkerSource()],{type:'text/javascript'}));
     const probe=new Worker(url);
-    const ok=await new Promise(res=>{
-      const t=setTimeout(()=>res({pong:0,err:'timeout'}),3000);
-      probe.onmessage=ev=>{clearTimeout(t);res(ev.data||{pong:0});};
-      probe.onerror  =ev=>{clearTimeout(t);res({pong:0,err:ev.message||'worker error'});};
-      probe.postMessage({ping:1});
-    });
+    const ok=await probeWorker(probe, 'simulation workers');
     probe.terminate();
     if(!ok.pong){
       log(`(simulation workers unavailable${ok.err?' — '+ok.err:''}; Simulate movie will run on the main thread)`);
@@ -20232,6 +20299,13 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
   // EMCCD excess noise (PARAMS.cameraExcessNoise): fit in F^2-photon units, report photons — see
   // applyExcessNoise(). `gain` from here on is what the FITTER sees, not what the user typed.
   const excessF2=Math.max(1, config.cameraExcessNoise||1), gain=config.gain/excessF2;
+  // Axial scale (PARAMS.zScale, the RIMF): carried on the z models, so every path below applies it.
+  const zScale = config.zScale>0 ? config.zScale : 1;
+  if(zScale!==1 && (wcal||zcal)){
+    if(wcal) wcal={...wcal, zScale};
+    if(zcal) zcal={...zcal, zScale};
+    onLog(`Axial scale (RIMF) ${zScale}: every fitted z and its precision are the calibration's objective travel × ${zScale}.`);
+  }
   if(excessF2>1) onLog(`Excess noise factor F² = ${excessF2}: fitting in F²-photon units, so photon counts stay in real photons while the reported precision (lpx/lpy/lpz) is the √F² = ${Math.sqrt(excessF2).toFixed(2)}× wider one an EM gain register actually gives.`);
   // 'gaussmleEll' rotation angle — see PARAMS.localize3D: checked (default)
   // means FREE angle (null here — gaussianMLEellipticangled fits its own
@@ -20518,9 +20592,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
           // this naturally never fires for gaussmleEll's fixed-angle mode
           // (only reachable when localize3D is false) without a separate check.
           if((method==='mle3d'||method==='gaussmleEll')&&wcal){ const zr=zFromWidths(L.sx,L.sy,wcal,L.lpsx,L.lpsy); L.z=zr.z; L.zClamped=zr.clamped; L.lpz=zr.lpz; }
-          else if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
-            const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
-            L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
+          else if(method==='phasor3d'&&zcal){ const zr=phasorZ(zcal, L.pratio); L.z=zr.z; L.zClamped=zr.clamped; }
           locs.push(L);
         }
         // Guarded and timed on the settled promise, like the other previews.
@@ -20939,9 +21011,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
         const frameLocs=[];                         // this frame's accepted fits, for the raw-panel overlay below
         for(const [cx,cy] of maxima){
           const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,w,h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,w,h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,w,h,cx,cy,win,gain,camoffset) : gaussianFit(img,w,h,cx,cy,win,sigma,gain,camoffset), excessF2);
-          if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
-                   const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
-                   L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
+          if(L){ if(method==='phasor3d'&&zcal){ const zr=phasorZ(zcal, L.pratio); L.z=zr.z; L.zClamped=zr.clamped; }
                  else if((method==='mle3d'||method==='gaussmleEll')&&wcal){ const zr=zFromWidths(L.sx,L.sy,wcal,L.lpsx,L.lpsy); L.z=zr.z; L.zClamped=zr.clamped; L.lpz=zr.lpz; }
                  L.frame=fi; if(config.auditCandidates)L._candidatePixel=cy*w+cx; locs.push(L); frameLocs.push({x:L.x,y:L.y}); }
         }
@@ -21114,7 +21184,7 @@ async function runCore(config, stack, {zcal=null, wcal=null}={}, hooks={}){
   const auditCandidatePixels=config.auditCandidates?Int32Array.from(locs,L=>L._candidatePixel):undefined;
   if(config.auditCandidates) for(const L of locs) L._candidatePixel=undefined;
 
-  return { locs, w, h, n, px, mag:config.mag, det:{sigma,k,win,border,exactBP,mode},
+  return { locs, w, h, n, px, mag:config.mag, det:{sigma,k,win,border,exactBP,mode}, zScale,
            method, label, processed, stopped, useWorkers,
            lastSpots, lastFrame, lastFrameIdx, firstIdx, lastIdx,
            // Per-stage cpu/gpu breakdown (see runStage(), MODULE: gpu). Additive:
@@ -21170,6 +21240,7 @@ async function run(){
       // only when set away from their defaults, so an ordinary run's line stays short but a
       // recalled EMCCD/engineered-PSF run still reproduces
       ...(config.cameraExcessNoise>1 ? {cameraExcessNoise:config.cameraExcessNoise} : {}),
+      ...(config.zScale!==1 && currentIs3d() ? {zScale:config.zScale} : {}),
       ...cropCmdFields() });
     const zcal = method==='phasor3d' ? cal3d : null;   // z(ratio) model for Phasor 3D
     // wcal (z from widths) only when 3D localisation is ticked; its presence
@@ -21198,7 +21269,7 @@ async function run(){
     });
     // Superseded while runCore() ran: discard (see newEpoch()).
     if(staleEpoch(myEpoch)) return;
-    lastResult={locs:r.locs,w:r.w,h:r.h,px,mag:paramValue('mag'),det:r.det,firstIdx:r.firstIdx,lastIdx:r.lastIdx,stopped:r.stopped};
+    lastResult={locs:r.locs,w:r.w,h:r.h,px,mag:paramValue('mag'),det:r.det,firstIdx:r.firstIdx,lastIdx:r.lastIdx,stopped:r.stopped,zScale:r.zScale};
     await rerender(true);
     log(`Ready in ${((performance.now()-uiRunT0)/1000).toFixed(1)} s including final reconstruction.`);
     // refresh the raw panel with the accepted localizations (magenta) overlaid,
@@ -21345,7 +21416,7 @@ async function liveStreamPushChunkFile(file){
   liveStreamState.allLocs.push(...r.locs);
   liveStreamState.frameOffset+=chunkStack.n;
   liveStreamState.chunkCount++;
-  lastResult={locs:liveStreamState.allLocs, w:r.w, h:r.h, px:cfg.pxnm, mag:paramValue('mag'), det:r.det};
+  lastResult={locs:liveStreamState.allLocs, w:r.w, h:r.h, px:cfg.pxnm, mag:paramValue('mag'), det:r.det, zScale:r.zScale};
   // Drift/NeNA/FRC only need lastResult.locs, so enable them as soon as locs
   // exist. Correct drift is idempotent; locs arriving later need another click.
   if(liveStreamState.allLocs.length){
@@ -21759,6 +21830,7 @@ async function runSimulation(){
     showStackProjection();      // background fill of the SR panel — not awaited
     await showFrame(0);         // paints frame 1 (live preview if RT-update is checked)
     $('runBtn').disabled=false; $('pcfoBtn').disabled=false; $('gainOffsetFromPcfoBtn').disabled=false; $('rawCropBtn').disabled=false; $('calBtn').disabled=false; $('smfretLocateBtn').disabled=false;
+    syncZScaleFromSimBtn();
     log(`Stack ready: ${stack.n} frames · ${stack.w}×${stack.h}. Click “Localize”.`);
   }catch(err){
     log(`⚠ Simulation failed: ${err.name}: ${err.message}`); setProg(null);
@@ -21948,7 +22020,7 @@ function clearAnalysisOutputs(){
 // Drops the simulator's ground truth (it describes a stack that is gone, or
 // one rotated or cropped away from it) and the controls that read it.
 function clearSimGroundTruth(){
-  groundTruthObjects=null; simDepthInfo=null;
+  groundTruthObjects=null; simDepthInfo=null; syncZScaleFromSimBtn();
   groundTruth=null; groundTruthEvents=null; groundTruthLocs=null; simTrueDrift=null; gtShowing=false; srFullBeforeGT=null;
   $('truthBtn').disabled=true; setViewGtBtn(false);
 }
@@ -22075,8 +22147,9 @@ async function showFrame(i){
       const camoffset=paramValue('camoffset'), eps=paramValue('mleEps');
       const excessF2=Math.max(1,paramValue('cameraExcessNoise')), gain=paramValue('gain')/excessF2;   // see applyExcessNoise()
       const localize3D=paramValue('localize3D');
-      const zcal = method==='phasor3d' ? cal3d : null;
-      const wcal = (method==='mle3d'||method==='gaussmleEll') && localize3D && cal3dW ? {qx:cal3dW.qx,qy:cal3dW.qy,zmin:cal3dW.zmin,zmax:cal3dW.zmax,px:paramValue('pxnm')} : null;
+      const zScale=paramValue('zScale');
+      const zcal = method==='phasor3d' && cal3d ? {...cal3d, zScale} : null;
+      const wcal = (method==='mle3d'||method==='gaussmleEll') && localize3D && cal3dW ? {qx:cal3dW.qx,qy:cal3dW.qy,zmin:cal3dW.zmin,zmax:cal3dW.zmax,px:paramValue('pxnm'),zScale} : null;
       const sSmlmAngleRad = localize3D ? null : paramValue('sSmlmAngleCenter')*Math.PI/180;   // see runCore()'s own copy of this same line (MODULE: fit, gaussianMLEellipticangled)
       spots=detectSpots(img,stack.w,stack.h,sigma,exactBP,mode,k,border).maxima;
       locsF=[];
@@ -22085,9 +22158,7 @@ async function showFrame(i){
       const inRange = i>=firstIdx && i<lastIdx;
       if(inRange) for(const [cx,cy] of spots){
         const L = applyExcessNoise(method==='gaussmle' ? gaussianMLEspheric(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='mle3d' ? gaussianMLEelliptic(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps) : method==='gaussmleEll' ? gaussianMLEellipticangled(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset,eps,sSmlmAngleRad) : (method==='phasor'||method==='phasor3d') ? phasorFit(img,stack.w,stack.h,cx,cy,win,gain,camoffset) : gaussianFit(img,stack.w,stack.h,cx,cy,win,sigma,gain,camoffset), excessF2);
-        if(L){ if(method==='phasor3d'&&zcal){ const raw=L.pratio; L.zClamped=(raw<zcal.rmin||raw>zcal.rmax);
-                 const rc=Math.max(zcal.rmin,Math.min(zcal.rmax,raw));
-                 L.z=polyEval(zcal.coef, zcal.basis==='ln'?Math.log(rc):rc); }
+        if(L){ if(method==='phasor3d'&&zcal){ const zr=phasorZ(zcal, L.pratio); L.z=zr.z; L.zClamped=zr.clamped; }
                else if((method==='mle3d'||method==='gaussmleEll')&&wcal){ const zr=zFromWidths(L.sx,L.sy,wcal,L.lpsx,L.lpsy); L.z=zr.z; L.zClamped=zr.clamped; L.lpz=zr.lpz; }
                locsF.push(L); }
       }
@@ -22257,6 +22328,8 @@ function updateMethodUI(){
   applyWinrDefault(is3d);
   const calibrationPresent = !!(cal3d||cal3dW);
   $('cal3dRow').style.display = (is3d && !calibrationPresent) ? 'block' : 'none';
+  $('zScaleRow').style.display = is3d ? 'block' : 'none';
+  syncZScaleFromSimBtn();
   // Reveal the depth-colour toggle (ticked) the moment a 3D method is chosen —
   // not only after a run. For a 2D method, keep it shown if the current
   // results still carry real z (an existing 3D reconstruction) OR an sSMLM
@@ -22277,6 +22350,18 @@ function updateMethodUI(){
 }
 $('method').addEventListener('change',updateMethodUI);
 $('localize3D').addEventListener('change',updateMethodUI);
+// The simulated sample's own RIMF (physical depth model): 1/f0'(Sample depth), the local scale
+// between objective travel and height there — what a fitted z relative to focus needs.
+function syncZScaleFromSimBtn(){ $('zScaleFromSimBtn').disabled = !(simDepthInfo && isFinite(simDepthInfo.rimf)); }
+function zScaleFromSimulation(){
+  if(!(simDepthInfo && isFinite(simDepthInfo.rimf))){ log('Axial scale: no simulated sample in the physical depth model to take a RIMF from.'); return; }
+  $('zScale').value=simDepthInfo.rimf.toFixed(3);
+  $('zScale').dispatchEvent(new Event('change',{bubbles:true}));
+  log(`Axial scale (RIMF) set to ${simDepthInfo.rimf.toFixed(3)}: the PSF model's local value at the simulated Sample depth `+
+      `(${simDepthInfo.depthNm} nm). Fitted z is now height in the sample relative to the focal plane; Localize again to apply it.`);
+  logCmd({}, 'zScaleFromSimulation()');
+}
+$('zScaleFromSimBtn').addEventListener('click', zScaleFromSimulation);
 updateMethodUI();
 
 // Simulation PSF model rows (simBox) — same "one selector, a list of rows toggled together"
@@ -22284,7 +22369,7 @@ updateMethodUI();
 // (Several of these rows live under Simulation → Advanced; the toggle doesn't care where. The two
 // section headings are block elements; Preview PSF / Calib. stack are disabled, not hidden, so the
 // top-level button grid keeps its shape.)
-const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','psfSafRow','psfApodRow','calibDepthMaxRow','beadDiameterRow','calibSeedRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfInterpRow'];
+const PSF_ZERNIKE_ROW_IDS=['psfNARow','psfWavelengthRow','psfNsRow','psfNiRow','psfTi0Row','psfDepthRow','depthModeRow','psfOpticsPresetRow','psfSafRow','psfApodRow','calibDepthMaxRow','beadDiameterRow','calibSeedRow','psfZRangeRow','psfZStepRow','psfOversampleRow','psfKernelWidthRow','psfZernikePresetRow','psfZernikeCustomRow','psfInterpRow'];
 function psfModelIsZernike(){ return paramValue('simulation_psfModel')==='zernike'; }
 function updatePsfModelUI(){
   const on = psfModelIsZernike();
@@ -22353,13 +22438,16 @@ function wirePreset(presetId, table){
   const ids=[...new Set(Object.values(table).flatMap(o=>Object.keys(o)))];
   $(presetId).addEventListener('change',()=>{
     const vals=table[$(presetId).value]; if(!vals) return;          // 'custom' writes nothing
+    // A preset may write another preset's select (the Sample presets write the Optics preset), whose
+    // own handler then runs inside this one: restore the outer flag, don't clear it.
+    const outer=_presetWriting;
     _presetWriting=true;
     // A field with no control (PARAMS id:null) goes through paramOverrides, where paramValue()
     // reads it — so a preset can set geometry that has no place in the sidebar.
     try{ for(const id in vals){ const el=$(id); if(!el){ if(PARAMS[id]) paramOverrides[id]=vals[id]; continue; }
            if(el.type==='checkbox') el.checked=!!vals[id]; else el.value=vals[id];
            el.dispatchEvent(new Event('change')); } }
-    finally{ _presetWriting=false; }
+    finally{ _presetWriting=outer; }
   });
   // Only a value that actually DIFFERS from what the active preset prescribes makes it 'custom'.
   // Without the comparison, a settings load broke every saved preset: it replays controls in PARAMS
@@ -22415,10 +22503,14 @@ wirePreset('validation_preset', {
 // 4.4 blinks per dye (bleach 0.23 per blink) for AF647 in GLOX/MEA. Density chosen so overlap
 // K stays below 0.1 at the edge of each sample's depth range. Calibration ±500 nm at 20 nm, the
 // range this astigmatism encodes single-valued (±400 nm).
-{ const optics={ simulation_psfModel:'zernike', simulation_psfNA:1.43, simulation_psfWavelength:670, simulation_psfNs:1.3345,
+{ const astig3d={ simulation_psfModel:'zernike', simulation_psfNA:1.43, simulation_psfWavelength:670, simulation_psfNs:1.3345,
     simulation_psfNi:1.518, simulation_pxnm:100, simulation_psfZernikeCustom:'0,0,0,0,0,183,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0',
     simulation_psfSaf:true, simulation_psfApodization:false, simulation_depthMode:'physical', simulation_3d:true,
-    simulation_psfZRange:500, simulation_psfZStep:20,
+    simulation_psfZRange:500, simulation_psfZStep:20 };
+  wirePreset('simulation_opticsPreset', { astig3d });
+  // The Sample presets write the Optics preset FIRST (so it reads "Standard astigmatic 3D" afterwards),
+  // then the same optics again (a Sample preset is complete on its own), then camera and sample.
+  const optics={ simulation_opticsPreset:'astig3d', ...astig3d,
     simulation_cameraType:'emccd', simulation_emGain:350, simulation_qe:0.9, simulation_illumProfile:'flat' };
   const beads={ ...optics, phot:5000, simbg:10, simulation_beadDiameter:100 };
   const dstorm={ ...optics, frames:2000, simlifetime:1, simulation_offLifetime:2000, simulation_blinkBleachProb:0.23,
@@ -22435,6 +22527,12 @@ wirePreset('validation_preset', {
     li2019_ccp2um:    { ...ccp, simulation_psfDepth:2000, simulation_ccp_orientation:'down' },
     li2019_npc340:    { ...npc, simulation_psfDepth:340,  simulation_nup_membrane:'flat', simulation_nup_curvature:600 },
     li2019_npc5um:    { ...npc, simulation_psfDepth:4850, simulation_nup_membrane:'dome', simulation_nup_curvature:0, simulation_nup_domeHeight:900 },
+    // A cell: CellField microtubules imaged 300 nm above the coverslip (Focus height is the sample
+    // depth for microtubules, simMovieDepthNm()), a ±400 nm slab = this astigmatism's single-valued
+    // range, the rest of the cell as out-of-focus emitters up to 1.5 um away.
+    cellMicrotubules: { ...dstorm, simulation_structureType:'microtubules', simulation_mt_focusZ:300, simulation_psfDepth:300,
+      simulation_zRange:400, phot:2000, simbg:15, dens:0.15, frames:5000,
+      simulation_hazeRatio:1, simulation_hazeDepth:1500 },
   });
   // What to click next, and the analysis-side settings a preset deliberately does NOT write
   // (a Simulation preset never touches Localisation).
@@ -22446,6 +22544,7 @@ wirePreset('validation_preset', {
     log(`Sample preset ${$('simulation_samplePreset').selectedOptions[0].textContent}: `+
         (v==='li2019_beadsGlass' ? 'click Calib. stack, then Calibrate (3D calibration).'
          : v==='li2019_beadsGel' ? 'calibrate on "beads on coverslip" first, then click Calib. stack here, Localize with a 3D method and Compare to GT → Show bead z.'
+         : v==='cellMicrotubules' ? 'calibrate on "beads on coverslip" first, then Simulate movie, Localize with a 3D method (Axial scale: From simulation, for z as height in the cell) and Compare to GT.'
          : 'calibrate on "beads on coverslip" first, then Simulate movie, Localize with a 3D method and Compare to GT → Show objects.')+
         ` For Localisation set Gain 0.34 photons/ADU, Camera offset 100 ADU and Excess noise F² 2 (EMCCD).`);
   });
@@ -23010,7 +23109,7 @@ $('pxnm').addEventListener('change',()=>{
 });
 // live preview: re-detect/re-fit the current raw frame (not the whole stack) when
 // detection/fit settings change, if "Real-time update" is checked.
-['method','localize3D','detection_wavelet_thr','detection_DoG_thr','detection_box_thr','psf','winr','detection_DoG_exactbp','detFilter'].forEach(id=>{
+['method','localize3D','zScale','detection_wavelet_thr','detection_DoG_thr','detection_box_thr','psf','winr','detection_DoG_exactbp','detFilter'].forEach(id=>{
   $(id).addEventListener('change',()=>{ if(stack && paramValue('liveUpdate')) showFrame(+$('scrub').value); });
 });
 // toggling "Real-time update" itself must refresh the overlay right away, not
@@ -23619,7 +23718,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-29h — Docs: Recipe H (Li et al. 2019) in the Simulation guide, every new field in the parameter tables, hints for the Sample preset, pits, Nup107, SAF and bead z / objects.
+log(`webSMLM v0.13.0-dev · build 2026-10-30a — Simulation: Optics preset "Standard astigmatic 3D" (PSF), Depth model control (Advanced → PSF), Sample preset "Cell — microtubules"; microtubules take their depth from Focus height; out-of-focus emitters reach past the kernel range in the physical depth model. Localisation: Axial scale (RIMF) with From simulation. Workers that are slow to start are waited for, not dropped.
+— from build 2026-10-29h: Docs: Recipe H (Li et al. 2019) in the Simulation guide, every new field in the parameter tables, hints for the Sample preset, pits, Nup107, SAF and bead z / objects.
 — from build 2026-10-29g: Simulation: Sample preset — the calibration and test samples of Li et al. (2019) in one choice (beads on coverslip / in gel, pits, Nup107 pores).
 — from build 2026-10-29f: Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.
 — from build 2026-10-29e: Simulation: Clathrin-coated pits structure; NPC model Nup96/Nup107; ground truth knows which pore or pit each emitter belongs to.

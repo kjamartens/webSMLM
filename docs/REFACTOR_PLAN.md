@@ -58,8 +58,12 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
 - **Depth-dependent calibration (Li et al. 2019), after the 2026-10-29 simulation work** — the
   samples can be simulated (Sample preset, DOCUMENTATION.md Recipe H); what is still open:
   - **The analysis half of the paper**: a cubic-spline PSF fitter and the Δz(z_fitted, f_obj)
-    B-spline correction with RIMF (`calibrate3Daberrations`/`correct_3Daberrations`). The gel stack
+    B-spline correction (`calibrate3Daberrations`/`correct_3Daberrations`). A constant RIMF exists
+    (**Axial scale (RIMF)**, 2026-10-30); the depth-dependent correction does not. The gel stack
     already carries everything that correction is built from (per-bead nominal z per frame).
+  - **Longer cell movies**: `frames` stops at 5000 because the whole simulated stack is held in
+    memory (128×128×5000 Float32 = 330 MB); a cell reconstruction wants 10–20k frames. Streaming the
+    simulated stack (frames generated on demand by seed) would lift it.
   - **The 340 nm ring-distance sign**: here the trend comes from the focus scale f0′ changing near
     the glass (c −0.25), in the paper from the defocus asymmetry of a cubic-spline fit (c +0.55).
     Re-check once a PSF-model fitter exists — it should move toward the paper if that explanation is

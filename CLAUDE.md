@@ -196,6 +196,12 @@ what makes GUI and command-line use interchangeable.
     (`makeGpuFitAccumulator()`; its seeds are packed with the already-divided gain). **A new fit
     dispatch path must do the same.** PCFO measures gain·F² on EMCCD data and warns instead of
     dividing.
+  - **Axial scale (RIMF)** (`zScale`, shown with any 3D fit): `runCore()` puts it on the z models
+    (`wcal.zScale`/`zcal.zScale`), and `zFromWidths()`/`phasorZ()` multiply z and lpz by it (the clamp
+    test stays in calibration units) — so worker, serial, GPU and live preview all get it with no copy of
+    their own. The Run's value rides on `lastResult.zScale`; `truthScoreConfig()` passes the model RIMF
+    divided by it as `_rimf` (what is left to apply). **From simulation** = `simDepthInfo.rimf`
+    (1/f0′ at the sample depth). A new z model must take the scale the same way.
   - PSF-model fitting (`psfmle`) and `detection_mergeRadius` live on the `psf_fitting` branch.
 
 - **render** — accumulates locs into `srFull` (dense, O(W·H)); `view` is zoom/pan (zoom = CSS px
@@ -562,8 +568,13 @@ writes everything; the physics underneath, all default-off so a seeded movie sta
   astigmatism; anchors on a fixed depth ladder, cached, interpolated. Never the paraxial d·ni/ns
   (off by >1 µm at 5 µm). A higher plane index = objective further from the sample = emitter above
   focus. `buildPsfKernelStack()` uses it for `focusIndex` when SAF/apod/physical is on.
-- **`simulation_depthMode`** ('objective' default | 'physical', no control): physical = structure z
-  is height relative to Sample depth, objective fixed at the measured focus. `buildPhysicalDepthStack()`
+- **`simulation_depthMode`** ('objective' default | 'physical'; control "Depth model" in Advanced → PSF):
+  physical = structure z is height relative to the sample depth (`simMovieDepthNm()`: Sample depth, or
+  **Focus height** for microtubules — CellField measures z from it, so it IS the sample depth), objective
+  fixed at the measured focus. Nothing goes below the coverslip: `zOnGlass()` clamps a blink's z before
+  the movie or the truth is written, so the two agree (CellField's dye shell reaches ~30 nm under
+  microtubules on the glass). Out-of-focus emitters are not capped at the kernel's z range here (each
+  gets a PSF for its own height), only by the coverslip. `buildPhysicalDepthStack()`
   bins emitters (25/50/250 nm), builds a small stack per bin on the shared objective axis
   (`sweepCenterM`), maps a residual δ to plane offset f0′(z_b)·δ/zStep, and concatenates all bins
   into ONE virtual stack (focusIndex 0) whose index rides in each frame entry's z slot — so serial,
@@ -591,6 +602,10 @@ writes everything; the physics underneath, all default-off so a seeded movie sta
   "fix" it by tuning; it is what this scalar model + Gaussian σ(z) fitter predict.
 - `wirePreset()` writes control-less fields through `paramOverrides`; `_presetTables`/`presetHolds()`
   let the Sample preset set Physics detail / Emitter density to Custom where it overrode them.
+  **Optics preset** (`simulation_opticsPreset`, 'astig3d' = "Standard astigmatic 3D") holds the optics
+  alone (no camera, no sample); the Sample presets write it first, so it runs nested inside them —
+  `wirePreset()` restores the outer `_presetWriting` rather than clearing it. Sample preset
+  `cellMicrotubules` = that microscope + a CellField cell (Focus height 300, ±400 nm, haze to 1.5 µm).
 
 **Around it**: `toggleGtLocalizations()` swaps `srFull` directly (stashing the previous one and its
 title/info, since `lastResult` is null before a Localize) and mirrors `rerender()`'s depth-colour
@@ -615,6 +630,10 @@ numerics exist once. Consequences:
   `d.<flag>`. A worker has one `onmessage`, not a queue: never put two job types on the pool at once
   (hence FTM's barrier phases).
 - The worker source is a template literal: no backticks in comments inside it.
+- All four pools self-test through `probeWorker()`: an error fails at once, but a slow answer is
+  waited for (logged after 3 s, given up after 60 s). A browser that throttles a background page
+  (Chrome on Windows: Idle priority, measured ~40× slower JS) can take >3 s to start a worker;
+  declaring the pool dead then put every later job on the main thread for the whole session.
 - The same holds one layer up for **explicit field lists across a postMessage**: the PSF worker and
   `buildPsfPlanesParallel()` spell the optical parameters out by hand (not `cfg`), so a new PSF
   parameter goes on both ends or pooled kernels silently ignore it (this once built every

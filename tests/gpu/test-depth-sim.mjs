@@ -18,6 +18,8 @@
 //  (6) per-object scores move in the published direction.
 //  (7) presets: every one simulates, survives a settings round trip, and an edit flips it.
 //
+// (8) the Optics preset, a CellField cell in the physical depth model, the Axial scale (RIMF).
+//
 // Run: node tests/gpu/test-depth-sim.mjs   (Playwright via tools/package.json, see tests/README.md)
 import { launchPage } from '../lib/launch.mjs';
 import { writeResults } from '../lib/report.mjs';
@@ -214,7 +216,7 @@ try {
   const base3 = await page.evaluate(async () => {
     __set('simulation_psfSaf', false); __set('simulation_psfZernikeCustom', ''); __set('simulation_psfNA', 1.4);
     __set('simulation_psfWavelength', 660); __set('simulation_psfNs', 1.33); __set('simulation_psfNi', 1.518);
-    paramOverrides.simulation_depthMode = 'objective';
+    __set('simulation_depthMode', 'objective');
     return { uniform3D: await __simHash({ simulation_structureType: 'uniform3D' }), nup: await __simHash({ simulation_structureType: 'nup' }) };
   });
   for (const k of Object.keys(BASELINE))
@@ -222,9 +224,9 @@ try {
   // (b) at the coverslip, a flat sample in physical mode is the objective-mode movie, bit for bit
   const same = await page.evaluate(async () => {
     const cfg = { simulation_structureType: 'tiltedPlane', simulation_zRange: 0, simulation_psfSaf: true, simulation_psfDepth: 0 };
-    paramOverrides.simulation_depthMode = 'objective'; const a = await __simHash(cfg);
-    paramOverrides.simulation_depthMode = 'physical'; const b = await __simHash(cfg);
-    paramOverrides.simulation_depthMode = 'objective';
+    __set('simulation_depthMode', 'objective'); const a = await __simHash(cfg);
+    __set('simulation_depthMode', 'physical'); const b = await __simHash(cfg);
+    __set('simulation_depthMode', 'objective');
     return { a, b };
   });
   results.physicalAtCoverslip = same;
@@ -236,7 +238,7 @@ try {
     __set('simulation_psfNA', 1.43); __set('simulation_psfWavelength', 670); __set('simulation_psfNs', 1.3345);
     __set('simulation_psfNi', 1.518); __set('simulation_psfSaf', true); __set('simulation_psfZernikeCustom', z.join(','));
     __set('simulation_psfZRange', 400); __set('simulation_psfZStep', 10);
-    paramOverrides.simulation_depthMode = 'physical';
+    __set('simulation_depthMode', 'physical');
     const cfg = readPsfConfigFromUI(), D = 2000;
     const fObj = (await psfFocusMap(cfg, D, D)).f0(D);
     const deltas = [-120, -60, 60, 120], zps = deltas.map(d => D + d);
@@ -254,7 +256,7 @@ try {
       const centre = ds.slices[B.offset + B.half];
       out.push({ zp, corrUsed: corr(direct.slices[0], used), corrMirror: corr(direct.slices[0], mirror), corrNoResidual: corr(direct.slices[0], centre) });
     }
-    paramOverrides.simulation_depthMode = 'objective';
+    __set('simulation_depthMode', 'objective');
     return { bins: ds.bins.map(b => ({ zb: b.zb, n: b.n })), out };
   });
   results.residualMapping = resid;
@@ -265,7 +267,7 @@ try {
   // (d) a real physical-mode movie, 2 um deep, ±500 nm of structure, on the CPU workers and the GPU
   const phys = await page.evaluate(async () => {
     const cfg = { simulation_structureType: 'uniform3D', simulation_zRange: 500, simulation_psfDepth: 2000, simulation_psfZRange: 1000 };
-    paramOverrides.simulation_depthMode = 'physical';
+    __set('simulation_depthMode', 'physical');
     const movies = [];
     for (const g of [false, true]) {
       __simBase(); for (const [k, v] of Object.entries(cfg)) __set(k, v); __set('useGpu', g);
@@ -273,7 +275,7 @@ try {
       movies.push({ path: lastSimTimings.path, frames: await st.getFrames(0, st.n),
         depths: groundTruthEvents.map(e => e.depth), zs: groundTruthEvents.map(e => e.z), rates: groundTruthEvents.map(e => e.rate) });
     }
-    paramOverrides.simulation_depthMode = 'objective'; __set('useGpu', false);
+    __set('simulation_depthMode', 'objective'); __set('useGpu', false);
     let close = 0, tot = 0, maxAbs = 0;
     for (let fi = 0; fi < movies[0].frames.length; fi++) for (let i = 0; i < movies[0].frames[fi].length; i++) {
       const d = Math.abs(movies[0].frames[fi][i] - movies[1].frames[fi][i]); tot++; if (d <= 1e-3) close++; if (d > maxAbs) maxAbs = d; }
@@ -389,7 +391,7 @@ try {
     __set('simulation_beadDiameter', 0);
     const score = async () => { __set('method', 'mle3d'); __set('gain', 0.34); __set('camoffset', 100); await run(); await computeTruthScore();
       const r = lastTruthScore; return { jaccard: r.jaccard, axialSlope: r.axialSlope, rimf: r.rimf, failFrac: r.failRule ? r.failRule.frac : NaN, objects: r.objects }; };
-    paramOverrides.simulation_depthMode = 'physical';
+    __set('simulation_depthMode', 'physical');
     const out = {};
     for (const [name, depth, orient] of [['ccp100', 100, 'up'], ['ccp2000', 2000, 'down']]) {
       li(); paramOverrides.simulation_ccp_orientation = orient;
@@ -409,7 +411,7 @@ try {
                     spreadTrue: pct(zt, 0.95) - pct(zt, 0.05), spreadFitRimf: (pct(zf, 0.95) - pct(zf, 0.05)) * r.rimf, failFrac: r.failFrac };
     }
     out.kLogged = document.getElementById('logText').textContent.includes('Overlap K');
-    paramOverrides.simulation_depthMode = 'objective'; delete paramOverrides.simulation_nup_tiltDeg; delete paramOverrides.simulation_nup_membrane;
+    __set('simulation_depthMode', 'objective'); delete paramOverrides.simulation_nup_tiltDeg; delete paramOverrides.simulation_nup_membrane;
     delete paramOverrides.simulation_nup_curvature; delete paramOverrides.simulation_ccp_orientation;
     __set('simulation_nup_variant', 'nup96'); __set('simulation_psfSaf', false); __set('simulation_psfZernikeCustom', '');
     return out;
@@ -442,7 +444,7 @@ try {
       // settings round trip: save, scramble, load
       const json = JSON.stringify(buildSettingsJson(buildConfigFromParams()));
       sel.value = 'custom'; sel.dispatchEvent(new Event('change'));
-      __set('simulation_psfDepth', 0); __set('simulation_structureType', 'uniform3D'); paramOverrides.simulation_depthMode = 'objective';
+      __set('simulation_psfDepth', 0); __set('simulation_structureType', 'uniform3D'); __set('simulation_depthMode', 'objective');
       await loadSettingsJson(new File([json], 'roundtrip.json', { type: 'application/json' }));
       r.roundTrip = sel.value === p && paramValue('simulation_psfDepth') === r.depth && paramValue('simulation_depthMode') === 'physical'
         && (!p.match(/ccp|npc/) || paramValue('simulation_structureType') === r.structure);
@@ -469,6 +471,50 @@ try {
     check(`(7) preset ${r.name}: simulates`, !r.failed && r.frames > 0 && (r.name === 'li2019_beadsGlass' || r.truth > 0),
       `${r.frames} frames, ${r.truth} truth events${r.objects ? ', ' + r.objects + ' objects' : ''}`);
   }
+
+  // ---- (8) the standard astigmatic optics, a cell, the axial scale (RIMF) ------------------------
+  const cell = await page.evaluate(async () => {
+    const r = {};
+    const op = document.getElementById('simulation_opticsPreset');
+    __set('simulation_cameraType', 'scmos');
+    op.value = 'astig3d'; op.dispatchEvent(new Event('change'));
+    r.optics = paramValue('simulation_psfNA') === 1.43 && paramValue('simulation_depthMode') === 'physical'
+      && paramValue('simulation_psfSaf') === true && paramValue('simulation_pxnm') === 100;
+    r.cameraUntouched = paramValue('simulation_cameraType') === 'scmos';
+    __set('simulation_psfNA', 1.4); r.flips = op.value === 'custom';
+    op.value = 'astig3d'; op.dispatchEvent(new Event('change'));
+    // Microtubules: the sample depth is Focus height (Sample depth set elsewhere on purpose), nothing
+    // below the coverslip, out-of-focus emitters not capped at the kernel's ±500 nm.
+    __simBase(); __set('useGpu', true); __set('simulation_psfZRange', 500);
+    __set('simulation_structureType', 'microtubules'); __set('simulation_mt_seed', 1249);
+    __set('simulation_mt_focusZ', 300); __set('simulation_psfDepth', 900); __set('simulation_zRange', 400);
+    __set('simulation_hazeRatio', 1); __set('simulation_hazeDepth', 1500); __set('frames', 100); __set('dens', 0.15);
+    await generateSynthetic();
+    const ev = groundTruthEvents, inF = ev.filter(e => !e.haze), hz = ev.filter(e => e.haze);
+    let lo = Infinity, hzLo = Infinity, hzHi = -Infinity;
+    for (const e of inF) if (e.depth < lo) lo = e.depth;
+    for (const e of hz) { if (e.depth < hzLo) hzLo = e.depth; if (e.depth > hzHi) hzHi = e.depth; }
+    r.nIn = inF.length; r.nHaze = hz.length; r.minDepth = lo; r.hazeRange = [hzLo, hzHi];
+    r.depthFromFocus = !!simDepthInfo && simDepthInfo.depthNm === 300 && inF.every(e => Math.abs(e.depth - (300 + e.z)) < 1e-9);
+    __set('simulation_hazeRatio', 0); __set('simulation_psfDepth', 0); __set('simulation_depthMode', 'objective');
+    op.value = 'custom'; op.dispatchEvent(new Event('change'));
+    // Axial scale: every z model scales z (and lpz) exactly; the clamp test stays in calibration units.
+    const wcal = { qx: { a: 4.48e-4, c: 238, b: 91.3 }, qy: { a: 4.43e-4, c: -231, b: 90 }, zmin: -500, zmax: 500, px: 100 };
+    const a = zFromWidths(1.0, 1.2, wcal, 0.02, 0.02), b = zFromWidths(1.0, 1.2, { ...wcal, zScale: 0.72 }, 0.02, 0.02);
+    r.widthScale = Math.abs(b.z - 0.72 * a.z) < 1e-9 && Math.abs(b.lpz - 0.72 * a.lpz) < 1e-9 && a.clamped === b.clamped;
+    const zc = { coef: [0, 300], basis: 'lin', rmin: 0.5, rmax: 2 };
+    r.phasorScale = Math.abs(phasorZ({ ...zc, zScale: 0.72 }, 1.3).z - 0.72 * phasorZ(zc, 1.3).z) < 1e-9;
+    return r;
+  });
+  results.cell = cell;
+  check('(8) Optics preset Standard astigmatic 3D writes the optics, leaves the camera, flips on an edit',
+    cell.optics && cell.cameraUntouched && cell.flips, '');
+  check('(8) microtubules in the physical model: sample depth = Focus height, nothing below the glass',
+    cell.depthFromFocus && cell.minDepth >= 0 && cell.nIn > 0, `${cell.nIn} blinks, lowest at ${cell.minDepth.toFixed(0)} nm`);
+  check('(8) out-of-focus emitters in the physical model reach past the kernel range, never below the glass',
+    cell.nHaze > 0 && cell.hazeRange[0] >= 0 && cell.hazeRange[1] > 300 + 500,
+    `${cell.nHaze} blinks at ${cell.hazeRange.map(v => v.toFixed(0)).join('–')} nm`);
+  check('(8) Axial scale (RIMF) multiplies z and its precision in both z models', cell.widthScale && cell.phasorScale, '');
 } finally {
   writeResults('depth-sim', results);
   await browser.close();

@@ -943,13 +943,29 @@ itself (calibrating over ±1 µm, past this astigmatism's ±400 nm single-valued
 
 Same samples, same optics, and the same *direction* of every bias — not the paper's numbers: the
 pupil here is scalar with the supercritical annulus (not vectorial), the fitter is a Gaussian σ(z)
-fit (not a cubic spline), and the correction step is not part of this release. One result does not
+fit (not a cubic spline), and the depth-dependent correction of the paper is not part of this release
+(a constant **Axial scale (RIMF)** is — see Recipe I). One result does not
 follow the paper: at 340 nm the ring distance *falls* with the pore's centre z here (Pearson c
 −0.17 to −0.25 over the runs made), where Li et al. find it rising (c 0.55). Dividing each pore by
 its own local focus slope f0′ removed the trend on the run where that was checked (c −0.14 →
 −0.05): in this model the dependence at 340 nm is the focus scale changing fast near the glass (f0′
 1.44 at the coverslip, 1.36 at 500 nm), not the defocus asymmetry of a cubic-spline fit of a
 mismatched PSF.
+
+**I. A cell on the standard astigmatic microscope.** **Sample preset** *Cell — microtubules*: a
+CellField cell (Microtubules) on the same optics and camera, imaged 300 nm above the coverslip
+(**Focus height**, which is the sample depth for Microtubules), a ±400 nm slab (this astigmatism's
+single-valued range), density 0.15 µm⁻², 5000 frames, and the rest of the cell as out-of-focus
+emitters up to 1.5 µm away (in the physical depth model only the coverslip limits them).
+1. Calibrate on *Li 2019 — beads on coverslip* (Recipe H, steps 1–2).
+2. *Cell — microtubules* → **Simulate movie**; Fit method *Gauss MLE elliptical* (3D) → **Localize**.
+3. **Axial scale (RIMF)** → **From simulation** → **Localize** again: z is now height in the cell.
+4. **Compare to GT**: the axial scale line reports fitted z / true z with the RIMF already applied.
+
+Measured on one seed (build 2026-10-30a, 85,425 localizations): axial median error 78 nm → 28 nm and
+bias −57 nm → −9 nm with the axial scale 0.721 applied; fitted z / true z 1.28 in objective units,
+0.92 after it (the residual squeezing). 2.7% of the blinks sat at CellField dye sites up to ~30 nm
+below the glass and were placed on it, in the movie and the ground truth alike.
 
 #### Performance
 
@@ -963,9 +979,8 @@ the time; the Gaussian model is fastest.
 
 - `runSimulation()`, `runCalibrationSimulation()`, `previewPsf()`, `toggleGtLocalizations()`,
   `computeTruthScore()` run the matching buttons with the current sidebar values.
-- `paramOverrides.simulation_structureFov = 200`, `paramOverrides.simulation_3d = false`,
-  `paramOverrides.simulation_depthMode = 'physical'`, and the NPC/pit/microtubule geometry keys set
-  fields without a sidebar control (then `runSimulation()`); a Sample preset sets them for you, and
+- `paramOverrides.simulation_structureFov = 200`, `paramOverrides.simulation_3d = false` and the
+  NPC/pit/microtubule geometry keys set fields without a sidebar control (then `runSimulation()`); a Sample preset sets them for you, and
   a logged Simulate movie command repeats every one it set.
 - `moveMtView(dxUm, dyUm)` pans the microtubule window.
 - There is no headless `analyze()` path that *generates* a movie; `analyze({scoreVsTruth:true, …})`
@@ -2246,7 +2261,7 @@ elapsed time instead.
 | `simulation_structureType` | Structure type | enum (`microtubules`, `nup`, `filaments_ring`, `tiltedPlane`, `uniform3D`, `shell`, `ccp`) | — | — | — | `microtubules` |
 | `simulation_densityPreset` | Emitter density | enum (`low` 0.05, `med` 0.2, `high` 0.5, `veryhigh` 2, `custom`) | — | — | — | `high` |
 | `simulation_realism` | Physics detail | enum (`min` Basic, `med` Realistic, `max` Full, `custom`) | — | — | — | `med` |
-| `simulation_samplePreset` | Sample preset — the samples of Li et al. (2019); see [Recipe H](#simulation-guide) | enum (`custom`, `li2019_beadsGlass`, `li2019_beadsGel`, `li2019_ccpGlass`, `li2019_ccp2um`, `li2019_npc340`, `li2019_npc5um`) | — | — | — | `custom` |
+| `simulation_samplePreset` | Sample preset — the samples of Li et al. (2019), and a cell (CellField microtubules), all on the standard astigmatic 3D microscope; see [Recipes H and I](#simulation-guide) | enum (`custom`, `li2019_beadsGlass`, `li2019_beadsGel`, `li2019_ccpGlass`, `li2019_ccp2um`, `li2019_npc340`, `li2019_npc5um`, `cellMicrotubules`) | — | — | — | `custom` |
 | `dens` | Emitter density (µm⁻²·frame⁻¹) | number | 0 | 5 | 0.01 | 0.5 |
 | `simulation_labelEfficiency` | Labeling efficiency (%) | number (int) | 0 | 100 | 1 | 70 |
 | `simulation_zRange` | Structure Z range (± nm) | number | 0 | 5000 | 10 | 1000 |
@@ -2293,6 +2308,8 @@ elapsed time instead.
 | `simulation_psfNs` | *PSF:* Sample refractive index (ns) | number | 1 | 1.7 | 0.0001 | 1.33 |
 | `simulation_psfNi` | *PSF:* Immersion refractive index (ni) | number | 1 | 1.7 | 0.001 | 1.518 |
 | `simulation_psfDepth` | *PSF:* Sample depth (nm) — height above the coverslip the sample sits at and the objective is focused on | number | 0 | 5000 | 10 | 0 |
+| `simulation_opticsPreset` | *PSF:* Optics preset — `astig3d` = **Standard astigmatic 3D**: NA 1.43 oil into water (ns 1.3345, ni 1.518), 670 nm, 100 nm pixels, 183 milliwaves of astigmatism (OSA j = 5), supercritical angle on, physical depth model, kernel ±500 nm at 20 nm (the optics of Li et al. 2019). Optics only: camera, sample and density are left alone | enum (`custom`, `astig3d`) | — | — | — | `custom` |
+| `simulation_depthMode` | *PSF:* Depth model — `physical` (**Height in sample**): z is height in the sample, each emitter imaged at its own height with the objective fixed; `objective` (**Objective travel**): z is a defocus, one Sample depth for the movie (every movie before 2026-10-29). For Microtubules the sample depth is **Focus height** | enum (`objective`, `physical`) | — | — | — | `objective` |
 | `simulation_psfSaf` | *PSF:* Supercritical angle (SAF) — open the pupil past the critical angle; that light is evanescent in the sample and fades within ~100 nm of the glass | bool | — | — | — | off |
 | `simulation_psfApodization` | *PSF:* Fresnel apodisation — weight the pupil with the interface's scalar Fresnel transmission | bool | — | — | — | off |
 | `simulation_calibDepthMax` | *PSF:* Bead depth range (nm) — Calib. stack in a gel above 0 | number | 0 | 6000 | 50 | 0 |
@@ -2331,7 +2348,6 @@ No sidebar control (Settings JSON, `paramOverrides`, or the log terminal):
 | `simulation_nup_tiltDeg` | NPC tilt (deg, max) — each pore tipped by a random angle up to this | number | 0 | 60 | 1 | 0 |
 | `simulation_nup_membrane` | NPC membrane — `dome`: an ellipsoidal cap (the top of a nucleus), pore axes along the surface normal | enum (`flat`, `dome`) | — | — | — | `flat` |
 | `simulation_nup_domeHeight` | NPC dome height (nm) | number | 0 | 5000 | 10 | 900 |
-| `simulation_depthMode` | Depth model — `physical`: z is height in the sample, each emitter imaged at its own height with the objective fixed; `objective`: z is objective travel (every movie before 2026-10-29) | enum (`objective`, `physical`) | — | — | — | `objective` |
 | `simulation_ccp_radius` | Pit radius (nm) | number | 20 | 200 | 1 | 72 |
 | `simulation_ccp_closingAngleDeg` | Pit closing angle (deg; 180 = a closed vesicle) | number | 10 | 180 | 1 | 120 |
 | `simulation_ccp_shellThickness` | Coat thickness (nm) | number | 0 | 50 | 1 | 15 |
@@ -2452,7 +2468,8 @@ for light from far above and below the focal plane) is set under Advanced → Ba
 <b>Fade time constant</b> lets the
 background bleach down to a 30% floor over the movie, which is what a temporal-median (FTM) correction
 exists for. <b>Out-of-focus emitters</b> goes further: a second, blinking population on the same
-structure, 0.3–2 µm out of focus (<b>Out-of-focus depth</b>), rendered with the real defocused PSF — so
+structure, 0.3–2 µm out of focus (<b>Out-of-focus depth</b>; capped at the PSF z range, except in the
+physical depth model, where only the coverslip limits it), rendered with the real defocused PSF — so
 it needs the Zernike-aberrated PSF model, and it is the one setting here with a real cost, roughly
 tripling the simulation time at a ratio of 1. Those emitters are in the movie but never in the score.
 A smooth background costs the <i>detector</i> almost nothing — the band-pass removes it before
@@ -2543,6 +2560,11 @@ factor of 2.4.
 <p><b>PSF model</b> — <code>Zernike-aberrated</code> (default) is a Gibson-Lanni + Zernike-pupil
 optical model; every emitter is rendered from its kernel at the emitter's own depth.
 <code>Gaussian</code> is a fixed σ = 1.3 px spot: fast, but it carries no depth information.</p>
+<p><b>Optics preset</b> — <b>Standard astigmatic 3D</b> is the usual astigmatic 3D SMLM microscope (the
+optics of Li <i>et al.</i> 2019): NA 1.43 oil objective imaging into water, 670 nm, 100 nm pixels, 183
+milliwaves of astigmatism, supercritical-angle light, and every emitter imaged at its own height (the
+physical depth model, Advanced → PSF). It sets optics only — camera, structure and density stay as they
+are — so it puts that microscope under any structure. Editing a field it wrote sets it back to Custom.</p>
 <p><b>Aberration preset</b> sets the objective's aberrations: astigmatism (the standard way to encode
 depth), coma, spherical, trefoil or a realistic mix, at a few strengths — order-of-magnitude values,
 not calibrated ones. <b>Saddle point</b> and <b>Extended depth</b> stack astigmatism at higher orders
@@ -2579,7 +2601,11 @@ depth-induced aberration; the focal shift is compensated, so the kernel's z rang
 emitter's actual focus. <b>Supercritical angle (SAF)</b> lets the light past the critical angle through —
 it is evanescent in the sample, so an emitter at the glass is brighter and sharper than one a few
 hundred nm up; <b>Fresnel apodisation</b> weights the pupil with the interface's transmission (off by
-default: published SAF fractions assume a uniform pupil). <b>Bead depth range</b> (above 0) makes Calib.
+default: published SAF fractions assume a uniform pupil). <b>Depth model</b>: <i>Objective travel</i>
+(default) treats a structure's z as a defocus, one Sample depth for the whole movie; <i>Height in
+sample</i> images each emitter at its own height above the coverslip with the objective fixed, so the
+refractive-index mismatch squeezes z the way it does in a real sample (for Microtubules the height is
+Focus height + z; nothing goes below the coverslip). <b>Bead depth range</b> (above 0) makes Calib.
 stack a gel of beads at random heights, with ground truth; <b>Bead diameter</b> averages each bead over
 its volume; <b>Calib. stack seed</b> makes the stack reproducible. <b>Working distance</b> is the
 Gibson-Lanni model's nominal coverslip-to-objective distance. <b>Custom Zernike</b> overrides the
@@ -2608,7 +2634,8 @@ and teaching the rest of the pipeline against known-correct answers.</p>
 <b>Physics detail</b> and <b>Sample preset</b>. <b>Sample preset</b> loads the calibration and test samples of Li <i>et al.</i>,
 <i>Biomed. Opt. Express</i> 10, 2708 (2019) — beads on the coverslip and in a gel, clathrin-coated pits at the
 coverslip and 2 µm deep, Nup107 pores at 340 nm and ~5 µm — on that paper's microscope, every emitter
-imaged at its own height; like every preset it only writes ordinary fields.</p>
+imaged at its own height; <b>Cell — microtubules</b> puts a cell on the same microscope. Like every
+preset it only writes ordinary fields.</p>
 <p><b>Physics detail</b> Physics detail is a preset for how much physics — and compute — the simulation
 spends: <b>Basic</b> blinks every molecule once at constant brightness on a flat, dark background;
 <b>Realistic</b> adds repeated blinking with bleaching, brightness spread, a fading background and
@@ -2755,6 +2782,7 @@ single control group in the sidebar.
 |---|---|---|---|---|---|---|
 | `method` | Fit method | enum | — | — | — | `gaussmle` (options: `phasor`, `phasor3d`, `gaussls`, `gaussmle`, `mle3d`, `gaussmleEll` — UI labels "Phasor 2D", "Phasor 3D", "Gaussian LS 2D", "Gauss MLE spherical", "Gauss MLE elliptical", "Gauss MLE rotated elliptical") |
 | `localize3D` | 3D localisation | bool | — | — | — | true (only shown/meaningful for `mle3d`/`gaussmleEll` — see §2/fit) |
+| `zScale` | Axial scale (RIMF) — multiplies every fitted z and its precision (all 3D methods); 1 = the calibration's objective travel. **From simulation** fills in the simulated sample's RIMF | number | 0.3 | 1.5 | 0.001 | 1 |
 | `fitFirstFrame` | First frame (1-based, inclusive) | number (int) | 1 | — | 1 | 1 |
 | `fitLastFrame` | Last frame (1-based, inclusive) | number (int) | 1 | — | 1 | `Infinity` (blank field — see below) |
 | `mleEps` | MLE convergence tolerance (px) | number | 1e-6 | 0.1 | 0.0001 | 0.001 |
@@ -2780,6 +2808,7 @@ here, then run the script, never edit the `.hint` div directly):
   <li><b>Gauss MLE elliptical</b> / <b>Gauss MLE rotated elliptical</b> — independent σx/σy (axis-aligned, or at a rotation angle) instead of one symmetric σ; see <b>3D localisation</b> below.</li>
 </ul>
 <p><b>3D localisation</b> (only shown for the two elliptical methods above) — <b>checked</b> (default): a free rotation angle recovered per emitter, plus z from a loaded calibration, same as <b>Gauss MLE elliptical</b>. <b>Unchecked</b>: a calibration-free fit with no z — for <b>Gauss MLE elliptical</b> this is a plain 2D elliptical fit; for the rotated method the angle is instead fixed to the sSMLM pairing step's own dispersion bearing (Pairing for sSMLM or FRET → Primary angle).</p>
+<p><b>Axial scale (RIMF)</b> (shown with any 3D fit) multiplies every fitted z and its precision. A 3D calibration on beads on the coverslip measures <i>objective travel</i>; in a sample of lower refractive index than the immersion oil (water, gel, cells) an emitter's focus moves about 1/RIMF nm per nm of height, so z × RIMF is height in the sample relative to the focal plane. 1 keeps objective travel. For an oil objective imaging into water the RIMF is about 0.7–0.8 and changes slowly with depth; one constant is the usual correction, not the depth-dependent one of Li <i>et al.</i> (2019). <b>From simulation</b> fills in the PSF model's own value at a simulated sample's depth (physical depth model only).</p>
 <p><b>Fit radius 2D</b>/<b>Fit radius 3D</b> set the fit window half-width used for a 2D vs. a genuinely 3D fit respectively — whichever one is relevant switches in automatically as you change method/<b>3D localisation</b>, so there's no separate "current Fit radius" field to keep in sync by hand.</p>
 <p><b>Detection filter</b> — Wavelet and DoG both band-pass the frame (suppress smooth background, enhance PSF-sized spots); candidates are strict local maxima above <b>k·σ_noise</b>. The three filters respond very differently, so <b>re-tune the threshold</b> when switching between them.</p>
 <ul>

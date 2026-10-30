@@ -242,8 +242,10 @@ what makes GUI and command-line use interchangeable.
   - `setupPlot(cv, isPlot, ratio)` letterboxes plots (default 4:3; square for the polar plot;
     `null` = whole canvas, the smFRET trace); `canvas#sr,#raw{min-height:320px}` keeps plots usable at extreme frame aspects.
   - SVG export: `SvgRecordingContext` duck-types the Canvas2D subset the vector plots use. `arc()`
-    only fills (stroke circles as polygons); no `closePath()` (close with `lineTo`); `save()`/
-    `translate()`/`rotate()` push a fresh `<g>`.
+    only fills (stroke circles as polygons); `closePath()`, `globalAlpha` (element opacity) and
+    `measureText()` (a real canvas in the same font) are supported; `save()`/`translate()`/`rotate()`
+    push a fresh `<g>`. A plot using any other Canvas2D call breaks its SVG export only — check
+    `renderPlotBothFormats()` after adding one.
   - UI theme (`applyTheme()`, dark/light/contrast, localStorage in try/catch) drives CSS variables;
     image overlays and the LUT list are theme-independent. `plotColors()` reads live theme colours;
     `_plotExportMode` switches to a fixed light palette for saved plots.

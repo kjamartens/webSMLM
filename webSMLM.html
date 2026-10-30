@@ -24,26 +24,26 @@
   MODULE INDEX — line numbers of each "MODULE:" banner; re-grep 'MODULE:' if
   stale. Details: CLAUDE.md, docs/DOCUMENTATION.md, CHANGELOG.md.
   ============================================================================
-    params          2685   PARAMS registry, param controls, log/terminal helpers, memory defaults
-    in/out          3750   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
-    simulation      3978   synthetic stack generator ("Simulate movie")
-    validation      7549   ground-truth scoring for simulated data ("Compare to GT")
-    detect          8626   band-pass (wavelet/DoG/box) + local-maxima detection
-    fit             8882   phasor, LSQ and Poisson-MLE fitters; aperture photometry
-    render          9499   super-resolution accumulation, view, colour maps, plots
-    workers         11023  frame-parallel detect/fit worker pool
-    gpu             11664  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
-    export          13993  ThunderSTORM-compatible CSV, plot/image export
-    3D calibration  14284  astigmatic width-vs-z bead calibration
-    drift           14683  AIM and cross-correlation drift correction
-    locprecision    15341  NeNA and FRC
-    sSMLM           16480  spectral SMLM pairing (distance/angle fit, pairCore())
+    params          2697   PARAMS registry, param controls, log/terminal helpers, memory defaults
+    in/out          3762   TIFF/ND2/FITS loading (whole-file or streamed), crop, rotate, FTM
+    simulation      3990   synthetic stack generator ("Simulate movie")
+    validation      7561   ground-truth scoring for simulated data ("Compare to GT")
+    detect          8638   band-pass (wavelet/DoG/box) + local-maxima detection
+    fit             8894   phasor, LSQ and Poisson-MLE fitters; aperture photometry
+    render          9511   super-resolution accumulation, view, colour maps, plots
+    workers         11044  frame-parallel detect/fit worker pool
+    gpu             11685  WebGPU engine: fit, render, FRC, simulation + PSF kernels (experimental)
+    export          14014  ThunderSTORM-compatible CSV, plot/image export
+    3D calibration  14305  astigmatic width-vs-z bead calibration
+    drift           14704  AIM and cross-correlation drift correction
+    locprecision    15362  NeNA and FRC
+    sSMLM           16501  spectral SMLM pairing (distance/angle fit, pairCore())
     smFRET          16135  sites of interest, time traces, pairing, E(S) (experimental)
-    spt             19193  single-particle tracking and diffusion coefficients
-    pipeline        20243  *Core()/wrapper orchestration, Run, hotkeys, terminal
-    liveStreaming   21287  Micro-Manager/pycromanager bridge (experimental)
-    table           23811  localizations table, filters, histograms, clustering
-    headless API    24496  window.webSMLM.analyze()/analyzeBatch()
+    spt             19214  single-particle tracking and diffusion coefficients
+    pipeline        20264  *Core()/wrapper orchestration, Run, hotkeys, terminal
+    liveStreaming   21308  Micro-Manager/pycromanager bridge (experimental)
+    table           23833  localizations table, filters, histograms, clustering
+    headless API    24518  window.webSMLM.analyze()/analyzeBatch()
   ============================================================================
 -->
 <html lang="en">
@@ -1692,7 +1692,7 @@ try{ var _t0=localStorage.getItem('webSMLM_theme'); if(_t0==='light'||_t0==='con
 <div id="scrim"></div>
 <header>
   <div class="title-row">
-    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-30a</span></h1>
+    <h1>webSMLM <span class="pill">v0.13.0-dev · build 2026-10-30b</span></h1>
     <p style="font-size:12px">© 2026 Hohlbein et al. · <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a> · <a href="https://github.com/HohlbeinLab/webSMLM" target="_blank" rel="noopener">GitHub</a> · <a href="https://websmlm.readthedocs.io/en/latest/" target="_blank" rel="noopener">Read the Docs</a></p>
   </div>
   <div class="header-actions">
@@ -10208,10 +10208,16 @@ class SvgRecordingContext{
     const rootG=document.createElementNS(NS,'g'); this.svg.appendChild(rootG);
     this._stack=[rootG]; this._saveMarks=[]; this._clipId=0;
     this.fillStyle='#000'; this.strokeStyle='#000'; this.lineWidth=1;
-    this.font='10px sans-serif'; this.textAlign='start'; this.textBaseline='alphabetic';
+    this.font='10px sans-serif'; this.textAlign='start'; this.textBaseline='alphabetic'; this.globalAlpha=1;
     this._dash=null; this._d=''; this._arc=null; this._rectPending=null;
   }
   _cur(){ return this._stack[this._stack.length-1]; }
+  // Text width for layout code (legends, offset notation): measured on one real canvas in the current
+  // font, so a vector export lays out exactly like the PNG of the same plot.
+  measureText(t){
+    const c=SvgRecordingContext._measure||(SvgRecordingContext._measure=document.createElement('canvas').getContext('2d'));
+    c.font=this.font; return c.measureText(t);
+  }
   _pushGroup(transformStr){
     const NS='http://www.w3.org/2000/svg', g=document.createElementNS(NS,'g');
     if(transformStr) g.setAttribute('transform',transformStr);
@@ -10219,7 +10225,7 @@ class SvgRecordingContext{
   }
   save(){
     this._saveMarks.push({stackLen:this._stack.length, fillStyle:this.fillStyle, strokeStyle:this.strokeStyle,
-      lineWidth:this.lineWidth, font:this.font, textAlign:this.textAlign, textBaseline:this.textBaseline, dash:this._dash});
+      lineWidth:this.lineWidth, font:this.font, textAlign:this.textAlign, textBaseline:this.textBaseline, dash:this._dash, alpha:this.globalAlpha});
     this._pushGroup(null);   // fresh, childless group so a following clip()/transform can't retroactively affect prior siblings
   }
   restore(){
@@ -10227,7 +10233,7 @@ class SvgRecordingContext{
     const m=this._saveMarks.pop();
     this._stack.length=Math.max(1,m.stackLen);
     this.fillStyle=m.fillStyle; this.strokeStyle=m.strokeStyle; this.lineWidth=m.lineWidth;
-    this.font=m.font; this.textAlign=m.textAlign; this.textBaseline=m.textBaseline; this._dash=m.dash;
+    this.font=m.font; this.textAlign=m.textAlign; this.textBaseline=m.textBaseline; this._dash=m.dash; this.globalAlpha=m.alpha;
   }
   translate(x,y){ this._pushGroup(`translate(${x},${y})`); }
   rotate(rad){ this._pushGroup(`rotate(${rad*180/Math.PI})`); }
@@ -10236,6 +10242,9 @@ class SvgRecordingContext{
   beginPath(){ this._d=''; this._arc=null; }
   moveTo(x,y){ this._d+=`M${x} ${y} `; this._arc=null; }
   lineTo(x,y){ this._d+=`L${x} ${y} `; }
+  closePath(){ if(this._d) this._d+='Z '; }
+  // globalAlpha → the element's own opacity (canvas multiplies it into every draw call the same way).
+  _alpha(el){ if(this.globalAlpha<1) el.setAttribute('opacity',this.globalAlpha); return el; }
   arc(cx,cy,r){ this._arc={cx,cy,r}; }   // only ever used as a full-circle marker (arc(cx,cy,r,0,2π)) in these plots
   rect(x,y,w,h){ this._rectPending={x,y,w,h}; }   // only ever paired with clip() in these plots, never fill()/stroke()
   clip(){
@@ -10257,7 +10266,7 @@ class SvgRecordingContext{
   fillRect(x,y,w,h){
     const NS='http://www.w3.org/2000/svg', r=document.createElementNS(NS,'rect');
     r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h);
-    r.setAttribute('fill',this.fillStyle); this._cur().appendChild(r);
+    r.setAttribute('fill',this.fillStyle); this._cur().appendChild(this._alpha(r));
   }
   stroke(){
     if(!this._d) return;
@@ -10265,19 +10274,19 @@ class SvgRecordingContext{
     p.setAttribute('d',this._d.trim()); p.setAttribute('fill','none');
     p.setAttribute('stroke',this.strokeStyle); p.setAttribute('stroke-width',this.lineWidth);
     if(this._dash) p.setAttribute('stroke-dasharray',this._dash);
-    this._cur().appendChild(p);
+    this._cur().appendChild(this._alpha(p));
   }
   fill(){
     const NS='http://www.w3.org/2000/svg';
     if(this._arc){
       const c=document.createElementNS(NS,'circle');
       c.setAttribute('cx',this._arc.cx); c.setAttribute('cy',this._arc.cy); c.setAttribute('r',this._arc.r);
-      c.setAttribute('fill',this.fillStyle); this._cur().appendChild(c); return;
+      c.setAttribute('fill',this.fillStyle); this._cur().appendChild(this._alpha(c)); return;
     }
     if(!this._d) return;
     const p=document.createElementNS(NS,'path');
     p.setAttribute('d',this._d.trim()); p.setAttribute('fill',this.fillStyle); p.setAttribute('stroke','none');
-    this._cur().appendChild(p);
+    this._cur().appendChild(this._alpha(p));
   }
   fillText(str,x,y){
     const NS='http://www.w3.org/2000/svg', t=document.createElementNS(NS,'text'), f=this._font();
@@ -10285,7 +10294,7 @@ class SvgRecordingContext{
     t.setAttribute('font-family',f.family); t.setAttribute('font-size',f.size);
     t.setAttribute('text-anchor',this._anchor()); t.setAttribute('dominant-baseline',this._baseline());
     t.setAttribute('fill',this.fillStyle); t.textContent=str;
-    this._cur().appendChild(t);
+    this._cur().appendChild(this._alpha(t));
   }
   serialize(){ return new XMLSerializer().serializeToString(this.svg); }
 }
@@ -23718,7 +23727,8 @@ function applyTheme(name){
 }
 // Version banner as a log() entry (so it gets a comment marker). Update this
 // string on every build-letter bump.
-log(`webSMLM v0.13.0-dev · build 2026-10-30a — Simulation: Optics preset "Standard astigmatic 3D" (PSF), Depth model control (Advanced → PSF), Sample preset "Cell — microtubules"; microtubules take their depth from Focus height; out-of-focus emitters reach past the kernel range in the physical depth model. Localisation: Axial scale (RIMF) with From simulation. Workers that are slow to start are waited for, not dropped.
+log(`webSMLM v0.13.0-dev · build 2026-10-30b — Save plot/image as SVG: the vector recorder now supports measureText, closePath and globalAlpha, so the Compare-to-GT plots (and PCFO offset notation) export instead of failing.
+— from build 2026-10-30a: Simulation: Optics preset "Standard astigmatic 3D" (PSF), Depth model control (Advanced → PSF), Sample preset "Cell — microtubules"; microtubules take their depth from Focus height; out-of-focus emitters reach past the kernel range in the physical depth model. Localisation: Axial scale (RIMF) with From simulation. Workers that are slow to start are waited for, not dropped.
 — from build 2026-10-29h: Docs: Recipe H (Li et al. 2019) in the Simulation guide, every new field in the parameter tables, hints for the Sample preset, pits, Nup107, SAF and bead z / objects.
 — from build 2026-10-29g: Simulation: Sample preset — the calibration and test samples of Li et al. (2019) in one choice (beads on coverslip / in gel, pits, Nup107 pores).
 — from build 2026-10-29f: Compare to GT: per-object scores (NPC ring distance, pit flattening) → Show objects; axial failures; axial scale × RIMF; overlap K logged.

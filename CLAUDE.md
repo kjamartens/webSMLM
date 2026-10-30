@@ -569,7 +569,9 @@ writes everything; the physics underneath, all default-off so a seeded movie sta
   `psfWidthRatios()`, factored out of `psfUsableZRange()`), brightest plane when there is no
   astigmatism; anchors on a fixed depth ladder, cached, interpolated. Never the paraxial d·ni/ns
   (off by >1 µm at 5 µm). A higher plane index = objective further from the sample = emitter above
-  focus. `buildPsfKernelStack()` uses it for `focusIndex` when SAF/apod/physical is on.
+  focus. `buildPsfKernelStack()` uses it for `focusIndex` when SAF/apod/physical is on — but in the
+  objective depth model the stack itself stays centred on the paraxial focus, so at depth it is lopsided
+  (REFACTOR_PLAN); the physical model passes `sweepCenterM` and is centred.
 - **`simulation_depthMode`** ('objective' default | 'physical'; control "Depth model" in Advanced → PSF):
   physical = structure z is height relative to the sample depth (`simMovieDepthNm()`: Sample depth, or
   **Focus height** for microtubules — CellField measures z from it, so it IS the sample depth), objective

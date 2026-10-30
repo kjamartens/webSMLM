@@ -64,6 +64,29 @@ in [`../CHANGELOG.md`](../CHANGELOG.md); this file doesn't duplicate it.
   - **Longer cell movies**: `frames` stops at 5000 because the whole simulated stack is held in
     memory (128×128×5000 Float32 = 330 MB); a cell reconstruction wants 10–20k frames. Streaming the
     simulated stack (frames generated on demand by seed) would lift it.
+  - **Calibration self-test and a depth-indexed σ(z) store** (after Korovin et al., "Proximity-based
+    depth-dependent PSF calibration", qnano/diffspline): a gel bead stack is its own test set — nominal
+    z per frame from the stage and each bead's own σx = σy focus, no truth needed. Leave-one-bead-out
+    (candidates from other stacks) scores any rule: measured on three simulated gel stacks (25 beads,
+    ±500 nm) the coverslip calibration gives mean RMS 95 nm / median slope 0.64, nearest-depth
+    calibration 32 nm / 0.99, linear interpolation between bracketing depths 31 nm, mean of three 33 nm,
+    non-uniform Catmull-Rom 35 nm and worst where the knot spacing is irregular (overshoot). Pieces that
+    exist: `scoreTruthCore()`'s `beadZ` crossing finder (needs only `fObj` + bead identity, from **Fix
+    bead x,y** on real data), `robustQuad()` per bead, `zFromWidths()` as a lookup. New: the per-bead
+    store, the LOO report (flagged beads, gap to the nearest calibration, recommended rule, usable depth
+    range) in a calibration JSON v3, a **Sample depth** field at Localize. The RIMF stays a separate,
+    external scale (assigned depth is objective travel: 1.24× the true depth on these stacks).
+    Validate on the 4TU data (doi 10.4121/5f75fadc-8f80-4e27-a049-1137031b19c0) before freezing a
+    default; the simulator has no bead-to-bead shape variation, so averaging's benefit cannot be judged
+    on it.
+  - **Objective-mode kernel stacks at depth are centred on the paraxial focus.** With SAF/apodisation
+    on and Sample depth > 0 in the objective depth model, `buildPsfKernelStack()` sweeps ±PSF z range
+    about `ti0 − d·ni/ns` and then finds the measured focus inside that stack: at 2 µm the focus sits
+    343 nm off centre, so the stack covers 160 nm on one side (`zUsableNm` reports 160; centred on the
+    measured focus it is 460) and Preview PSF / a deep objective-mode movie see a truncated range. The
+    physical depth model re-centres every bin (`sweepCenterM`) and is unaffected, as are all presets.
+    Fix: take `sweepCenterM = ti0 − f0(d)` from `psfFocusMap()` before building instead of locating the
+    focus afterwards; re-run `test-depth-sim.mjs` (2)–(3) and the Preview PSF slider.
   - **The 340 nm ring-distance sign**: here the trend comes from the focus scale f0′ changing near
     the glass (c −0.25), in the paper from the defocus asymmetry of a cubic-spline fit (c +0.55).
     Re-check once a PSF-model fitter exists — it should move toward the paper if that explanation is
